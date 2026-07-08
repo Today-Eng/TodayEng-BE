@@ -1,5 +1,6 @@
 package com.example.todayEng.global.common;
 
+
 import com.example.todayEng.global.error.ErrorCode;
 import lombok.Getter;
 
@@ -32,6 +33,10 @@ public class ApiResponse<T> {
 
     public static ApiResponse<Void> error(ErrorCode errorCode) {
         return new ApiResponse<>(false, errorCode.getCode(), errorCode.getMessage(), null);
+    }
+
+    public static ApiResponse<Void> error(ErrorCode errorCode, String message) {
+        return new ApiResponse<>(false, errorCode.getCode(), message, null);
     }
 
     public static <T> ApiResponse<T> error(ErrorCode errorCode, T data) {
