@@ -1,0 +1,31 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: todayeng-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: today_eng
+      MYSQL_USER: todayeng
+      MYSQL_PASSWORD: todayeng1234
+      MYSQL_ROOT_PASSWORD: root1234
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - todayeng-mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -uroot -proot1234 --silent"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  todayeng-mysql-data:
