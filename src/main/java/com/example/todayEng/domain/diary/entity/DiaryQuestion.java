@@ -2,6 +2,8 @@ package com.example.todayEng.domain.diary.entity;
 
 import com.example.todayEng.domain.diary.entity.enums.QuestionGenerationType;
 import com.example.todayEng.domain.diary.entity.enums.QuestionType;
+import com.example.todayEng.global.error.ErrorCode;
+import com.example.todayEng.global.error.exception.BaseException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -134,23 +136,17 @@ public class DiaryQuestion {
             DiaryQuestion parentQuestion
     ) {
         if (questionType == QuestionType.MAIN && parentQuestion != null) {
-            throw new IllegalArgumentException(
-                    "메인 질문에는 상위 질문을 지정할 수 없습니다."
-            );
+            throw new BaseException(ErrorCode.MAIN_QUESTION_CANNOT_HAVE_PARENT);
         }
 
         if (questionType == QuestionType.FOLLOW_UP
                 && parentQuestion == null) {
-            throw new IllegalArgumentException(
-                    "후속 질문에는 메인 질문이 필요합니다."
-            );
+            throw new BaseException(ErrorCode.FOLLOW_UP_QUESTION_REQUIRES_PARENT);
         }
 
         if (parentQuestion != null
                 && parentQuestion.questionType != QuestionType.MAIN) {
-            throw new IllegalArgumentException(
-                    "후속 질문의 상위 질문은 메인 질문이어야 합니다."
-            );
+            throw new BaseException(ErrorCode.FOLLOW_UP_PARENT_MUST_BE_MAIN_QUESTION);
         }
     }
 
@@ -159,9 +155,7 @@ public class DiaryQuestion {
             String keyword
     ) {
         if (questionType == QuestionType.FOLLOW_UP && keyword != null) {
-            throw new IllegalArgumentException(
-                    "후속 질문에는 키워드를 지정할 수 없습니다."
-            );
+            throw new BaseException(ErrorCode.FOLLOW_UP_QUESTION_CANNOT_HAVE_KEYWORD);
         }
     }
 }
