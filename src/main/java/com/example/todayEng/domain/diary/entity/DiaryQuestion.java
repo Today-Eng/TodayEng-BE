@@ -67,7 +67,7 @@ public class DiaryQuestion {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Builder
+    @Builder(access = AccessLevel.PRIVATE)
     private DiaryQuestion(
             Diary diary,
             DiaryQuestion parentQuestion,

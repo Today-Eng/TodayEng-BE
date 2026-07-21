@@ -60,7 +60,7 @@ public class Diary {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
-    @Builder
+    @Builder(access = AccessLevel.PRIVATE)
     private Diary(
             Long userId,
             LocalDate diaryDate,

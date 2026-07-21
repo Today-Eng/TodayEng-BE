@@ -67,7 +67,7 @@ public class DiaryAnswer {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Builder
+    @Builder(access = AccessLevel.PRIVATE)
     private DiaryAnswer(
             DiaryQuestion question,
             String originalText

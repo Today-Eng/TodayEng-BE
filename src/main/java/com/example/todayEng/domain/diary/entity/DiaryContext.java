@@ -52,7 +52,7 @@ public class DiaryContext {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Builder
+    @Builder(access = AccessLevel.PRIVATE)
     private DiaryContext(
             Diary diary,
             DiaryContextType contextType,
