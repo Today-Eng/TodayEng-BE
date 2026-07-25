@@ -1,5 +1,6 @@
 package com.example.todayEng.domain.user.entity;
 
+import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -30,7 +31,9 @@ public class Notification extends BaseTimeEntity {
             name = "user_id",
             nullable = false,
             unique = true,
-            foreignKey = @ForeignKey(name = "fk_notification_setting_user")
+            foreignKey = @ForeignKey(
+                    name = "fk_notification_setting_user"
+            )
     )
     private User user;
 
@@ -46,7 +49,10 @@ public class Notification extends BaseTimeEntity {
     @Column(name = "auth_key", length = 255)
     private String authKey;
 
-    private Notification(User user, boolean useEnabled) {
+    private Notification(
+            User user,
+            boolean useEnabled
+    ) {
         this.user = user;
         this.useEnabled = useEnabled;
     }
@@ -55,7 +61,10 @@ public class Notification extends BaseTimeEntity {
         return new Notification(user, true);
     }
 
-    public static Notification create(User user, boolean useEnabled) {
+    public static Notification create(
+            User user,
+            boolean useEnabled
+    ) {
         return new Notification(user, useEnabled);
     }
 
@@ -81,7 +90,7 @@ public class Notification extends BaseTimeEntity {
         this.authKey = authKey;
     }
 
-    public void deletePushSubscription() {
+    public void clearPushSubscription() {
         this.pushEndpoint = null;
         this.p256dhKey = null;
         this.authKey = null;
