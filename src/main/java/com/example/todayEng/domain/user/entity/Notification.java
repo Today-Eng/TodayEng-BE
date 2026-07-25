@@ -42,6 +42,15 @@ import lombok.NoArgsConstructor;
         @Column(name = "use_enabled", nullable = false)
         private boolean useEnabled;
 
+        @Column(name = "push_endpoint", length = 500)
+        private String pushEndpoint;
+
+        @Column(name = "p256dh_key", length = 255)
+        private String p256dhKey;
+
+        @Column(name = "auth_key", length = 255)
+        private String authKey;
+
         private Notification(
                 User user,
                 boolean useEnabled
@@ -71,5 +80,22 @@ import lombok.NoArgsConstructor;
 
         public void disable() {
             this.useEnabled = false;
+        }
+
+
+        public void updatePushSubscription(
+                String pushEndpoint,
+                String p256dhKey,
+                String authKey
+        ) {
+            this.pushEndpoint = pushEndpoint;
+            this.p256dhKey = p256dhKey;
+            this.authKey = authKey;
+        }
+
+        public void deletePushSubscription() {
+            this.pushEndpoint = null;
+            this.p256dhKey = null;
+            this.authKey = null;
         }
     }
