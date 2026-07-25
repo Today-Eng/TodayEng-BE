@@ -1,6 +1,5 @@
 package com.example.todayEng.domain.user.entity;
 
-import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
