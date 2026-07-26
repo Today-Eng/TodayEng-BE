@@ -9,14 +9,18 @@ reviews:
     enabled: true
     drafts: false
   path_instructions:
-    - path: "src/components/**"
-      instructions: "재사용 가능한 공통 컴포넌트입니다. props 타입 정의, 접근성(a11y), 재사용성을 중점적으로 검토해주세요."
-    - path: "src/features/**"
-      instructions: "기능별 모듈입니다. 비즈니스 로직의 명확성과 컴포넌트 분리가 적절한지 검토해주세요."
-    - path: "src/**/*.tsx"
-      instructions: "React + TypeScript 컴포넌트입니다. 타입 안전성, 훅 사용 규칙(exhaustive-deps), 불필요한 리렌더링을 검토해주세요."
-    - path: "tailwind.config.js"
-      instructions: "Tailwind 설정 파일입니다. 커스텀 토큰이 디자인 시스템과 일치하는지 확인해주세요."
+    - path: "src/main/java/**"
+      instructions: "Spring Boot 비즈니스 로직입니다. 레이어 분리(Controller/Service/Repository)가 적절한지, 트랜잭션 처리, 예외 처리가 올바른지 검토해주세요."
+    - path: "src/main/java/**/controller/**"
+      instructions: "API 컨트롤러입니다. HTTP 메서드와 상태 코드가 RESTful 규칙에 맞는지, 요청/응답 DTO 사용 여부를 검토해주세요."
+    - path: "src/main/java/**/service/**"
+      instructions: "서비스 레이어입니다. 트랜잭션 범위, 비즈니스 로직의 응집도, 불필요한 의존성 여부를 검토해주세요."
+    - path: "src/main/java/**/repository/**"
+      instructions: "JPA Repository입니다. N+1 문제, 불필요한 쿼리, 인덱스 활용 여부를 검토해주세요."
+    - path: "src/main/java/**/entity/**"
+      instructions: "JPA 엔티티입니다. 연관관계 설정, FetchType, cascade 옵션이 적절한지 검토해주세요."
+    - path: "src/test/**"
+      instructions: "테스트 코드입니다. 테스트 커버리지, given-when-then 구조, Mock 사용이 적절한지 검토해주세요."
 
 chat:
   auto_reply: true
