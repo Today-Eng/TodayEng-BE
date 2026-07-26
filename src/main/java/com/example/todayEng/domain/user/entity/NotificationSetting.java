@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Notification extends BaseTimeEntity {
+public class NotificationSetting extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,7 +29,6 @@ public class Notification extends BaseTimeEntity {
     @JoinColumn(
             name = "user_id",
             nullable = false,
-            unique = true,
             foreignKey = @ForeignKey(
                     name = "fk_notification_setting_user"
             )
@@ -39,7 +38,7 @@ public class Notification extends BaseTimeEntity {
     @Column(name = "use_enabled", nullable = false)
     private boolean useEnabled;
 
-    @Column(name = "push_endpoint", length = 500)
+    @Column(name = "push_endpoint", length = 1000)
     private String pushEndpoint;
 
     @Column(name = "p256dh_key", length = 255)
@@ -48,30 +47,22 @@ public class Notification extends BaseTimeEntity {
     @Column(name = "auth_key", length = 255)
     private String authKey;
 
-    private Notification(
-            User user,
-            boolean useEnabled
-    ) {
+    private NotificationSetting(User user) {
         this.user = user;
-        this.useEnabled = useEnabled;
+        this.useEnabled = false;
     }
 
-    public static Notification createDefault(User user) {
-        return new Notification(user, true);
-    }
-
-    public static Notification create(
-            User user,
-            boolean useEnabled
-    ) {
-        return new Notification(user, useEnabled);
-    }
-
-    public void updateEnabled(boolean useEnabled) {
-        this.useEnabled = useEnabled;
+    public static NotificationSetting create(User user) {
+        return new NotificationSetting(user);
     }
 
     public void enable() {
+        if (!hasPushSubscription()) {
+            throw new IllegalStateException(
+                    "푸시 구독 정보가 없어 알림을 활성화할 수 없습니다."
+            );
+        }
+
         this.useEnabled = true;
     }
 
@@ -84,14 +75,34 @@ public class Notification extends BaseTimeEntity {
             String p256dhKey,
             String authKey
     ) {
+        if (isBlank(pushEndpoint)
+                || isBlank(p256dhKey)
+                || isBlank(authKey)) {
+            throw new IllegalArgumentException(
+                    "푸시 구독 정보는 모두 입력되어야 합니다."
+            );
+        }
+
         this.pushEndpoint = pushEndpoint;
         this.p256dhKey = p256dhKey;
         this.authKey = authKey;
+        this.useEnabled = true;
     }
 
     public void clearPushSubscription() {
         this.pushEndpoint = null;
         this.p256dhKey = null;
         this.authKey = null;
+        this.useEnabled = false;
+    }
+
+    private boolean hasPushSubscription() {
+        return !isBlank(pushEndpoint)
+                && !isBlank(p256dhKey)
+                && !isBlank(authKey);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
