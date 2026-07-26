@@ -1,0 +1,22 @@
+language: "ko-KR"
+
+reviews:
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "src/components/**"
+      instructions: "재사용 가능한 공통 컴포넌트입니다. props 타입 정의, 접근성(a11y), 재사용성을 중점적으로 검토해주세요."
+    - path: "src/features/**"
+      instructions: "기능별 모듈입니다. 비즈니스 로직의 명확성과 컴포넌트 분리가 적절한지 검토해주세요."
+    - path: "src/**/*.tsx"
+      instructions: "React + TypeScript 컴포넌트입니다. 타입 안전성, 훅 사용 규칙(exhaustive-deps), 불필요한 리렌더링을 검토해주세요."
+    - path: "tailwind.config.js"
+      instructions: "Tailwind 설정 파일입니다. 커스텀 토큰이 디자인 시스템과 일치하는지 확인해주세요."
+
+chat:
+  auto_reply: true
