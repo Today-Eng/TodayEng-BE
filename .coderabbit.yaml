@@ -1,26 +1,54 @@
+# ---------------------------------------------------------------- #
+# CodeRabbit AI 설정
+# ---------------------------------------------------------------- #
+
+# 응답 기본 언어 설정
 language: "ko-KR"
 
+# AI 페르소나 및 톤앤매너 지시
+tone_instructions: >
+  1. 피드백은 명확하고 구체적이어야 하며, 문제의 원인과 개선 방법을 반드시 제시하세요.
+  2. 리뷰는 교육적이어야 하며, 관련 개념이나 공식 문서를 함께 추천하세요.
+  3. 비판보다는 개선 중심의 제안을 우선하세요.
+  4. 칭찬은 짧고 위트 있게 작성하세요.
+
+# ---------------------------------------------------------------- #
+# 코드 리뷰 기능 세부 설정
+# ---------------------------------------------------------------- #
 reviews:
-  high_level_summary: true
-  poem: false
-  review_status: true
-  collapse_walkthrough: false
+  profile: "chill"                  # 리뷰 전반 스타일 (부드러운 톤)
+  request_changes_workflow: false   # 코멘트 resolve 시 자동 Approve 처리
+  high_level_summary: true          # PR 변경 사항 고수준 요약 활성화
+  collapse_walkthrough: true        # 워크스루 코멘트 접기 활성화
+  changed_files_summary: true       # 변경된 파일별 요약 생성
+  sequence_diagrams: true           # 실행 흐름 시퀀스 다이어그램 생성
+  assess_linked_issues: true        # 연결된 이슈 분석 컨텍스트 활용
+  related_issues: false             # 연관 다른 이슈 링크 비활성화
+  related_prs: true                 # 연관 다른 PR 링크 활성화
+  suggested_labels: false           # 적절한 레이블 제안 비활성화
+  auto_apply_labels: false          # 제안 레이블 자동 적용 비활성화
+  suggested_reviewers: false        # 동료 리뷰어 추천 비활성화
+  auto_assign_reviewers: false      # 추천 리뷰어 자동 할당 비활성화
+  poem: true                        # 리뷰 요약에 위트 있는 시 포함 활성화
+
+  # ---------------------------------------------------------------- #
+  # 자동 리뷰 트리거 설정
+  # ---------------------------------------------------------------- #
   auto_review:
     enabled: true
-    drafts: false
-  path_instructions:
-    - path: "src/main/java/**"
-      instructions: "Spring Boot 비즈니스 로직입니다. 레이어 분리(Controller/Service/Repository)가 적절한지, 트랜잭션 처리, 예외 처리가 올바른지 검토해주세요."
-    - path: "src/main/java/**/controller/**"
-      instructions: "API 컨트롤러입니다. HTTP 메서드와 상태 코드가 RESTful 규칙에 맞는지, 요청/응답 DTO 사용 여부를 검토해주세요."
-    - path: "src/main/java/**/service/**"
-      instructions: "서비스 레이어입니다. 트랜잭션 범위, 비즈니스 로직의 응집도, 불필요한 의존성 여부를 검토해주세요."
-    - path: "src/main/java/**/repository/**"
-      instructions: "JPA Repository입니다. N+1 문제, 불필요한 쿼리, 인덱스 활용 여부를 검토해주세요."
-    - path: "src/main/java/**/entity/**"
-      instructions: "JPA 엔티티입니다. 연관관계 설정, FetchType, cascade 옵션이 적절한지 검토해주세요."
-    - path: "src/test/**"
-      instructions: "테스트 코드입니다. 테스트 커버리지, given-when-then 구조, Mock 사용이 적절한지 검토해주세요."
+    auto_incremental_review: true   # 추가 커밋 시 변경된 부분만 자동 리뷰
 
+# ---------------------------------------------------------------- #
+# 채팅 기능 설정
+# ---------------------------------------------------------------- #
 chat:
-  auto_reply: true
+  auto_reply: true                  # 태그하지 않아도 자동 답글 활성화
+
+# ---------------------------------------------------------------- #
+# CodeRabbit의 지식 기반(Knowledge Base) 설정
+# ---------------------------------------------------------------- #
+knowledge_base:
+  web_search:
+    enabled: true                   # 최신 문서 검색 허용
+  code_guidelines:
+    enabled: true
