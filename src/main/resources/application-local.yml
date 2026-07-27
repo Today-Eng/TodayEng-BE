@@ -18,6 +18,9 @@ spring:
 cors:
   allowed-origins: http://localhost:3000,http://localhost:5173
 
+google:
+  client-id: ${GOOGLE_CLIENT_ID:local-google-client-id-not-configured}
+
 logging:
   level:
     org.hibernate.SQL: debug
