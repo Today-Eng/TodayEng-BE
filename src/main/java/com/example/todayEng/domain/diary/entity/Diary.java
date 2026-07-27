@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -20,7 +21,15 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 @Getter
 @Entity
-@Table(name = "diary")
+@Table(
+        name = "diary",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_diary_user_date",
+                        columnNames = {"user_id", "diary_date"}
+                )
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Diary {
 
@@ -46,7 +55,7 @@ public class Diary {
     @Column(name = "status", nullable = false, length = 20)
     private DiaryStatus status;
 
-    @Column(name = "memo", length = 500)
+    @Column(name = "memo", length = 200)
     private String memo;
 
     @CreationTimestamp
@@ -63,24 +72,20 @@ public class Diary {
     @Builder(access = AccessLevel.PRIVATE)
     private Diary(
             Long userId,
-            LocalDate diaryDate,
-            String memo
+            LocalDate diaryDate
     ) {
         this.userId = userId;
         this.diaryDate = diaryDate;
-        this.memo = memo;
         this.status = DiaryStatus.IN_PROGRESS;
     }
 
     public static Diary create(
             Long userId,
-            LocalDate diaryDate,
-            String memo
+            LocalDate diaryDate
     ) {
         return Diary.builder()
                 .userId(userId)
                 .diaryDate(diaryDate)
-                .memo(memo)
                 .build();
     }
 

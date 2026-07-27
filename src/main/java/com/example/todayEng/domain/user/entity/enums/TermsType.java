@@ -43,10 +43,22 @@ public enum TermsType {
             6
     ),
 
+    LOCATION_INFORMATION_COLLECTION(
+            "위치정보 수집 및 이용 동의",
+            false,
+            7
+    ),
+
+    PHOTO_EXIF_LOCATION_COLLECTION(
+            "사진 EXIF 위치정보(GPS) 수집 및 이용 동의",
+            false,
+            8
+    ),
+
     MARKETING_INFORMATION_RECEIVE(
             "마케팅 정보 수신 동의",
             false,
-            7
+            9
     );
 
     private final String displayName;

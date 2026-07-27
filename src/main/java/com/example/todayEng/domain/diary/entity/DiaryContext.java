@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -24,7 +25,15 @@ import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
-@Table(name = "diary_context")
+@Table(
+        name = "diary_context",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_diary_context_diary_type",
+                        columnNames = {"diary_id", "context_type"}
+                )
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DiaryContext {
 
@@ -92,5 +101,10 @@ public class DiaryContext {
     public void updateContextData(JsonNode contextData) {
         this.contextData = contextData;
         this.success = true;
+    }
+
+    public void markFailed() {
+        this.contextData = null;
+        this.success = false;
     }
 }

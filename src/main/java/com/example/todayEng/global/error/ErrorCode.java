@@ -49,7 +49,9 @@ public enum ErrorCode {
     MAIN_QUESTION_CANNOT_HAVE_PARENT(HttpStatus.BAD_REQUEST, "D001", "메인 질문에는 상위 질문을 지정할 수 없습니다."),
     FOLLOW_UP_QUESTION_REQUIRES_PARENT(HttpStatus.BAD_REQUEST, "D002", "후속 질문에는 메인 질문이 필요합니다."),
     FOLLOW_UP_PARENT_MUST_BE_MAIN_QUESTION(HttpStatus.BAD_REQUEST,"D003","후속 질문의 상위 질문은 메인 질문이어야 합니다."),
-    FOLLOW_UP_QUESTION_CANNOT_HAVE_KEYWORD(HttpStatus.BAD_REQUEST, "D004", "후속 질문에는 키워드를 지정할 수 없습니다.")
+    FOLLOW_UP_QUESTION_CANNOT_HAVE_KEYWORD(HttpStatus.BAD_REQUEST, "D004", "후속 질문에는 키워드를 지정할 수 없습니다."),
+    DEFAULT_GENERATION_REQUIRES_DEFAULT_QUESTION(HttpStatus.BAD_REQUEST, "D005", "생성 방식이 DEFAULT인 질문에는 기본 질문이 필요합니다."),
+    AI_GENERATION_CANNOT_HAVE_DEFAULT_QUESTION(HttpStatus.BAD_REQUEST, "D006", "생성 방식이 AI인 질문에는 기본 질문을 지정할 수 없습니다.")
 
     ;
 

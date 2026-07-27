@@ -1,19 +1,34 @@
 package com.example.todayEng.domain.user.entity;
 
-import com.example.todayEng.domain.user.entity.enums.AuthProvider;
+import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.global.common.BaseTimeEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Getter
 @Entity
 @Table(
         name = "external_account",
         uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_external_account_user_provider",
+                        columnNames = {"user_id", "provider"}
+                ),
                 @UniqueConstraint(
                         name = "uk_external_account_provider_account",
                         columnNames = {"provider", "provider_account_id"}
@@ -28,27 +43,54 @@ public class ExternalAccount extends BaseTimeEntity {
     @Column(name = "external_account_id")
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "user_id",
             nullable = false,
-            unique = true,
-            foreignKey = @ForeignKey(name = "fk_external_account_user")
+            foreignKey = @ForeignKey(
+                    name = "fk_external_account_user"
+            )
     )
     private User user;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "provider", nullable = false, length = 20)
-    private AuthProvider provider;
+    @Column(name = "provider", nullable = false, length = 30)
+    private ExternalServiceProvider provider;
 
     /*
-     * Google이 발급한 사용자 고유 식별자(sub).
-     * 이메일보다 변경 가능성이 낮으므로 로그인 식별값으로 사용한다.
+     * 계정 연동은 유지하면서 해당 외부 서비스의 데이터를
+     * 회고 질문 생성에 사용할지를 나타냅니다.
      */
-    @Column(name = "provider_account_id", nullable = false, length = 255)
+    @Column(name = "use_enabled", nullable = false)
+    private boolean useEnabled;
+
+    /*
+     * 외부 서비스가 발급한 계정 고유 식별값입니다.
+     * Google Calendar는 Google 계정의 sub,
+     * Spotify는 Spotify 사용자 ID를 저장합니다.
+     *
+     * TodayEng 로그인에 사용한 계정의 식별값과는 별개입니다.
+     */
+    @Column(
+            name = "provider_account_id",
+            nullable = false,
+            length = 255
+    )
     private String providerAccountId;
 
-    @Column(name = "access_token", columnDefinition = "TEXT")
+    /*
+     * 연동 관리 화면에 표시할 계정 정보입니다.
+     * Google Calendar는 이메일,
+     * Spotify는 이메일 또는 표시 이름을 저장할 수 있습니다.
+     */
+    @Column(name = "account_identifier", length = 255)
+    private String accountIdentifier;
+
+    @Column(
+            name = "access_token",
+            nullable = false,
+            columnDefinition = "TEXT"
+    )
     private String accessToken;
 
     @Column(name = "refresh_token", columnDefinition = "TEXT")
@@ -62,8 +104,9 @@ public class ExternalAccount extends BaseTimeEntity {
 
     private ExternalAccount(
             User user,
-            AuthProvider provider,
+            ExternalServiceProvider provider,
             String providerAccountId,
+            String accountIdentifier,
             String accessToken,
             String refreshToken,
             LocalDateTime tokenExpiresAt
@@ -71,23 +114,46 @@ public class ExternalAccount extends BaseTimeEntity {
         this.user = user;
         this.provider = provider;
         this.providerAccountId = providerAccountId;
+        this.accountIdentifier = accountIdentifier;
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
         this.tokenExpiresAt = tokenExpiresAt;
         this.connectedAt = LocalDateTime.now();
+        this.useEnabled = true;
     }
 
-    public static ExternalAccount createGoogleAccount(
+    public static ExternalAccount createGoogleCalendarAccount(
             User user,
             String providerAccountId,
+            String accountIdentifier,
             String accessToken,
             String refreshToken,
             LocalDateTime tokenExpiresAt
     ) {
         return new ExternalAccount(
                 user,
-                AuthProvider.GOOGLE,
+                ExternalServiceProvider.GOOGLE_CALENDAR,
                 providerAccountId,
+                accountIdentifier,
+                accessToken,
+                refreshToken,
+                tokenExpiresAt
+        );
+    }
+
+    public static ExternalAccount createSpotifyAccount(
+            User user,
+            String providerAccountId,
+            String accountIdentifier,
+            String accessToken,
+            String refreshToken,
+            LocalDateTime tokenExpiresAt
+    ) {
+        return new ExternalAccount(
+                user,
+                ExternalServiceProvider.SPOTIFY,
+                providerAccountId,
+                accountIdentifier,
                 accessToken,
                 refreshToken,
                 tokenExpiresAt
@@ -108,9 +174,19 @@ public class ExternalAccount extends BaseTimeEntity {
         this.tokenExpiresAt = tokenExpiresAt;
     }
 
-    public void clearTokens() {
-        this.accessToken = null;
-        this.refreshToken = null;
-        this.tokenExpiresAt = null;
+    public void updateAccountIdentifier(String accountIdentifier) {
+        this.accountIdentifier = accountIdentifier;
+    }
+
+    public void updateUseEnabled(boolean useEnabled) {
+        this.useEnabled = useEnabled;
+    }
+
+    public void enableUse() {
+        this.useEnabled = true;
+    }
+
+    public void disableUse() {
+        this.useEnabled = false;
     }
 }
