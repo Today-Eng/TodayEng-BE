@@ -41,6 +41,10 @@ public class DiaryQuestion {
     @JoinColumn(name = "parent_question_id")
     private DiaryQuestion parentQuestion;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "default_question_id")
+    private DefaultQuestion defaultQuestion;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "question_type", nullable = false, length = 20)
     private QuestionType questionType;
@@ -73,6 +77,7 @@ public class DiaryQuestion {
     private DiaryQuestion(
             Diary diary,
             DiaryQuestion parentQuestion,
+            DefaultQuestion defaultQuestion,
             QuestionType questionType,
             Integer questionOrder,
             String questionText,
@@ -82,9 +87,11 @@ public class DiaryQuestion {
     ) {
         validateParentQuestion(questionType, parentQuestion);
         validateKeyword(questionType, keyword);
+        validateDefaultQuestion(generationType, defaultQuestion);
 
         this.diary = diary;
         this.parentQuestion = parentQuestion;
+        this.defaultQuestion = defaultQuestion;
         this.questionType = questionType;
         this.questionOrder = questionOrder;
         this.questionText = questionText;
@@ -99,7 +106,8 @@ public class DiaryQuestion {
             String questionText,
             QuestionGenerationType generationType,
             String koreanTranslation,
-            String keyword
+            String keyword,
+            DefaultQuestion defaultQuestion
     ) {
         return DiaryQuestion.builder()
                 .diary(diary)
@@ -109,6 +117,7 @@ public class DiaryQuestion {
                 .generationType(generationType)
                 .koreanTranslation(koreanTranslation)
                 .keyword(keyword)
+                .defaultQuestion(defaultQuestion)
                 .build();
     }
 
@@ -156,6 +165,19 @@ public class DiaryQuestion {
     ) {
         if (questionType == QuestionType.FOLLOW_UP && keyword != null) {
             throw new BaseException(ErrorCode.FOLLOW_UP_QUESTION_CANNOT_HAVE_KEYWORD);
+        }
+    }
+
+    private static void validateDefaultQuestion(
+            QuestionGenerationType generationType,
+            DefaultQuestion defaultQuestion
+    ) {
+        if (generationType == QuestionGenerationType.DEFAULT && defaultQuestion == null) {
+            throw new BaseException(ErrorCode.DEFAULT_GENERATION_REQUIRES_DEFAULT_QUESTION);
+        }
+
+        if (generationType == QuestionGenerationType.AI && defaultQuestion != null) {
+            throw new BaseException(ErrorCode.AI_GENERATION_CANNOT_HAVE_DEFAULT_QUESTION);
         }
     }
 }
