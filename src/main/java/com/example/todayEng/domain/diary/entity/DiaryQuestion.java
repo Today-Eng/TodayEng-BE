@@ -126,7 +126,6 @@ public class DiaryQuestion {
             DiaryQuestion parentQuestion,
             Integer questionOrder,
             String questionText,
-            QuestionGenerationType generationType,
             String koreanTranslation
     ) {
         return DiaryQuestion.builder()
@@ -135,7 +134,7 @@ public class DiaryQuestion {
                 .questionType(QuestionType.FOLLOW_UP)
                 .questionOrder(questionOrder)
                 .questionText(questionText)
-                .generationType(generationType)
+                .generationType(QuestionGenerationType.AI)
                 .koreanTranslation(koreanTranslation)
                 .build();
     }
