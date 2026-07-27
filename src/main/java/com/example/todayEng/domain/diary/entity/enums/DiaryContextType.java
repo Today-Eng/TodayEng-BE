@@ -4,6 +4,7 @@ public enum DiaryContextType {
     CALENDAR,
     WEATHER,
     PHOTO,
-    USER_MEMO,
-    DIARY_MEMORY
+    MEMO,
+    DIARY_MEMORY,
+    SPOTIFY
 }
