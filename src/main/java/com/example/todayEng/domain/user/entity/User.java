@@ -84,6 +84,10 @@ public class User extends BaseTimeEntity {
         this.englishLevel = englishLevel;
     }
 
+    public boolean isOnboardingCompleted() {
+        return nickname != null && englishLevel != null;
+    }
+
     public void increaseDiaryCount() {
         this.totalDiaryCount++;
     }

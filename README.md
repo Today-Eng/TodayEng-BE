@@ -5,6 +5,12 @@
 - **Language** : Java 17
 - **Framework** : Spring boot 3.3.4
 - **Database** : MySQL
+
+## 인증 환경 변수
+
+- `JWT_SECRET`: HS256 서명용 32바이트 이상의 비밀키
+- `GOOGLE_CLIENT_ID`: Google OAuth 웹 클라이언트 ID
+- 인증 API는 `POST /auth/google` 요청 바디로 `{"idToken":"..."}`을 받습니다.
 - 
 ## 📋 Commit Convention
 | type       | name                    | description     |
