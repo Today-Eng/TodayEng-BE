@@ -1,0 +1,8 @@
+.git
+.github
+.gradle
+.idea
+*.iml
+README.md
+docker-compose.local.yml
+src/test

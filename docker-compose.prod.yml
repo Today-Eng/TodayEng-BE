@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ${DOCKERHUB_USERNAME}/todayeng-be:latest
+    container_name: todayeng-app
+    restart: unless-stopped
+
+    env_file:
+      - /opt/todayeng/.env
+
+    ports:
+      - "8080:8080" # 추후 Nginx 붙이면 내부 접근만 허용하도록 수정
