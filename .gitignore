@@ -37,3 +37,7 @@ bin/
 
 ### DOCS ###
 docs/
+
+### ETC ###
+.claude
+CLAUDE.md
