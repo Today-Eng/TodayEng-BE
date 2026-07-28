@@ -21,6 +21,7 @@ public enum ErrorCode {
     MISSING_REQUEST_PARAMETER(HttpStatus.BAD_REQUEST, "C007", "필수 요청 파라미터가 누락되었습니다."),
     INVALID_HTTP_BODY(HttpStatus.BAD_REQUEST, "C008", "HTTP 요청 바디(JSON) 파싱에 실패했습니다."),
     MULTIPART_FILE_ERROR(HttpStatus.BAD_REQUEST, "C009", "파일 업로드 처리 중 오류가 발생했습니다."),
+    DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "C010", "이미 존재하는 리소스입니다."),
 
 
     // Auth (A)
@@ -42,7 +43,17 @@ public enum ErrorCode {
     FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "E001", "S3 파일 업로드에 실패했습니다."),
     FILE_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "E002", "파일 업로드 용량을 초과했습니다."),
     INVALID_FILE_EXTENSION(HttpStatus.BAD_REQUEST, "E003", "허용되지 않는 파일 확장자입니다."),
-    EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "E004", "외부 연동 API 호출에 실패했습니다.");
+    EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "E004", "외부 연동 API 호출에 실패했습니다."),
+
+    // Diary (D)
+    MAIN_QUESTION_CANNOT_HAVE_PARENT(HttpStatus.BAD_REQUEST, "D001", "메인 질문에는 상위 질문을 지정할 수 없습니다."),
+    FOLLOW_UP_QUESTION_REQUIRES_PARENT(HttpStatus.BAD_REQUEST, "D002", "후속 질문에는 메인 질문이 필요합니다."),
+    FOLLOW_UP_PARENT_MUST_BE_MAIN_QUESTION(HttpStatus.BAD_REQUEST,"D003","후속 질문의 상위 질문은 메인 질문이어야 합니다."),
+    FOLLOW_UP_QUESTION_CANNOT_HAVE_KEYWORD(HttpStatus.BAD_REQUEST, "D004", "후속 질문에는 키워드를 지정할 수 없습니다."),
+    DEFAULT_GENERATION_REQUIRES_DEFAULT_QUESTION(HttpStatus.BAD_REQUEST, "D005", "생성 방식이 DEFAULT인 질문에는 기본 질문이 필요합니다."),
+    AI_GENERATION_CANNOT_HAVE_DEFAULT_QUESTION(HttpStatus.BAD_REQUEST, "D006", "생성 방식이 AI인 질문에는 기본 질문을 지정할 수 없습니다.")
+
+    ;
 
     private final HttpStatus status;
     private final String code;
