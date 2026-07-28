@@ -12,6 +12,7 @@ import com.example.todayEng.global.error.exception.BaseException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class DiaryService {
 
     private static final int DIARY_WRITABLE_PERIOD_DAYS = 7;
     private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
+    private static final String DIARY_USER_DATE_UNIQUE_CONSTRAINT = "uk_diary_user_date";
 
     private final DiaryRepository diaryRepository;
     private final UserRepository userRepository;
@@ -51,11 +53,25 @@ public class DiaryService {
             Diary savedDiary = diaryRepository.saveAndFlush(diary);
             return DiaryStartResponse.from(savedDiary);
         } catch (DataIntegrityViolationException exception) {
-            // 동시 생성 요청으로 유니크 제약 충돌 시, 먼저 저장된 회고는 IN_PROGRESS 상태
+            if (!isDiaryUserDateUniqueViolation(exception)) {
+                throw exception;
+            }
+
+            // 동시 생성 요청으로 (user_id, diary_date) 유니크 제약 충돌 시, 먼저 저장된 회고는 IN_PROGRESS 상태
             throw new BaseException(
                     ErrorCode.DIARY_ALREADY_IN_PROGRESS
             );
         }
+    }
+
+    private boolean isDiaryUserDateUniqueViolation(DataIntegrityViolationException exception) {
+        if (!(exception.getCause() instanceof ConstraintViolationException constraintViolationException)) {
+            return false;
+        }
+
+        String constraintName = constraintViolationException.getConstraintName();
+        return constraintName != null
+                && constraintName.toLowerCase().contains(DIARY_USER_DATE_UNIQUE_CONSTRAINT);
     }
 
     private void validateDiaryDate(

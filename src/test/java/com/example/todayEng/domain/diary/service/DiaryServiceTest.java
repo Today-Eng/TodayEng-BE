@@ -14,9 +14,11 @@ import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.repository.UserRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -141,17 +143,44 @@ class DiaryServiceTest {
     }
 
     @Test
-    @DisplayName("동시 생성 요청으로 유니크 제약이 깨지면 진행 중 예외로 변환된다")
+    @DisplayName("동시 생성 요청으로 (user_id, diary_date) 유니크 제약이 깨지면 진행 중 예외로 변환된다")
     void startDiary_concurrentDuplicate_throwsAlreadyInProgress() {
         LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(diaryRepository.findByUserAndDiaryDate(user, today)).willReturn(Optional.empty());
         given(diaryRepository.saveAndFlush(any(Diary.class)))
-                .willThrow(new DataIntegrityViolationException("duplicate key"));
+                .willThrow(uniqueConstraintViolation("uk_diary_user_date"));
 
         assertThatThrownBy(() -> diaryService.startDiary(userId, new DiaryStartRequest(today)))
                 .isInstanceOf(BaseException.class)
                 .extracting(exception -> ((BaseException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.DIARY_ALREADY_IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("다른 제약 조건 위반(예: FK, NOT NULL)은 변환하지 않고 그대로 전파한다")
+    void startDiary_unrelatedConstraintViolation_propagatesAsIs() {
+        LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(diaryRepository.findByUserAndDiaryDate(user, today)).willReturn(Optional.empty());
+        given(diaryRepository.saveAndFlush(any(Diary.class)))
+                .willThrow(uniqueConstraintViolation("fk_diary_user"));
+
+        assertThatThrownBy(() -> diaryService.startDiary(userId, new DiaryStartRequest(today)))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .isNotInstanceOf(BaseException.class);
+    }
+
+    private DataIntegrityViolationException uniqueConstraintViolation(String constraintName) {
+        SQLException sqlException = new SQLException(
+                "Duplicate entry for key '" + constraintName + "'"
+        );
+        ConstraintViolationException cause = new ConstraintViolationException(
+                "could not execute statement",
+                sqlException,
+                constraintName
+        );
+
+        return new DataIntegrityViolationException("could not execute statement", cause);
     }
 }
