@@ -34,3 +34,10 @@ bin/
 
 ### Env ###
 .env
+
+### DOCS ###
+docs/
+
+### ETC ###
+.claude
+CLAUDE.md
