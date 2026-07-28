@@ -9,3 +9,10 @@ services:
 
     ports:
       - "8080:8080" # 추후 Nginx 붙이면 내부 접근만 허용하도록 수정
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
