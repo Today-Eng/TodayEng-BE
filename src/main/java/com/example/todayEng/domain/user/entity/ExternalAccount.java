@@ -174,8 +174,29 @@ public class ExternalAccount extends BaseTimeEntity {
         this.tokenExpiresAt = tokenExpiresAt;
     }
 
-    public void updateAccountIdentifier(String accountIdentifier) {
+    public void reconnect(
+            String providerAccountId,
+            String accountIdentifier,
+            String accessToken,
+            String refreshToken,
+            LocalDateTime tokenExpiresAt
+    ) {
+        boolean isAccountSwitched =
+                !this.providerAccountId.equals(providerAccountId);
+
+        this.providerAccountId = providerAccountId;
         this.accountIdentifier = accountIdentifier;
+
+        if (isAccountSwitched) {
+            this.accessToken = accessToken;
+            this.refreshToken = refreshToken;
+            this.tokenExpiresAt = tokenExpiresAt;
+        } else {
+            updateTokens(accessToken, refreshToken, tokenExpiresAt);
+        }
+
+        this.connectedAt = LocalDateTime.now();
+        this.useEnabled = true;
     }
 
     public void updateUseEnabled(boolean useEnabled) {
