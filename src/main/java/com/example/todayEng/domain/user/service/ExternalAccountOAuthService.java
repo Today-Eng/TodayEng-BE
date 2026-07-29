@@ -47,16 +47,20 @@ public class ExternalAccountOAuthService {
     public void connectExternalAccount(
             ExternalServiceProvider provider,
             String code,
-            String state
+            String state,
+            String error
     ) {
-        validateAuthorizationCode(code);
-
         Long userId =
                 oauthAuthorizationRequestService
                         .validateAndConsume(
                                 state,
                                 provider
                         );
+
+        validateOAuthCallback(
+                code,
+                error
+        );
 
         OAuthProviderClient providerClient =
                 oauthProviderClientRegistry.getClient(provider);
@@ -77,7 +81,16 @@ public class ExternalAccountOAuthService {
         );
     }
 
-    private void validateAuthorizationCode(String code) {
+    private void validateOAuthCallback(
+            String code,
+            String error
+    ) {
+        if (error != null && !error.isBlank()) {
+            throw new BaseException(
+                    ErrorCode.OAUTH_AUTHORIZATION_DENIED
+            );
+        }
+
         if (code == null || code.isBlank()) {
             throw new BaseException(
                     ErrorCode.OAUTH_AUTHORIZATION_CODE_MISSING
