@@ -1,23 +1,16 @@
 package com.example.todayEng.domain.diary.entity;
 
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import com.example.todayEng.domain.user.entity.User;
+import com.example.todayEng.global.common.BaseTimeEntity;
+import jakarta.persistence.*;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 @Getter
 @Entity
@@ -31,22 +24,20 @@ import org.hibernate.annotations.UpdateTimestamp;
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Diary {
+public class Diary extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "diary_id")
     private Long id;
 
-    /*
-     * User 엔티티 구현 후 수정
-     *
-     * @ManyToOne(fetch = FetchType.LAZY)
-     * @JoinColumn(name = "user_id", nullable = false)
-     * private User user;
-     */
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "user_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_diary_user")
+    )
+    private User user;
 
     @Column(name = "diary_date", nullable = false)
     private LocalDate diaryDate;
@@ -58,33 +49,25 @@ public class Diary {
     @Column(name = "memo", length = 200)
     private String memo;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
     @Builder(access = AccessLevel.PRIVATE)
     private Diary(
-            Long userId,
+            User user,
             LocalDate diaryDate
     ) {
-        this.userId = userId;
+        this.user = user;
         this.diaryDate = diaryDate;
         this.status = DiaryStatus.IN_PROGRESS;
     }
 
     public static Diary create(
-            Long userId,
+            User user,
             LocalDate diaryDate
     ) {
         return Diary.builder()
-                .userId(userId)
+                .user(user)
                 .diaryDate(diaryDate)
                 .build();
     }

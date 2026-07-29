@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.entity;
 
 import com.example.todayEng.domain.diary.entity.enums.CorrectionStatus;
+import com.example.todayEng.global.common.BaseTimeEntity;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,7 +28,7 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "diary_answer")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class DiaryAnswer {
+public class DiaryAnswer extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -58,14 +59,6 @@ public class DiaryAnswer {
     @Enumerated(EnumType.STRING)
     @Column(name = "correction_status", nullable = false, length = 20)
     private CorrectionStatus correctionStatus;
-
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     @Builder(access = AccessLevel.PRIVATE)
     private DiaryAnswer(

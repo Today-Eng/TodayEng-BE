@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.entity;
 
 import com.example.todayEng.domain.user.entity.InterestTag;
+import com.example.todayEng.global.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -22,7 +23,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Entity
 @Table(name = "default_question")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class DefaultQuestion {
+public class DefaultQuestion extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,14 +42,6 @@ public class DefaultQuestion {
 
     @Column(name = "is_active", nullable = false)
     private boolean active;
-
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     @Builder(access = AccessLevel.PRIVATE)
     private DefaultQuestion(
