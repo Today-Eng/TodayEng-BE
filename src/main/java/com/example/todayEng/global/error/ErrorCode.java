@@ -54,6 +54,7 @@ public enum ErrorCode {
     GOOGLE_USER_INFO_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "E011", "Google 계정 정보를 조회하지 못했습니다."),
     EXTERNAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "E012", "이미 다른 사용자에게 연동된 외부 계정입니다."),
     UNSUPPORTED_OAUTH_PROVIDER(HttpStatus.BAD_REQUEST, "E013", "지원하지 않는 외부 서비스 provider입니다."),
+    OAUTH_STATE_CONSUME_FAILED(HttpStatus.CONFLICT, "E014", "OAuth 인증 요청 처리에 실패했습니다."),
 
     // Diary (D)
     MAIN_QUESTION_CANNOT_HAVE_PARENT(HttpStatus.BAD_REQUEST, "D001", "메인 질문에는 상위 질문을 지정할 수 없습니다."),
