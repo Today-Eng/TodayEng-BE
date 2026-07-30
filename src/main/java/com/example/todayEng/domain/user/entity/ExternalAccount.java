@@ -122,8 +122,9 @@ public class ExternalAccount extends BaseTimeEntity {
         this.useEnabled = true;
     }
 
-    public static ExternalAccount createGoogleCalendarAccount(
+    public static ExternalAccount create(
             User user,
+            ExternalServiceProvider provider,
             String providerAccountId,
             String accountIdentifier,
             String accessToken,
@@ -132,26 +133,7 @@ public class ExternalAccount extends BaseTimeEntity {
     ) {
         return new ExternalAccount(
                 user,
-                ExternalServiceProvider.GOOGLE_CALENDAR,
-                providerAccountId,
-                accountIdentifier,
-                accessToken,
-                refreshToken,
-                tokenExpiresAt
-        );
-    }
-
-    public static ExternalAccount createSpotifyAccount(
-            User user,
-            String providerAccountId,
-            String accountIdentifier,
-            String accessToken,
-            String refreshToken,
-            LocalDateTime tokenExpiresAt
-    ) {
-        return new ExternalAccount(
-                user,
-                ExternalServiceProvider.SPOTIFY,
+                provider,
                 providerAccountId,
                 accountIdentifier,
                 accessToken,

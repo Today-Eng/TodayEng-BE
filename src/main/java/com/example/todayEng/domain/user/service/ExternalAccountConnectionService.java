@@ -103,27 +103,15 @@ public class ExternalAccountConnectionService {
             ExternalUserInfo externalUserInfo,
             LocalDateTime tokenExpiresAt
     ) {
-        return switch (provider) {
-            case GOOGLE_CALENDAR ->
-                    ExternalAccount.createGoogleCalendarAccount(
-                            user,
-                            externalUserInfo.providerAccountId(),
-                            externalUserInfo.accountIdentifier(),
-                            tokenResponse.accessToken(),
-                            tokenResponse.refreshToken(),
-                            tokenExpiresAt
-                    );
-
-            case SPOTIFY ->
-                    ExternalAccount.createSpotifyAccount(
-                            user,
-                            externalUserInfo.providerAccountId(),
-                            externalUserInfo.accountIdentifier(),
-                            tokenResponse.accessToken(),
-                            tokenResponse.refreshToken(),
-                            tokenExpiresAt
-                    );
-        };
+        return ExternalAccount.create(
+                user,
+                provider,
+                externalUserInfo.providerAccountId(),
+                externalUserInfo.accountIdentifier(),
+                tokenResponse.accessToken(),
+                tokenResponse.refreshToken(),
+                tokenExpiresAt
+        );
     }
 
     private LocalDateTime calculateTokenExpiresAt(

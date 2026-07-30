@@ -21,15 +21,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class GoogleCalendarOAuthClient implements OAuthProviderClient {
 
-    private static final String AUTHORIZATION_URI =
-            "https://accounts.google.com/o/oauth2/v2/auth";
-
-    private static final String TOKEN_URI =
-            "https://oauth2.googleapis.com/token";
-
-    private static final String USER_INFO_URI =
-            "https://openidconnect.googleapis.com/v1/userinfo";
-
     private static final String RESPONSE_TYPE = "code";
 
     private static final String GRANT_TYPE =
@@ -37,14 +28,7 @@ public class GoogleCalendarOAuthClient implements OAuthProviderClient {
 
     private static final String ACCESS_TYPE = "offline";
 
-    private static final String PROMPT = "consent";
-
-    private static final String SCOPE = String.join(
-            " ",
-            "openid",
-            "email",
-            "https://www.googleapis.com/auth/calendar.readonly"
-    );
+    private static final String PROMPT = "select_account consent";
 
     private final RestClient restClient;
 
@@ -57,8 +41,15 @@ public class GoogleCalendarOAuthClient implements OAuthProviderClient {
 
     @Override
     public String buildAuthorizationUrl(String state) {
+        String scope = String.join(
+                " ",
+                googleOAuthProperties.scopes()
+        );
+
         return UriComponentsBuilder
-                .fromUriString(AUTHORIZATION_URI)
+                .fromUriString(
+                        googleOAuthProperties.authorizationUri()
+                )
                 .queryParam(
                         "client_id",
                         googleOAuthProperties.clientId()
@@ -73,7 +64,7 @@ public class GoogleCalendarOAuthClient implements OAuthProviderClient {
                 )
                 .queryParam(
                         "scope",
-                        SCOPE
+                        scope
                 )
                 .queryParam(
                         "access_type",
@@ -120,7 +111,7 @@ public class GoogleCalendarOAuthClient implements OAuthProviderClient {
 
         try {
             GoogleOAuthTokenResponse response = restClient.post()
-                    .uri(TOKEN_URI)
+                    .uri(googleOAuthProperties.tokenUri())
                     .contentType(
                             MediaType.APPLICATION_FORM_URLENCODED
                     )
@@ -156,7 +147,7 @@ public class GoogleCalendarOAuthClient implements OAuthProviderClient {
     public ExternalUserInfo fetchUserInfo(String accessToken) {
         try {
             GoogleUserInfoResponse response = restClient.get()
-                    .uri(USER_INFO_URI)
+                    .uri(googleOAuthProperties.userInfoUri())
                     .headers(headers ->
                             headers.setBearerAuth(accessToken)
                     )

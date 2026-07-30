@@ -32,7 +32,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/api/external-accounts/google-calendar/callback"   // Google이 직접 호출
+                                "/api/external-accounts/*/callback"
                         ).permitAll()
                         .anyRequest().authenticated()
                 );

@@ -28,13 +28,13 @@ public class ExternalAccountOAuthService {
             Long userId,
             ExternalServiceProvider provider
     ) {
+        OAuthProviderClient providerClient =
+                oauthProviderClientRegistry.getClient(provider);
+
         String state = oauthAuthorizationRequestService.issue(
                 userId,
                 provider
         );
-
-        OAuthProviderClient providerClient =
-                oauthProviderClientRegistry.getClient(provider);
 
         String authorizationUrl =
                 providerClient.buildAuthorizationUrl(state);
