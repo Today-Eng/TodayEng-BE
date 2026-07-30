@@ -31,7 +31,8 @@ public class SecurityConfig {
                                 "/health", // Health Check도 인증 제외 필수!
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/api/external-accounts/*/callback"
                         ).permitAll()
                         .anyRequest().authenticated()
                 );

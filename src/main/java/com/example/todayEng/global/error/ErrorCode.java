@@ -45,6 +45,17 @@ public enum ErrorCode {
     FILE_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "E002", "파일 업로드 용량을 초과했습니다."),
     INVALID_FILE_EXTENSION(HttpStatus.BAD_REQUEST, "E003", "허용되지 않는 파일 확장자입니다."),
     EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "E004", "외부 연동 API 호출에 실패했습니다."),
+    GOOGLE_OAUTH_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "E005", "Google Calendar OAuth 설정이 완료되지 않았습니다."),
+    OAUTH_STATE_INVALID(HttpStatus.BAD_REQUEST, "E006", "유효하지 않은 OAuth 요청입니다."),
+    OAUTH_STATE_EXPIRED(HttpStatus.BAD_REQUEST, "E007", "OAuth 인증 요청이 만료되었습니다."),
+    OAUTH_STATE_ALREADY_USED(HttpStatus.BAD_REQUEST, "E008", "이미 처리된 OAuth 인증 요청입니다."),
+    OAUTH_AUTHORIZATION_DENIED(HttpStatus.BAD_REQUEST, "E009", "외부 서비스 접근 권한이 거부되었습니다."),
+    OAUTH_TOKEN_EXCHANGE_FAILED(HttpStatus.BAD_GATEWAY, "E010", "OAuth 토큰 발급에 실패했습니다."),
+    OAUTH_USER_INFO_FAILED(HttpStatus.BAD_GATEWAY, "E011", "외부 계정 정보를 조회하지 못했습니다."),
+    EXTERNAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "E012", "이미 다른 사용자에게 연동된 외부 계정입니다."),
+    UNSUPPORTED_OAUTH_PROVIDER(HttpStatus.BAD_REQUEST, "E013", "지원하지 않는 외부 서비스 provider입니다."),
+    OAUTH_STATE_CONSUME_FAILED(HttpStatus.CONFLICT, "E014", "OAuth 인증 요청 처리에 실패했습니다."),
+    OAUTH_AUTHORIZATION_CODE_MISSING(HttpStatus.BAD_REQUEST, "E015", "OAuth Authorization Code가 존재하지 않습니다."),
 
     // Diary (D)
     MAIN_QUESTION_CANNOT_HAVE_PARENT(HttpStatus.BAD_REQUEST, "D001", "메인 질문에는 상위 질문을 지정할 수 없습니다."),
