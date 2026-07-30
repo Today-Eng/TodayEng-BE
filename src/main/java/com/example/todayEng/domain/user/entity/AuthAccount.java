@@ -29,21 +29,17 @@ public class AuthAccount extends BaseTimeEntity {
     @Column(name = "provider_subject", nullable = false, length = 255)
     private String providerSubject;
 
-    @Column(length = 255)
-    private String email;
-
-    private AuthAccount(User user, AuthProvider provider, String providerSubject, String email) {
+    private AuthAccount(User user, AuthProvider provider, String providerSubject) {
         this.user = user;
         this.provider = provider;
         this.providerSubject = providerSubject;
-        this.email = email;
     }
 
-    public static AuthAccount google(User user, String subject, String email) {
-        return new AuthAccount(user, AuthProvider.GOOGLE, subject, email);
+    public static AuthAccount google(User user, String subject) {
+        return new AuthAccount(user, AuthProvider.GOOGLE, subject);
     }
 
     public static AuthAccount test(User user, String socialUid) {
-        return new AuthAccount(user, AuthProvider.TEST, socialUid, null);
+        return new AuthAccount(user, AuthProvider.TEST, socialUid);
     }
 }

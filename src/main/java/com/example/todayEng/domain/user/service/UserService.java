@@ -55,6 +55,7 @@ public class UserService {
         User user = getUser(userId);
         return new MeResponse(user.getId(), user.getNickname(), user.getProfileUrl(),
                 user.getEnglishLevel(), user.getTotalDiaryCount(), user.getCurrentStreak(),
+                user.getEmail(),
                 interestResponses(userInterestRepository.findAllByUserIdOrderByInterestTagId(userId)
                         .stream().map(UserInterest::getInterestTag).toList()));
     }

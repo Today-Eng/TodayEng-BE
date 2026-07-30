@@ -40,7 +40,7 @@ public final class UserDtos {
                                      EnglishLevel englishLevel, List<InterestResponse> interests) {}
     public record MeResponse(Long userId, String nickname, String profileUrl,
                              EnglishLevel englishLevel, Long totalDiaryCount, Integer currentStreak,
-                             List<InterestResponse> interests) {}
+                             String email, List<InterestResponse> interests) {}
     public record ProfileResponse(String nickname) {}
     public record EnglishLevelResponse(EnglishLevel englishLevel) {}
     public record InterestsResponse(List<InterestResponse> interests) {}

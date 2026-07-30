@@ -31,8 +31,8 @@ public class AuthService {
         boolean isNewUser = account == null;
         User user;
         if (account == null) {
-            user = userRepository.save(User.create());
-            authAccountRepository.save(AuthAccount.google(user, google.subject(), google.email()));
+            user = userRepository.save(User.create(google.email()));
+            authAccountRepository.save(AuthAccount.google(user, google.subject()));
         } else {
             user = account.getUser();
         }
