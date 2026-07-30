@@ -19,6 +19,14 @@ oauth:
     client-id: ${GOOGLE_CALENDAR_CLIENT_ID}
     client-secret: ${GOOGLE_CALENDAR_CLIENT_SECRET}
     redirect-uri: ${GOOGLE_CALENDAR_REDIRECT_URI}
+  spotify:
+    client-id: ${SPOTIFY_CLIENT_ID}
+    client-secret: ${SPOTIFY_CLIENT_SECRET}
+    redirect-uri: ${SPOTIFY_REDIRECT_URI}
+
+security:
+  oauth:
+    authorization-endpoint-permit-all: false
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}

@@ -67,7 +67,7 @@ public class ExternalAccount extends BaseTimeEntity {
     /*
      * 외부 서비스가 발급한 계정 고유 식별값입니다.
      * Google Calendar는 Google 계정의 sub,
-     * Spotify는 Spotify 사용자 ID를 저장합니다.
+     * Spotify 계정의 account_id.
      *
      * TodayEng 로그인에 사용한 계정의 식별값과는 별개입니다.
      */

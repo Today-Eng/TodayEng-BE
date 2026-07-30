@@ -12,9 +12,14 @@ import org.springframework.web.cors.CorsConfigurationSource;
 public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
+    private final OAuthSecurityProperties oauthSecurityProperties;
 
-    public SecurityConfig(CorsConfigurationSource corsConfigurationSource) {
+    public SecurityConfig(
+            CorsConfigurationSource corsConfigurationSource,
+            OAuthSecurityProperties oauthSecurityProperties
+    ) {
         this.corsConfigurationSource = corsConfigurationSource;
+        this.oauthSecurityProperties = oauthSecurityProperties;
     }
 
     @Bean
@@ -26,16 +31,24 @@ public class SecurityConfig {
 
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
 
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(
-                                "/health", // Health Check도 인증 제외 필수!
+                .authorizeHttpRequests(authorize -> {
+                    authorize.requestMatchers(
+                                "/health",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/api/external-accounts/*/callback"
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                );
+                        ).permitAll();
+
+                    if (oauthSecurityProperties
+                            .authorizationEndpointPermitAll()) {
+                        authorize.requestMatchers(
+                                "/api/external-accounts/*/authorization"
+                        ).permitAll();
+                    }
+
+                    authorize.anyRequest().authenticated();
+                });
 
         return http.build();
     }
