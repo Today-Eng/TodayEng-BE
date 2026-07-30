@@ -2,6 +2,7 @@ package com.example.todayEng.domain.user.service;
 
 import com.example.todayEng.domain.user.dto.UserDtos.*;
 import com.example.todayEng.domain.user.entity.*;
+import com.example.todayEng.domain.user.entity.enums.TermsType;
 import com.example.todayEng.domain.user.repository.*;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
@@ -44,7 +45,8 @@ public class UserService {
     @Transactional
     public OnboardingResponse onboard(Long userId, OnboardingRequest request) {
         User user = getUser(userId);
-        validateNickname(request.nickname());
+        validateRequiredTerms(userId);
+        validateNickname(user, request.nickname());
         List<InterestTag> tags = getTags(request.interestTagIds());
         user.completeOnboarding(request.nickname(), request.profileUrl(), request.englishLevel());
         replaceInterests(user, tags);
@@ -75,7 +77,7 @@ public class UserService {
     @Transactional
     public ProfileResponse updateProfile(Long userId, ProfileRequest request) {
         User user = getUser(userId);
-        validateNickname(request.nickname());
+        validateNickname(user, request.nickname());
         user.updateProfile(request.nickname(), null);
         return new ProfileResponse(user.getNickname());
     }
@@ -99,8 +101,16 @@ public class UserService {
         return userRepository.findById(id).orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
     }
 
-    private void validateNickname(String nickname) {
-        if (userRepository.existsByNickname(nickname))
+    private void validateRequiredTerms(Long userId) {
+        List<TermsType> requiredTypes = Arrays.stream(TermsType.values())
+                .filter(TermsType::isRequired)
+                .toList();
+        if (userTermsRepository.countAgreedRequiredTerms(userId, requiredTypes) != requiredTypes.size())
+            throw new BaseException(ErrorCode.REQUIRED_TERMS_NOT_AGREED);
+    }
+
+    private void validateNickname(User user, String nickname) {
+        if (!Objects.equals(user.getNickname(), nickname) && userRepository.existsByNickname(nickname))
             throw new BaseException(ErrorCode.DUPLICATE_NICKNAME);
     }
 

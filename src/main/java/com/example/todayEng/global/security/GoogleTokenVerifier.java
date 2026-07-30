@@ -10,17 +10,20 @@ import org.springframework.web.client.RestClientException;
 
 @Component
 public class GoogleTokenVerifier {
-    private final RestClient restClient = RestClient.create("https://oauth2.googleapis.com");
+    private final RestClient restClient;
     private final String clientId;
 
-    public GoogleTokenVerifier(@Value("${google.client-id:}") String clientId) {
+    public GoogleTokenVerifier(RestClient restClient,
+                               @Value("${google.client-id:}") String clientId) {
+        this.restClient = restClient;
         this.clientId = clientId;
     }
 
     public GoogleUser verify(String idToken) {
         try {
             GoogleTokenInfo info = restClient.get()
-                    .uri(uri -> uri.path("/tokeninfo").queryParam("id_token", idToken).build())
+                    .uri(uri -> uri.scheme("https").host("oauth2.googleapis.com")
+                            .path("/tokeninfo").queryParam("id_token", idToken).build())
                     .retrieve().body(GoogleTokenInfo.class);
             if (info == null || info.sub() == null || !"true".equalsIgnoreCase(info.emailVerified())
                     || !clientId.equals(info.aud())) {
