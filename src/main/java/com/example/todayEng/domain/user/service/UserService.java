@@ -44,7 +44,7 @@ public class UserService {
     @Transactional
     public OnboardingResponse onboard(Long userId, OnboardingRequest request) {
         User user = getUser(userId);
-        validateNickname(userId, request.nickname());
+        validateNickname(request.nickname());
         List<InterestTag> tags = getTags(request.interestTagIds());
         user.completeOnboarding(request.nickname(), request.profileUrl(), request.englishLevel());
         replaceInterests(user, tags);
@@ -74,7 +74,7 @@ public class UserService {
     @Transactional
     public ProfileResponse updateProfile(Long userId, ProfileRequest request) {
         User user = getUser(userId);
-        validateNickname(userId, request.nickname());
+        validateNickname(request.nickname());
         user.updateProfile(request.nickname(), null);
         return new ProfileResponse(user.getNickname());
     }
@@ -98,8 +98,8 @@ public class UserService {
         return userRepository.findById(id).orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
     }
 
-    private void validateNickname(Long userId, String nickname) {
-        if (userRepository.existsByNicknameAndIdNot(nickname, userId))
+    private void validateNickname(String nickname) {
+        if (userRepository.existsByNickname(nickname))
             throw new BaseException(ErrorCode.DUPLICATE_NICKNAME);
     }
 

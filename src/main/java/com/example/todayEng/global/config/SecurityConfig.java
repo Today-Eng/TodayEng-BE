@@ -60,7 +60,8 @@ public class SecurityConfig {
                                 "/auth/test",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/api/external-accounts/*/callback"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

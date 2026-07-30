@@ -1,0 +1,18 @@
+services:
+  app:
+    image: ${DOCKERHUB_USERNAME}/todayeng-be:latest
+    container_name: todayeng-app
+    restart: unless-stopped
+
+    env_file:
+      - /opt/todayeng/.env
+
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
