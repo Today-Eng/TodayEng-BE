@@ -1,5 +1,7 @@
 package com.example.todayEng.domain.user.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.todayEng.domain.user.config.SpotifyOAuthProperties;
 import com.example.todayEng.domain.user.dto.oauth.ExternalUserInfo;
 import com.example.todayEng.domain.user.dto.oauth.OAuthTokenResponse;
@@ -9,23 +11,28 @@ import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class SpotifyOAuthClient implements OAuthProviderClient {
 
     private static final String RESPONSE_TYPE = "code";
     private static final String GRANT_TYPE = "authorization_code";
+    private static final int MAX_ERROR_DESCRIPTION_LENGTH = 500;
 
     private final RestClient restClient;
     private final SpotifyOAuthProperties spotifyOAuthProperties;
+    private final ObjectMapper objectMapper;
 
     @Override
     public ExternalServiceProvider supports() {
@@ -108,11 +115,67 @@ public class SpotifyOAuthClient implements OAuthProviderClient {
             );
         } catch (BaseException exception) {
             throw exception;
+        } catch (RestClientResponseException exception) {
+            logTokenExchangeFailure(exception);
+            throw new BaseException(
+                    ErrorCode.OAUTH_TOKEN_EXCHANGE_FAILED
+            );
         } catch (RestClientException exception) {
+            log.warn(
+                    "Spotify token exchange request failed: exception={}",
+                    exception.getClass().getSimpleName()
+            );
             throw new BaseException(
                     ErrorCode.OAUTH_TOKEN_EXCHANGE_FAILED
             );
         }
+    }
+
+    private void logTokenExchangeFailure(
+            RestClientResponseException exception
+    ) {
+        String error = "unknown";
+        String errorDescription = "unavailable";
+
+        try {
+            JsonNode responseBody = objectMapper.readTree(
+                    exception.getResponseBodyAsString()
+            );
+            error = sanitizeLogValue(
+                    responseBody.path("error").asText("unknown")
+            );
+            errorDescription = sanitizeLogValue(
+                    responseBody.path("error_description")
+                            .asText("unavailable")
+            );
+        } catch (Exception parsingException) {
+            log.debug(
+                    "Spotify token error response parsing failed: exception={}",
+                    parsingException.getClass().getSimpleName()
+            );
+        }
+
+        log.warn(
+                "Spotify token exchange failed: status={}, error={}, description={}",
+                exception.getStatusCode().value(),
+                error,
+                errorDescription
+        );
+    }
+
+    private String sanitizeLogValue(String value) {
+        String sanitized = value
+                .replaceAll("[\\r\\n\\t]", " ")
+                .trim();
+
+        if (sanitized.length() <= MAX_ERROR_DESCRIPTION_LENGTH) {
+            return sanitized;
+        }
+
+        return sanitized.substring(
+                0,
+                MAX_ERROR_DESCRIPTION_LENGTH
+        );
     }
 
     @Override

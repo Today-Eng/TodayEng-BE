@@ -8,7 +8,9 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.todayEng.domain.user.config.SpotifyOAuthProperties;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.global.error.ErrorCode;
@@ -16,12 +18,17 @@ import com.example.todayEng.global.error.exception.BaseException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+@ExtendWith(OutputCaptureExtension.class)
 class SpotifyOAuthClientTest {
 
     private static final String TOKEN_URI =
@@ -41,7 +48,8 @@ class SpotifyOAuthClientTest {
         ).build();
         client = new SpotifyOAuthClient(
                 restClientBuilder.build(),
-                properties()
+                properties(),
+                new ObjectMapper()
         );
     }
 
@@ -109,6 +117,43 @@ class SpotifyOAuthClientTest {
                 .isEqualTo("refresh-token");
         assertThat(response.expiresInSeconds())
                 .isEqualTo(3600L);
+        server.verify();
+    }
+
+    @Test
+    void exchangeToken_providerError_logsSafeErrorDetails(
+            CapturedOutput output
+    ) {
+        server.expect(requestTo(TOKEN_URI))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {
+                                  "error": "invalid_grant",
+                                  "error_description": "Invalid authorization code",
+                                  "access_token": "must-not-be-logged"
+                                }
+                                """));
+
+        assertThatThrownBy(() ->
+                client.exchangeToken("authorization-code")
+        )
+                .isInstanceOf(BaseException.class)
+                .extracting(exception ->
+                        ((BaseException) exception).getErrorCode()
+                )
+                .isEqualTo(ErrorCode.OAUTH_TOKEN_EXCHANGE_FAILED);
+
+        assertThat(output.getOut())
+                .contains(
+                        "status=400",
+                        "error=invalid_grant",
+                        "description=Invalid authorization code"
+                )
+                .doesNotContain(
+                        "must-not-be-logged",
+                        "authorization-code"
+                );
         server.verify();
     }
 
