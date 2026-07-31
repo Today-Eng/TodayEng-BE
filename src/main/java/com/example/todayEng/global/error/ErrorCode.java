@@ -31,12 +31,16 @@ public enum ErrorCode {
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "A004", "접근 권한이 없습니다."),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "A005", "아이디 또는 비밀번호가 올바르지 않습니다."),
     TOKEN_NOT_FOUND(HttpStatus.UNAUTHORIZED, "A006", "헤더에 토큰이 존재하지 않습니다."),
+    INVALID_GOOGLE_TOKEN(HttpStatus.UNAUTHORIZED, "A007", "유효하지 않은 Google ID 토큰입니다."),
 
 
     // User (U)
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "존재하지 않는 사용자입니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "U002", "이미 사용중인 이메일입니다."),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "U003", "이미 사용중인 닉네임입니다."),
+    TERMS_NOT_FOUND(HttpStatus.NOT_FOUND, "U007", "존재하지 않는 약관입니다."),
+    REQUIRED_TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "U005", "필수 약관에 동의해야 합니다."),
+    INTEREST_TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "U006", "존재하지 않는 관심사 태그입니다."),
     EXTERNAL_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "U004", "연동된 외부 계정을 찾을 수 없습니다."),
 
 
