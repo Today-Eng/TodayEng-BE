@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.todayEng.domain.user.controller.ExternalAccountOAuthController;
 import com.example.todayEng.domain.user.service.ExternalAccountOAuthService;
 import com.example.todayEng.global.security.JwtAuthenticationFilter;
+import com.example.todayEng.global.security.JwtTokenProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -17,7 +18,11 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(ExternalAccountOAuthController.class)
-@Import({SecurityConfig.class, CorsConfig.class})
+@Import({
+        SecurityConfig.class,
+        CorsConfig.class,
+        JwtAuthenticationFilter.class
+})
 @EnableConfigurationProperties(OAuthSecurityProperties.class)
 @TestPropertySource(properties = {
         "security.oauth.authorization-endpoint-permit-all=false",
@@ -32,7 +37,7 @@ class ProdOAuthAuthorizationSecurityTest {
     private ExternalAccountOAuthService externalAccountOAuthService;
 
     @MockBean
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
+    private JwtTokenProvider jwtTokenProvider;
 
     @Test
     void authorization_withoutAuthentication_isForbidden()
@@ -41,7 +46,7 @@ class ProdOAuthAuthorizationSecurityTest {
                         "/api/external-accounts/spotify/authorization"
                 )
                         .param("userId", "1"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
