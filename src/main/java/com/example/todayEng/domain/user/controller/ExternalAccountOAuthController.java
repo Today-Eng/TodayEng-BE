@@ -4,6 +4,7 @@ import com.example.todayEng.domain.user.dto.response.OAuthAuthorizationResponse;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.service.ExternalAccountOAuthService;
 import com.example.todayEng.global.common.ApiResponse;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,7 +42,7 @@ public class ExternalAccountOAuthController {
         );
     }
 
-    @Operation(summary = "외부 서비스 연동 콜백", description = "외부 서비스가 사용자 동의 처리 후 브라우저를 직접 Redirect하는 콜백 엔드포인트입니다. JWT 인증 없이 state로 사용자를 식별해서 토큰 교환과 외부 계정 저장까지 처리합니다.")
+    @Hidden
     @GetMapping("/callback")
     public ApiResponse<Void> handleCallback(
             @Parameter(description = "외부 서비스 Provider", example = "google-calendar")
