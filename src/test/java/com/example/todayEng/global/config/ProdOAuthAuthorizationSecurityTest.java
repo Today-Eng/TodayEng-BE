@@ -3,11 +3,14 @@ package com.example.todayEng.global.config;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.BDDMockito.given;
 
 import com.example.todayEng.domain.user.controller.ExternalAccountOAuthController;
 import com.example.todayEng.domain.user.service.ExternalAccountOAuthService;
 import com.example.todayEng.global.security.JwtAuthenticationFilter;
 import com.example.todayEng.global.security.JwtTokenProvider;
+import com.example.todayEng.global.error.ErrorCode;
+import com.example.todayEng.global.error.exception.BaseException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -58,5 +61,16 @@ class ProdOAuthAuthorizationSecurityTest {
                         .param("code", "authorization-code")
                         .param("state", "state-value"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void protectedEndpoint_withInvalidToken_isUnauthorized() throws Exception {
+        given(jwtTokenProvider.parse("invalid", "access"))
+                .willThrow(new BaseException(ErrorCode.INVALID_TOKEN));
+
+        mockMvc.perform(post("/api/external-accounts/spotify/authorization")
+                        .header("Authorization", "Bearer invalid")
+                        .param("userId", "1"))
+                .andExpect(status().isUnauthorized());
     }
 }

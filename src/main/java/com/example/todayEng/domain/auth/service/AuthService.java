@@ -22,17 +22,20 @@ public class AuthService {
     private final GoogleTokenVerifier googleTokenVerifier;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthAccountProvisioningService provisioningService;
+    private final AuthTokenService authTokenService;
 
     public LoginResponse googleLogin(String idToken) {
         GoogleTokenVerifier.GoogleUser google = googleTokenVerifier.verify(idToken);
         ProvisionedAccount provisioned = getOrCreate(
                 AuthProvider.GOOGLE, google.subject(), google.email());
-        return issueTokens(provisioned.account().getUser(), provisioned.created());
+        return authTokenService.issueTokens(
+                provisioned.account().getUser(), provisioned.created());
     }
 
     public LoginResponse testLogin(String socialUid) {
         ProvisionedAccount provisioned = getOrCreate(AuthProvider.TEST, socialUid, null);
-        return issueTokens(provisioned.account().getUser(), provisioned.created());
+        return authTokenService.issueTokens(
+                provisioned.account().getUser(), provisioned.created());
     }
 
     @Transactional
@@ -62,14 +65,6 @@ public class AuthService {
                     .orElseThrow(() -> e);
             return new ProvisionedAccount(account, false);
         }
-    }
-
-    @Transactional
-    protected LoginResponse issueTokens(User user, boolean isNewUser) {
-        JwtTokenProvider.IssuedToken access = jwtTokenProvider.issueAccessToken(user.getId());
-        JwtTokenProvider.IssuedToken refresh = jwtTokenProvider.issueRefreshToken(user.getId());
-        refreshTokenRepository.save(RefreshToken.create(user, refresh.jti(), refresh.expiresAt()));
-        return new LoginResponse(access.value(), refresh.value(), isNewUser);
     }
 
     private record ProvisionedAccount(AuthAccount account, boolean created) {}

@@ -10,6 +10,8 @@ import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.service.ExternalAccountOAuthService;
 import com.example.todayEng.global.security.JwtAuthenticationFilter;
 import com.example.todayEng.global.security.JwtTokenProvider;
+import com.example.todayEng.global.error.ErrorCode;
+import com.example.todayEng.global.error.exception.BaseException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -53,6 +55,23 @@ class LocalOAuthAuthorizationSecurityTest {
         mockMvc.perform(post(
                         "/api/external-accounts/spotify/authorization"
                 )
+                        .param("userId", "1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void authorization_withInvalidToken_isStillAllowed() throws Exception {
+        given(jwtTokenProvider.parse("invalid", "access"))
+                .willThrow(new BaseException(ErrorCode.INVALID_TOKEN));
+        given(externalAccountOAuthService.createAuthorizationUrl(
+                1L,
+                ExternalServiceProvider.SPOTIFY
+        )).willReturn(new OAuthAuthorizationResponse(
+                "https://accounts.spotify.com/authorize"
+        ));
+
+        mockMvc.perform(post("/api/external-accounts/spotify/authorization")
+                        .header("Authorization", "Bearer invalid")
                         .param("userId", "1"))
                 .andExpect(status().isOk());
     }
