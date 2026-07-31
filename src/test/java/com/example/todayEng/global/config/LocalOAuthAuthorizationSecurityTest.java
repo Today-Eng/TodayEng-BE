@@ -8,6 +8,7 @@ import com.example.todayEng.domain.user.controller.ExternalAccountOAuthControlle
 import com.example.todayEng.domain.user.dto.response.OAuthAuthorizationResponse;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.service.ExternalAccountOAuthService;
+import com.example.todayEng.global.security.JwtAuthenticationFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -31,6 +32,9 @@ class LocalOAuthAuthorizationSecurityTest {
 
     @MockBean
     private ExternalAccountOAuthService externalAccountOAuthService;
+
+    @MockBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Test
     void authorization_withoutAuthentication_isAllowed() throws Exception {

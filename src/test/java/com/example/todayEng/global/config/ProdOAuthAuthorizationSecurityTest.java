@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.todayEng.domain.user.controller.ExternalAccountOAuthController;
 import com.example.todayEng.domain.user.service.ExternalAccountOAuthService;
+import com.example.todayEng.global.security.JwtAuthenticationFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -29,6 +30,9 @@ class ProdOAuthAuthorizationSecurityTest {
 
     @MockBean
     private ExternalAccountOAuthService externalAccountOAuthService;
+
+    @MockBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Test
     void authorization_withoutAuthentication_isForbidden()
