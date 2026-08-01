@@ -72,7 +72,8 @@ public enum ErrorCode {
     DIARY_DATE_EXPIRED(HttpStatus.BAD_REQUEST, "D008", "7일이 지난 날짜에는 회고를 작성할 수 없습니다."),
     DIARY_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "D009", "해당 날짜에 이미 진행 중인 회고가 있습니다."),
     DIARY_ALREADY_COMPLETED(HttpStatus.CONFLICT, "D010", "해당 날짜의 회고가 이미 완료되었습니다."),
-
+    INVALID_DIARY_YEAR_MONTH(HttpStatus.BAD_REQUEST, "D011", "조회할 연도 또는 월이 올바르지 않습니다."),
+    DIARY_NOT_FOUND(HttpStatus.NOT_FOUND, "D012", "삭제되었거나 존재하지 않는 회고입니다."),
     ;
 
     private final HttpStatus status;
