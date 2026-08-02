@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.notification.service;
 
 import com.example.todayEng.domain.notification.entity.NotificationSetting;
+import com.example.todayEng.domain.notification.exception.PushSubscriptionExpiredException;
 import com.example.todayEng.domain.notification.repository.NotificationSettingRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
@@ -20,6 +21,7 @@ public class NotificationService {
     private final NotificationSettingRepository notificationSettingRepository;
     private final WebPushService webPushService;
 
+    @Transactional
     public void sendTestNotification(Long userId) {
         NotificationSetting notificationSetting =
                 notificationSettingRepository.findByUserId(userId)
@@ -49,11 +51,17 @@ public class NotificationService {
         );
     }
 
+    @Transactional
     public void sendDiaryReminders(LocalDate today) {
         List<NotificationSetting> targets =
                 notificationSettingRepository.findDiaryReminderTargets(
                         today
                 );
+
+        log.info(
+                "회고 알림 발송 대상 수. count={}",
+                targets.size()
+        );
 
         for (NotificationSetting target : targets) {
             try {
@@ -62,6 +70,14 @@ public class NotificationService {
                         "오늘의 회고를 남겨볼까요?",
                         "오늘 하루를 영어로 천천히 돌아보세요.",
                         "/home"
+                );
+            } catch (PushSubscriptionExpiredException exception) {
+                target.clearPushSubscription();
+
+                log.info(
+                        "만료된 푸시 구독 제거. notificationSettingId={}, userId={}",
+                        target.getId(),
+                        target.getUser().getId()
                 );
             } catch (Exception exception) {
                 log.error(
