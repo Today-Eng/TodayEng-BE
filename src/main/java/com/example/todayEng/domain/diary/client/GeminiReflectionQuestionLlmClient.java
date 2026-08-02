@@ -85,7 +85,10 @@ public class GeminiReflectionQuestionLlmClient
                         "questionText", Map.of("type", "string"),
                         "koreanTranslation", Map.of("type", "string"),
                         "keyword", Map.of("type", "string"),
-                        "contextId", Map.of("type", "integer")
+                        "contextId", Map.of(
+                                "type", "integer",
+                                "nullable", true
+                        )
                 ),
                 "required", List.of(
                         "order",

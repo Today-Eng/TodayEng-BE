@@ -24,7 +24,7 @@ public record ReflectionSessionResponse(
                     question.getQuestionText(),
                     question.getKoreanTranslation(),
                     question.getKeyword(),
-                    question.getContext().getId()
+                    question.getContext() == null ? null : question.getContext().getId()
             );
         }
     }

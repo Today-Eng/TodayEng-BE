@@ -40,4 +40,18 @@ class ReflectionQuestionPromptFactoryTest {
                 .contains("Had lunch")
                 .contains("contextId");
     }
+
+    @Test
+    void createsNonInventingInterestFallbackPromptWithoutContext() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, EnglishLevel.BEGINNER, List.of("MUSIC", "TRAVEL"), List.of());
+
+        String prompt = promptFactory.create(command);
+
+        assertThat(prompt)
+                .contains("There is no diary context")
+                .contains("Never claim or imply")
+                .contains("contextId as null")
+                .contains("MUSIC", "TRAVEL", "BEGINNER");
+    }
 }

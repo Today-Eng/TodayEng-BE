@@ -91,6 +91,33 @@ class ReflectionQuestionPersistenceServiceTest {
     }
 
     @Test
+    void usesInterestFallbackWhenDiaryContextIsAbsent() {
+        InterestTag tag = InterestTag.create(InterestTagName.MUSIC);
+        UserInterest interest = UserInterest.create(user, tag);
+        given(diaryRepository.findByIdAndUserId(10L, 1L)).willReturn(Optional.of(diary));
+        given(diaryRepository.claimQuestionGeneration(10L, 1L)).willReturn(1);
+        given(contextRepository.findAllByDiaryIdAndSuccessTrueOrderById(10L)).willReturn(List.of());
+        given(userInterestRepository.findAllByUserIdOrderByInterestTagId(1L)).willReturn(List.of(interest));
+
+        var result = service.prepare(1L, 10L);
+
+        assertThat(result.contexts()).isEmpty();
+        assertThat(result.interests()).containsExactly("MUSIC");
+    }
+
+    @Test
+    void rejectsGenerationWhenBothContextAndInterestAreAbsent() {
+        given(diaryRepository.findByIdAndUserId(10L, 1L)).willReturn(Optional.of(diary));
+        given(diaryRepository.claimQuestionGeneration(10L, 1L)).willReturn(1);
+        given(contextRepository.findAllByDiaryIdAndSuccessTrueOrderById(10L)).willReturn(List.of());
+        given(userInterestRepository.findAllByUserIdOrderByInterestTagId(1L)).willReturn(List.of());
+
+        assertThatThrownBy(() -> service.prepare(1L, 10L))
+                .isInstanceOfSatisfying(BaseException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.DIARY_CONTEXT_NOT_FOUND));
+    }
+
+    @Test
     void rejectsDuplicateGenerationBeforeLlmCall() {
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary));

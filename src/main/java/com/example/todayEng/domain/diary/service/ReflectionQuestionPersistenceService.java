@@ -64,10 +64,6 @@ public class ReflectionQuestionPersistenceService {
 
         List<DiaryContext> contexts = contextRepository
                 .findAllByDiaryIdAndSuccessTrueOrderById(diaryId);
-        if (contexts.isEmpty()) {
-            claimedDiary.failQuestionGeneration();
-            throw new BaseException(ErrorCode.DIARY_CONTEXT_NOT_FOUND);
-        }
         if (contexts.stream().anyMatch(context -> context.getContextData() == null)) {
             claimedDiary.failQuestionGeneration();
             throw new BaseException(ErrorCode.DIARY_CONTEXT_NOT_FOUND);
@@ -79,6 +75,10 @@ public class ReflectionQuestionPersistenceService {
                 .map(UserInterest::getInterestTag)
                 .map(tag -> tag.getTagName().name())
                 .toList();
+        if (contexts.isEmpty() && interests.isEmpty()) {
+            claimedDiary.failQuestionGeneration();
+            throw new BaseException(ErrorCode.DIARY_CONTEXT_NOT_FOUND);
+        }
 
         return new ReflectionQuestionGenerationCommand(
                 userId,
@@ -108,6 +108,7 @@ public class ReflectionQuestionPersistenceService {
 
         List<Long> contextIds = generated.stream()
                 .map(ReflectionQuestionLlmResponse.GeneratedQuestion::contextId)
+                .filter(java.util.Objects::nonNull)
                 .distinct()
                 .toList();
         Map<Long, DiaryContext> contexts = contextRepository
@@ -171,7 +172,9 @@ public class ReflectionQuestionPersistenceService {
 
         for (ReflectionQuestionLlmResponse.GeneratedQuestion question
                 : response.questions()) {
-            if (!allowedContextIds.contains(question.contextId())) {
+            boolean interestFallback = allowedContextIds.isEmpty();
+            if ((interestFallback && question.contextId() != null)
+                    || (!interestFallback && !allowedContextIds.contains(question.contextId()))) {
                 throw new BaseException(ErrorCode.INVALID_QUESTION_CONTEXT);
             }
             if (isBlank(question.questionText())
