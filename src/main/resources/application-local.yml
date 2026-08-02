@@ -15,8 +15,25 @@ spring:
         default_batch_fetch_size: 100
     open-in-view: false
 
+oauth:
+  google-calendar:
+    client-id: ${GOOGLE_CALENDAR_CLIENT_ID:}
+    client-secret: ${GOOGLE_CALENDAR_CLIENT_SECRET:}
+    redirect-uri: ${GOOGLE_CALENDAR_REDIRECT_URI:http://localhost:8080/api/external-accounts/google-calendar/callback}
+  spotify:
+    client-id: ${SPOTIFY_CLIENT_ID:}
+    client-secret: ${SPOTIFY_CLIENT_SECRET:}
+    redirect-uri: ${SPOTIFY_REDIRECT_URI:http://127.0.0.1:8080/api/external-accounts/spotify/callback}
+
+security:
+  oauth:
+    authorization-endpoint-permit-all: true
+
 cors:
   allowed-origins: http://localhost:3000,http://localhost:5173
+
+google:
+  client-id: ${GOOGLE_CLIENT_ID:local-google-client-id-not-configured}
 
 logging:
   level:

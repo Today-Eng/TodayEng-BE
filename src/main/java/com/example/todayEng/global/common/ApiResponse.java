@@ -31,6 +31,18 @@ public class ApiResponse<T> {
         return success(null);
     }
 
+    public static <T> ApiResponse<T> success(
+            String message,
+            T data
+    ) {
+        return new ApiResponse<>(
+                true,
+                "OK",
+                message,
+                data
+        );
+    }
+
     public static ApiResponse<Void> error(ErrorCode errorCode) {
         return new ApiResponse<>(false, errorCode.getCode(), errorCode.getMessage(), null);
     }

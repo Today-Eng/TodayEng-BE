@@ -67,7 +67,7 @@ public class ExternalAccount extends BaseTimeEntity {
     /*
      * 외부 서비스가 발급한 계정 고유 식별값입니다.
      * Google Calendar는 Google 계정의 sub,
-     * Spotify는 Spotify 사용자 ID를 저장합니다.
+     * Spotify 계정의 account_id.
      *
      * TodayEng 로그인에 사용한 계정의 식별값과는 별개입니다.
      */
@@ -122,8 +122,9 @@ public class ExternalAccount extends BaseTimeEntity {
         this.useEnabled = true;
     }
 
-    public static ExternalAccount createGoogleCalendarAccount(
+    public static ExternalAccount create(
             User user,
+            ExternalServiceProvider provider,
             String providerAccountId,
             String accountIdentifier,
             String accessToken,
@@ -132,26 +133,7 @@ public class ExternalAccount extends BaseTimeEntity {
     ) {
         return new ExternalAccount(
                 user,
-                ExternalServiceProvider.GOOGLE_CALENDAR,
-                providerAccountId,
-                accountIdentifier,
-                accessToken,
-                refreshToken,
-                tokenExpiresAt
-        );
-    }
-
-    public static ExternalAccount createSpotifyAccount(
-            User user,
-            String providerAccountId,
-            String accountIdentifier,
-            String accessToken,
-            String refreshToken,
-            LocalDateTime tokenExpiresAt
-    ) {
-        return new ExternalAccount(
-                user,
-                ExternalServiceProvider.SPOTIFY,
+                provider,
                 providerAccountId,
                 accountIdentifier,
                 accessToken,
@@ -174,8 +156,29 @@ public class ExternalAccount extends BaseTimeEntity {
         this.tokenExpiresAt = tokenExpiresAt;
     }
 
-    public void updateAccountIdentifier(String accountIdentifier) {
+    public void reconnect(
+            String providerAccountId,
+            String accountIdentifier,
+            String accessToken,
+            String refreshToken,
+            LocalDateTime tokenExpiresAt
+    ) {
+        boolean isAccountSwitched =
+                !this.providerAccountId.equals(providerAccountId);
+
+        this.providerAccountId = providerAccountId;
         this.accountIdentifier = accountIdentifier;
+
+        if (isAccountSwitched) {
+            this.accessToken = accessToken;
+            this.refreshToken = refreshToken;
+            this.tokenExpiresAt = tokenExpiresAt;
+        } else {
+            updateTokens(accessToken, refreshToken, tokenExpiresAt);
+        }
+
+        this.connectedAt = LocalDateTime.now();
+        this.useEnabled = true;
     }
 
     public void updateUseEnabled(boolean useEnabled) {

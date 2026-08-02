@@ -35,6 +35,17 @@ public class Terms extends BaseTimeEntity {
     )
     private TermsType termsType;
 
+    /*
+     * 기존 로컬 DB 스키마에 남아 있는 NOT NULL `term` 컬럼과의 호환 필드입니다.
+     * 약관의 실제 식별과 필수 여부는 termsType을 기준으로 사용합니다.
+     */
+    @Column(
+            name = "term",
+            nullable = false,
+            length = 255
+    )
+    private String term;
+
     @Column(
             name = "content",
             nullable = false,
@@ -47,6 +58,7 @@ public class Terms extends BaseTimeEntity {
             String content
     ) {
         this.termsType = termsType;
+        this.term = termsType.getDisplayName();
         this.content = content;
     }
 
