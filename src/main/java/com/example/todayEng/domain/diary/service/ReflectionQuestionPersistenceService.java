@@ -123,7 +123,7 @@ public class ReflectionQuestionPersistenceService {
                 .map(item -> DiaryQuestion.createGeneratedMainQuestion(
                         diary,
                         contexts.get(item.contextId()),
-                        item.order(),
+                        item.order() * 2 - 1,
                         item.questionText().trim(),
                         item.koreanTranslation().trim(),
                         item.keyword().trim(),

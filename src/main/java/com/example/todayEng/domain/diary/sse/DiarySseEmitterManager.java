@@ -81,6 +81,15 @@ public class DiarySseEmitterManager {
         sendIfPresent(userId, diaryId, DiarySseEventType.ANSWER_CORRECTED, data);
     }
 
+    public void sendFollowUpReady(Long userId, Long diaryId, DiarySsePayload.QuestionReady data) {
+        sendIfPresent(userId, diaryId, DiarySseEventType.FOLLOW_UP_READY, data);
+    }
+
+    public void sendReadyToComplete(Long userId, Long diaryId) {
+        sendIfPresent(userId, diaryId, DiarySseEventType.READY_TO_COMPLETE,
+                new DiarySsePayload.ReadyToComplete(diaryId));
+    }
+
     public void sendProcessingFailed(
             Long userId,
             Long diaryId,

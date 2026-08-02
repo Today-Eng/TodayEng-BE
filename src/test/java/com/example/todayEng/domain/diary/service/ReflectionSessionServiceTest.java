@@ -28,6 +28,8 @@ class ReflectionSessionServiceTest {
     private ReflectionQuestionLlmClient llmClient;
     @Mock
     private DiarySseEmitterManager emitterManager;
+    @Mock
+    private QuestionTtsService questionTtsService;
     @InjectMocks
     private ReflectionSessionService service;
 
@@ -52,6 +54,7 @@ class ReflectionSessionServiceTest {
                 10L,
                 new DiarySsePayload.QuestionsReady(response.questions())
         );
+        verify(questionTtsService).generateFirstQuestion(1L, response);
     }
 
     @Test

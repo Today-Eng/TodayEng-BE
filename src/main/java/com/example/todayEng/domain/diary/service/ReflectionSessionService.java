@@ -16,6 +16,7 @@ public class ReflectionSessionService {
     private final ReflectionQuestionPersistenceService persistenceService;
     private final ReflectionQuestionLlmClient llmClient;
     private final DiarySseEmitterManager emitterManager;
+    private final QuestionTtsService questionTtsService;
 
     public ReflectionSessionResponse create(Long userId, Long diaryId) {
         ReflectionQuestionGenerationCommand command =
@@ -32,6 +33,7 @@ public class ReflectionSessionService {
                     diaryId,
                     new DiarySsePayload.QuestionsReady(response.questions())
             );
+            questionTtsService.generateFirstQuestion(userId, response);
             return response;
         } catch (RuntimeException exception) {
             persistenceService.markFailed(userId, diaryId);

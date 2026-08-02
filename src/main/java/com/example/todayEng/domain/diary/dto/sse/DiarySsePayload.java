@@ -41,6 +41,8 @@ public final class DiarySsePayload {
     ) {
     }
 
+    public record ReadyToComplete(Long diaryId) { }
+
     public record ProcessingFailed(
             String stage,
             String errorCode,

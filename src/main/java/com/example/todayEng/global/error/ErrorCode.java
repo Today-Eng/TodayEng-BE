@@ -79,6 +79,21 @@ public enum ErrorCode {
     INVALID_LLM_RESPONSE(HttpStatus.BAD_GATEWAY, "D015", "LLM 응답 형식이 올바르지 않습니다."),
     LLM_API_FAILED(HttpStatus.BAD_GATEWAY, "D016", "LLM API 호출에 실패했습니다."),
     INVALID_QUESTION_CONTEXT(HttpStatus.BAD_GATEWAY, "D017", "LLM이 허용되지 않은 컨텍스트를 선택했습니다."),
+    QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "D018", "존재하지 않는 질문입니다."),
+    QUESTION_TTS_ALREADY_PROCESSING(HttpStatus.CONFLICT, "D019", "질문 음성이 이미 생성되었거나 생성 중입니다."),
+    TTS_API_FAILED(HttpStatus.BAD_GATEWAY, "D020", "Google TTS 호출에 실패했습니다."),
+    AUDIO_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "D021", "질문 음성 저장에 실패했습니다."),
+    QUESTION_NOT_ANSWERABLE(HttpStatus.CONFLICT, "D022", "현재 답변할 수 있는 질문이 아닙니다."),
+    ANSWER_ALREADY_EXISTS(HttpStatus.CONFLICT, "D023", "이미 답변이 등록된 질문입니다."),
+    INVALID_AUDIO_FILE(HttpStatus.BAD_REQUEST, "D024", "지원하지 않거나 올바르지 않은 음성 파일입니다."),
+    ANSWER_NOT_FOUND(HttpStatus.NOT_FOUND, "D025", "존재하지 않는 답변입니다."),
+    STT_API_FAILED(HttpStatus.BAD_GATEWAY, "D026", "Google STT 호출에 실패했습니다."),
+    INVALID_STT_RESPONSE(HttpStatus.BAD_GATEWAY, "D027", "STT 결과가 비어 있거나 올바르지 않습니다."),
+    ANSWER_CORRECTION_ALREADY_PROCESSING(HttpStatus.CONFLICT, "D028", "답변 교정이 이미 완료되었거나 처리 중입니다."),
+    FOLLOW_UP_QUESTION_ALREADY_EXISTS(HttpStatus.CONFLICT, "D029", "후속 질문이 이미 존재합니다."),
+    INVALID_REFLECTION_QUESTION_COMPOSITION(HttpStatus.CONFLICT, "D030", "회고 질문 구성이 완료 조건을 충족하지 않습니다."),
+    INCOMPLETE_REFLECTION_ANSWERS(HttpStatus.CONFLICT, "D031", "모든 회고 답변이 완료되지 않았습니다."),
+    REFLECTION_CORRECTION_NOT_FINISHED(HttpStatus.CONFLICT, "D032", "답변 교정 처리가 완료되지 않았습니다."),
 
     ;
 

@@ -2,6 +2,7 @@ package com.example.todayEng.domain.diary.entity;
 
 import com.example.todayEng.domain.diary.entity.enums.QuestionGenerationType;
 import com.example.todayEng.domain.diary.entity.enums.QuestionType;
+import com.example.todayEng.domain.diary.entity.enums.TtsStatus;
 import com.example.todayEng.domain.user.entity.enums.EnglishLevel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.example.todayEng.global.error.ErrorCode;
@@ -92,6 +93,17 @@ public class DiaryQuestion {
     @Column(name = "interest_snapshot", columnDefinition = "json")
     private JsonNode interestSnapshot;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tts_status", nullable = false, length = 20)
+    @org.hibernate.annotations.ColumnDefault("'PENDING'")
+    private TtsStatus ttsStatus;
+
+    @Column(name = "tts_audio_key", length = 500)
+    private String ttsAudioKey;
+
+    @Column(name = "tts_error_message", length = 500)
+    private String ttsErrorMessage;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -127,6 +139,19 @@ public class DiaryQuestion {
         this.context = context;
         this.englishLevelSnapshot = englishLevelSnapshot;
         this.interestSnapshot = interestSnapshot;
+        this.ttsStatus = TtsStatus.PENDING;
+    }
+
+    public void completeTts(String audioKey) {
+        this.ttsStatus = TtsStatus.SUCCEEDED;
+        this.ttsAudioKey = audioKey;
+        this.ttsErrorMessage = null;
+    }
+
+    public void failTts(String errorMessage) {
+        this.ttsStatus = TtsStatus.FAILED;
+        this.ttsAudioKey = null;
+        this.ttsErrorMessage = errorMessage;
     }
 
     public static DiaryQuestion createGeneratedMainQuestion(
@@ -185,10 +210,13 @@ public class DiaryQuestion {
                 .diary(diary)
                 .parentQuestion(parentQuestion)
                 .questionType(QuestionType.FOLLOW_UP)
-                .questionOrder(questionOrder)
+                .questionOrder(parentQuestion.getQuestionOrder() + 1)
                 .questionText(questionText)
                 .generationType(QuestionGenerationType.AI)
                 .koreanTranslation(koreanTranslation)
+                .context(parentQuestion.context)
+                .englishLevelSnapshot(parentQuestion.englishLevelSnapshot)
+                .interestSnapshot(parentQuestion.interestSnapshot)
                 .build();
     }
 

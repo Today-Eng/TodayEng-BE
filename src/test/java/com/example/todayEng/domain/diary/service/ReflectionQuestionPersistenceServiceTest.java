@@ -144,7 +144,7 @@ class ReflectionQuestionPersistenceServiceTest {
 
         assertThat(result.questions()).extracting(
                 com.example.todayEng.domain.diary.dto.response.ReflectionSessionResponse.Question::order
-        ).containsExactly(1, 2, 3);
+        ).containsExactly(1, 3, 5);
         assertThat(result.questions()).extracting(
                 com.example.todayEng.domain.diary.dto.response.ReflectionSessionResponse.Question::contextId
         ).containsOnly(100L);

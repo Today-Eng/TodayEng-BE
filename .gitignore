@@ -43,3 +43,6 @@ docs/
 CLAUDE.md
 .agents
 AGENTS.md
+
+src/main/resources/google-credentials.json
+/storage/

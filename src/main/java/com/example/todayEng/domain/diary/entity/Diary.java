@@ -53,7 +53,7 @@ public class Diary extends BaseTimeEntity {
     @ColumnDefault("'NOT_STARTED'")
     private ReflectionQuestionGenerationStatus questionGenerationStatus;
 
-    @Column(name = "memo", length = 200)
+    @Column(name = "memo", length = 2000)
     private String memo;
 
     @Column(name = "completed_at")
@@ -91,6 +91,11 @@ public class Diary extends BaseTimeEntity {
 
         this.status = DiaryStatus.COMPLETED;
         this.completedAt = LocalDateTime.now();
+    }
+
+    public void complete(String finalMemo) {
+        this.memo = finalMemo == null || finalMemo.isBlank() ? null : finalMemo.trim();
+        complete();
     }
 
     public void completeQuestionGeneration() {
