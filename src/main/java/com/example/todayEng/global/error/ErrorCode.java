@@ -73,6 +73,10 @@ public enum ErrorCode {
     DIARY_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "D009", "해당 날짜에 이미 진행 중인 회고가 있습니다."),
     DIARY_ALREADY_COMPLETED(HttpStatus.CONFLICT, "D010", "해당 날짜의 회고가 이미 완료되었습니다."),
 
+    // Notification (N)
+    PUSH_SUBSCRIPTION_REQUIRED(HttpStatus.BAD_REQUEST, "N001", "푸시 구독 정보가 없어 알림을 활성화할 수 없습니다."),
+    INVALID_PUSH_SUBSCRIPTION(HttpStatus.BAD_REQUEST, "N002", "푸시 구독 정보는 모두 입력되어야 합니다."),
+    NOTIFICATION_DISABLED(HttpStatus.BAD_REQUEST, "N003", "알림이 비활성화되어 있습니다."),
     ;
 
     private final HttpStatus status;
