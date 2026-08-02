@@ -3,6 +3,7 @@ package com.example.todayEng.global.config;
 import java.time.Duration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
@@ -13,6 +14,7 @@ public class RestClientConfig {
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
 
     @Bean
+    @Primary
     public RestClient restClient() {
         SimpleClientHttpRequestFactory requestFactory =
                 new SimpleClientHttpRequestFactory();

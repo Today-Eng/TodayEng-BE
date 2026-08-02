@@ -40,3 +40,15 @@ oauth:
     scopes:
       - user-read-email
       - user-read-recently-played
+
+diary:
+  sse:
+    timeout-millis: 1800000
+    heartbeat-interval-millis: 30000
+
+gemini:
+  base-url: https://generativelanguage.googleapis.com
+  api-key: ${GEMINI_API_KEY:}
+  model: gemini-2.5-flash
+  connect-timeout-seconds: 3
+  read-timeout-seconds: 30

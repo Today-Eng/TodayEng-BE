@@ -72,6 +72,13 @@ public enum ErrorCode {
     DIARY_DATE_EXPIRED(HttpStatus.BAD_REQUEST, "D008", "7일이 지난 날짜에는 회고를 작성할 수 없습니다."),
     DIARY_ALREADY_IN_PROGRESS(HttpStatus.CONFLICT, "D009", "해당 날짜에 이미 진행 중인 회고가 있습니다."),
     DIARY_ALREADY_COMPLETED(HttpStatus.CONFLICT, "D010", "해당 날짜의 회고가 이미 완료되었습니다."),
+    DIARY_NOT_FOUND(HttpStatus.NOT_FOUND, "D011", "존재하지 않는 회고입니다."),
+    DIARY_NOT_IN_PROGRESS(HttpStatus.CONFLICT, "D012", "진행 가능한 회고 상태가 아닙니다."),
+    REFLECTION_QUESTIONS_ALREADY_GENERATED(HttpStatus.CONFLICT, "D013", "회고 질문이 이미 생성되었거나 생성 중입니다."),
+    DIARY_CONTEXT_NOT_FOUND(HttpStatus.BAD_REQUEST, "D014", "질문 생성에 사용할 회고 컨텍스트가 없습니다."),
+    INVALID_LLM_RESPONSE(HttpStatus.BAD_GATEWAY, "D015", "LLM 응답 형식이 올바르지 않습니다."),
+    LLM_API_FAILED(HttpStatus.BAD_GATEWAY, "D016", "LLM API 호출에 실패했습니다."),
+    INVALID_QUESTION_CONTEXT(HttpStatus.BAD_GATEWAY, "D017", "LLM이 허용되지 않은 컨텍스트를 선택했습니다."),
 
     ;
 
