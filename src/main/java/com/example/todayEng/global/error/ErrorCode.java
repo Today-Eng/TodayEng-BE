@@ -94,6 +94,7 @@ public enum ErrorCode {
     INVALID_REFLECTION_QUESTION_COMPOSITION(HttpStatus.CONFLICT, "D030", "회고 질문 구성이 완료 조건을 충족하지 않습니다."),
     INCOMPLETE_REFLECTION_ANSWERS(HttpStatus.CONFLICT, "D031", "모든 회고 답변이 완료되지 않았습니다."),
     REFLECTION_CORRECTION_NOT_FINISHED(HttpStatus.CONFLICT, "D032", "답변 교정 처리가 완료되지 않았습니다."),
+    DIARY_ALREADY_PAUSED(HttpStatus.CONFLICT, "D033", "이미 중단된 회고입니다."),
 
     ;
 

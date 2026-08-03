@@ -59,6 +59,12 @@ public class Diary extends BaseTimeEntity {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "paused_at")
+    private LocalDateTime pausedAt;
+
+    @Column(name = "pause_expires_at")
+    private LocalDateTime pauseExpiresAt;
+
     @Builder(access = AccessLevel.PRIVATE)
     private Diary(
             User user,
@@ -96,6 +102,19 @@ public class Diary extends BaseTimeEntity {
     public void complete(String finalMemo) {
         this.memo = finalMemo == null || finalMemo.isBlank() ? null : finalMemo.trim();
         complete();
+    }
+
+    public void pause(LocalDateTime pausedAt, LocalDateTime pauseExpiresAt) {
+        if (this.status != DiaryStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Only an in-progress diary can be paused.");
+        }
+        if (pausedAt == null || pauseExpiresAt == null || !pauseExpiresAt.isAfter(pausedAt)) {
+            throw new IllegalArgumentException("Pause expiration must be after the pause time.");
+        }
+
+        this.status = DiaryStatus.PAUSED;
+        this.pausedAt = pausedAt;
+        this.pauseExpiresAt = pauseExpiresAt;
     }
 
     public void completeQuestionGeneration() {
