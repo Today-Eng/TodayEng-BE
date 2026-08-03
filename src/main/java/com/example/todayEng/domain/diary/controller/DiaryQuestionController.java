@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/diaries")
 @RequiredArgsConstructor
-@Tag(name = "회고 질문 조회", description = "질문 목록, 처리 상태 및 현재 답변 가능한 질문 조회")
+@Tag(name = "회고 진행", description = "질문 생성·조회, 음성 답변 및 진행 결과 구독 API")
 public class DiaryQuestionController {
     private final DiaryQuestionQueryService queryService;
 

@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/diaries")
 @RequiredArgsConstructor
-@Tag(name = "회고 완료", description = "모든 질문과 교정 완료 후 최종 메모 저장")
+@Tag(name = "회고 관리", description = "회고 시작 및 완료 API")
 public class DiaryCompletionController {
     private final DiaryCompletionService completionService;
 

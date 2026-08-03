@@ -214,9 +214,9 @@ public class DiaryQuestion {
                 .questionText(questionText)
                 .generationType(QuestionGenerationType.AI)
                 .koreanTranslation(koreanTranslation)
-                .context(parentQuestion.context)
-                .englishLevelSnapshot(parentQuestion.englishLevelSnapshot)
-                .interestSnapshot(parentQuestion.interestSnapshot)
+                .context(parentQuestion.getContext())
+                .englishLevelSnapshot(parentQuestion.getEnglishLevelSnapshot())
+                .interestSnapshot(parentQuestion.getInterestSnapshot())
                 .build();
     }
 
@@ -234,7 +234,7 @@ public class DiaryQuestion {
         }
 
         if (parentQuestion != null
-                && parentQuestion.questionType != QuestionType.MAIN) {
+                && parentQuestion.getQuestionType() != QuestionType.MAIN) {
             throw new BaseException(ErrorCode.FOLLOW_UP_PARENT_MUST_BE_MAIN_QUESTION);
         }
     }

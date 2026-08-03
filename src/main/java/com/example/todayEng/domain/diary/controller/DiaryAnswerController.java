@@ -25,7 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/diaries")
 @RequiredArgsConstructor
-@Tag(name = "회고 답변", description = "WebM 음성 답변 업로드와 STT·교정 결과 조회")
+@Tag(name = "회고 진행", description = "질문 생성·조회, 음성 답변 및 진행 결과 구독 API")
 public class DiaryAnswerController {
     private final AnswerUploadService answerUploadService;
     private final DiaryAnswerQueryService answerQueryService;
