@@ -72,15 +72,6 @@ public class QuestionTtsService {
             byte[] audio = googleTtsClient.synthesize(command.questionText());
             audioKey = audioFileStorage.store(diaryId, questionId, audio);
             persistenceService.complete(command, audioKey);
-
-            DiarySsePayload.QuestionReady payload = new DiarySsePayload.QuestionReady(
-                            questionId,
-                            command.questionText(),
-                            koreanTranslation,
-                            audioFileStorage.publicUrl(audioKey)
-                    );
-            if (followUp) emitterManager.sendFollowUpReady(userId, diaryId, payload);
-            else emitterManager.sendQuestionReady(userId, diaryId, payload);
         } catch (RuntimeException exception) {
             if (audioKey != null) {
                 audioFileStorage.deleteQuietly(audioKey);
@@ -93,6 +84,17 @@ public class QuestionTtsService {
                     questionId,
                     exception.getClass().getSimpleName()
             );
+            return;
+        }
+
+        try {
+            DiarySsePayload.QuestionReady payload = new DiarySsePayload.QuestionReady(
+                    questionId, command.questionText(), koreanTranslation, audioFileStorage.publicUrl(audioKey));
+            if (followUp) emitterManager.sendFollowUpReady(userId, diaryId, payload);
+            else emitterManager.sendQuestionReady(userId, diaryId, payload);
+        } catch (RuntimeException exception) {
+            log.error("Question TTS notification failed: userId={}, diaryId={}, questionId={}",
+                    userId, diaryId, questionId, exception);
         }
     }
 

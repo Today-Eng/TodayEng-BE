@@ -79,4 +79,24 @@ class AnswerCorrectionPipelineServiceTest {
         service.process(1L, 2L, 3L, 4L);
         verifyNoInteractions(llmClient);
     }
+
+    @Test
+    void notificationFailureDoesNotRevertCompletedCorrection() {
+        var command = new AnswerCorrectionCommand(QuestionType.FOLLOW_UP, "q", "a", EnglishLevel.BEGINNER, null);
+        var work = new AnswerCorrectionWork(1L, 2L, 3L, 4L, command);
+        var llm = new AnswerCorrectionLlmResponse("correct", "reason", List.of(), null);
+        var result = new AnswerCorrectionResult(QuestionType.FOLLOW_UP, 3L, 4L,
+                "correct", "reason", null, true);
+        when(persistenceService.claim(1L, 2L, 3L, 4L)).thenReturn(work);
+        when(llmClient.correct(command)).thenReturn(llm);
+        when(persistenceService.complete(work, llm)).thenReturn(result);
+        doThrow(new RuntimeException("disconnected")).when(emitterManager)
+                .sendAnswerCorrected(eq(1L), eq(2L), any());
+
+        service.process(1L, 2L, 3L, 4L);
+
+        verify(persistenceService, never()).fail(anyLong(), any());
+        verify(emitterManager, never()).sendProcessingFailed(eq(1L), eq(2L), any());
+        verify(emitterManager).sendReadyToComplete(1L, 2L);
+    }
 }

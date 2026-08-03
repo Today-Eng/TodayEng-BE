@@ -202,7 +202,6 @@ public class DiaryQuestion {
     public static DiaryQuestion createFollowUpQuestion(
             Diary diary,
             DiaryQuestion parentQuestion,
-            Integer questionOrder,
             String questionText,
             String koreanTranslation
     ) {

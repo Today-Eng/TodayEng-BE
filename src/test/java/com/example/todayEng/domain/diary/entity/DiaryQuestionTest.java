@@ -24,7 +24,7 @@ class DiaryQuestionTest {
         when(parent.getInterestSnapshot()).thenReturn(interests);
 
         DiaryQuestion followUp = DiaryQuestion.createFollowUpQuestion(
-                diary, parent, 2, "Why?", "왜인가요?");
+                diary, parent, "Why?", "왜인가요?");
 
         assertThat(followUp.getQuestionType()).isEqualTo(QuestionType.FOLLOW_UP);
         assertThat(followUp.getQuestionOrder()).isEqualTo(2);

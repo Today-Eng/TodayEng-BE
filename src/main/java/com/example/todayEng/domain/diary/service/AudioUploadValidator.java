@@ -5,6 +5,7 @@ import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import java.io.IOException;
 import org.springframework.stereotype.Component;
+import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 
 @Component
@@ -19,7 +20,7 @@ public class AudioUploadValidator {
     public ValidatedAudio validate(MultipartFile file) {
         if (file == null || file.isEmpty()) throw new BaseException(ErrorCode.INVALID_AUDIO_FILE);
         if (file.getSize() > properties.maxFileSizeBytes()) throw new BaseException(ErrorCode.FILE_SIZE_EXCEEDED);
-        if (!properties.contentType().equalsIgnoreCase(file.getContentType())) {
+        if (!sameBaseMediaType(properties.contentType(), file.getContentType())) {
             throw new BaseException(ErrorCode.INVALID_AUDIO_FILE);
         }
         try {
@@ -28,6 +29,18 @@ public class AudioUploadValidator {
             return new ValidatedAudio(bytes);
         } catch (IOException exception) {
             throw new BaseException(ErrorCode.MULTIPART_FILE_ERROR);
+        }
+    }
+
+    private boolean sameBaseMediaType(String expected, String actual) {
+        if (actual == null) return false;
+        try {
+            MediaType expectedType = MediaType.parseMediaType(expected);
+            MediaType actualType = MediaType.parseMediaType(actual);
+            return expectedType.getType().equalsIgnoreCase(actualType.getType())
+                    && expectedType.getSubtype().equalsIgnoreCase(actualType.getSubtype());
+        } catch (IllegalArgumentException exception) {
+            return false;
         }
     }
 

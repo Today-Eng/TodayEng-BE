@@ -21,6 +21,13 @@ class AudioUploadValidatorTest {
     }
 
     @Test
+    void acceptsWebmContentTypeWithCodecParameter() {
+        var result = validator.validate(new MockMultipartFile("audio", "a.webm", "audio/webm;codecs=opus",
+                new byte[]{0x1a, 0x45, (byte) 0xdf, (byte) 0xa3}));
+        assertThat(result.bytes()).hasSize(4);
+    }
+
+    @Test
     void rejectsSpoofedAudio() {
         assertThatThrownBy(() -> validator.validate(new MockMultipartFile(
                 "audio", "a.webm", "audio/webm", new byte[]{1, 2, 3, 4})))

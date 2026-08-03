@@ -3,6 +3,7 @@ package com.example.todayEng.domain.diary.service;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 import com.example.todayEng.domain.diary.client.GoogleTtsClient;
 import com.example.todayEng.domain.diary.dto.response.ReflectionSessionResponse;
@@ -124,6 +125,24 @@ class QuestionTtsServiceTest {
 
         verify(persistenceService).claim(1L, 10L, 101L);
         verify(persistenceService).complete(command, "retry.mp3");
+    }
+
+    @Test
+    void notificationFailureDoesNotRevertCompletedTtsOrDeleteAudio() {
+        QuestionTtsCommand command = new QuestionTtsCommand(1L, 10L, 101L, "Question");
+        byte[] audio = new byte[]{1};
+        given(persistenceService.claim(1L, 10L, 101L)).willReturn(command);
+        given(googleTtsClient.synthesize("Question")).willReturn(audio);
+        given(audioFileStorage.store(10L, 101L, audio)).willReturn("audio.mp3");
+        given(audioFileStorage.publicUrl("audio.mp3")).willReturn("/audio.mp3");
+        doThrow(new RuntimeException("disconnected")).when(emitterManager)
+                .sendQuestionReady(eq(1L), eq(10L), any());
+
+        service.generateQuestion(1L, 10L, 101L, "질문");
+
+        verify(persistenceService).complete(command, "audio.mp3");
+        verify(persistenceService, never()).fail(any(), any());
+        verify(audioFileStorage, never()).deleteQuietly("audio.mp3");
     }
 
     private ReflectionSessionResponse.Question question(Long id, int order) {

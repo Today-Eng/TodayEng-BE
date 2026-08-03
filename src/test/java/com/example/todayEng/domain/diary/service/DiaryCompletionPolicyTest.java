@@ -66,7 +66,7 @@ class DiaryCompletionPolicyTest {
         for (int order = 1; order <= 5; order += 2) {
             DiaryQuestion main = DiaryQuestion.createMainQuestion(diary, order, "main", QuestionGenerationType.AI,
                     "메인", null, null);
-            DiaryQuestion follow = DiaryQuestion.createFollowUpQuestion(diary, main, order + 1, "follow", "후속");
+            DiaryQuestion follow = DiaryQuestion.createFollowUpQuestion(diary, main, "follow", "후속");
             questions.add(main); questions.add(follow);
         }
         for (DiaryQuestion q : questions) {

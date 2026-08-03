@@ -25,7 +25,7 @@ public class AnswerCorrectionPersistenceService {
     @Transactional
     public AnswerCorrectionWork claim(Long userId, Long diaryId, Long questionId, Long answerId) {
         if (answerRepository.claimCorrection(answerId) != 1) {
-            DiaryAnswer current = owned(userId, diaryId, questionId, answerId);
+            owned(userId, diaryId, questionId, answerId);
             throw new BaseException(ErrorCode.ANSWER_CORRECTION_ALREADY_PROCESSING);
         }
         DiaryAnswer answer = owned(userId, diaryId, questionId, answerId);
@@ -52,9 +52,13 @@ public class AnswerCorrectionPersistenceService {
                 throw new BaseException(ErrorCode.FOLLOW_UP_QUESTION_ALREADY_EXISTS);
             }
             var follow = response.followUpQuestion();
+            if (follow == null || follow.questionText() == null || follow.questionText().isBlank()
+                    || follow.koreanTranslation() == null || follow.koreanTranslation().isBlank()) {
+                throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
+            }
             try {
                 DiaryQuestion saved = questionRepository.saveAndFlush(DiaryQuestion.createFollowUpQuestion(
-                        question.getDiary(), question, question.getQuestionOrder(), follow.questionText(),
+                        question.getDiary(), question, follow.questionText(),
                         follow.koreanTranslation()));
                 next = new AnswerCorrectionResult.NextQuestion(saved.getId(), saved.getKoreanTranslation(), true);
             } catch (DataIntegrityViolationException exception) {

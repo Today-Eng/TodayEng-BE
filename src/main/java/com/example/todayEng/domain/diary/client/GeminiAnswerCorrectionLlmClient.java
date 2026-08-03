@@ -60,11 +60,18 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
     }
 
     private Map<String, Object> schema(QuestionType type) {
-        Map<String, Object> followUp = Map.of("type", "object", "nullable", type == QuestionType.FOLLOW_UP,
+        Map<String, Object> followUp = Map.of("type", "object",
                 "additionalProperties", false,
                 "properties", Map.of("questionText", Map.of("type", "string"),
                         "koreanTranslation", Map.of("type", "string")),
                 "required", List.of("questionText", "koreanTranslation"));
+        if (type == QuestionType.FOLLOW_UP) {
+            return Map.of("type", "object", "additionalProperties", false,
+                    "properties", Map.of("correctedText", Map.of("type", "string"),
+                            "correctionReason", Map.of("type", "string"),
+                            "alternativeExpressions", Map.of("type", "array", "items", Map.of("type", "string"))),
+                    "required", List.of("correctedText", "correctionReason", "alternativeExpressions"));
+        }
         return Map.of("type", "object", "additionalProperties", false,
                 "properties", Map.of("correctedText", Map.of("type", "string"),
                         "correctionReason", Map.of("type", "string"),

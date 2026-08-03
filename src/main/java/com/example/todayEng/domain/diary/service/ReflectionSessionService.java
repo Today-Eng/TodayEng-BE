@@ -7,9 +7,11 @@ import com.example.todayEng.domain.diary.dto.response.ReflectionSessionResponse;
 import com.example.todayEng.domain.diary.dto.sse.DiarySsePayload;
 import com.example.todayEng.domain.diary.sse.DiarySseEmitterManager;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ReflectionSessionService {
 
@@ -22,22 +24,31 @@ public class ReflectionSessionService {
         ReflectionQuestionGenerationCommand command =
                 persistenceService.prepare(userId, diaryId);
 
+        ReflectionSessionResponse response;
         try {
             ReflectionQuestionLlmResponse llmResponse =
                     llmClient.generateQuestions(command);
-            ReflectionSessionResponse response =
-                    persistenceService.saveQuestions(command, llmResponse);
-
+            response = persistenceService.saveQuestions(command, llmResponse);
+        } catch (RuntimeException exception) {
+            persistenceService.markFailed(userId, diaryId);
+            throw exception;
+        }
+        try {
             emitterManager.sendQuestionsReady(
                     userId,
                     diaryId,
                     new DiarySsePayload.QuestionsReady(response.questions())
             );
-            questionTtsService.generateFirstQuestion(userId, response);
-            return response;
         } catch (RuntimeException exception) {
-            persistenceService.markFailed(userId, diaryId);
-            throw exception;
+            log.error("Questions-ready notification failed: userId={}, diaryId={}",
+                    userId, diaryId, exception);
         }
+        try {
+            questionTtsService.generateFirstQuestion(userId, response);
+        } catch (RuntimeException exception) {
+            log.error("First-question TTS request failed: userId={}, diaryId={}",
+                    userId, diaryId, exception);
+        }
+        return response;
     }
 }

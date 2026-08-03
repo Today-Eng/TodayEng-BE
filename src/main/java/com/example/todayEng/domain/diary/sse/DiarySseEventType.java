@@ -1,5 +1,7 @@
 package com.example.todayEng.domain.diary.sse;
 
+import java.util.Locale;
+
 public enum DiarySseEventType {
     CONNECTED,
     HEARTBEAT,
@@ -14,7 +16,7 @@ public enum DiarySseEventType {
     private final String eventName;
 
     DiarySseEventType() {
-        this.eventName = name().toLowerCase();
+        this.eventName = name().toLowerCase(Locale.ROOT);
     }
 
     DiarySseEventType(String eventName) {

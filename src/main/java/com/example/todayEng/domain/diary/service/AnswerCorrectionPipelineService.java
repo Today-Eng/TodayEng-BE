@@ -22,12 +22,20 @@ public class AnswerCorrectionPipelineService {
 
     public void process(Long userId, Long diaryId, Long questionId, Long answerId) {
         AnswerCorrectionWork work = null;
+        AnswerCorrectionResult result;
         try {
             work = persistenceService.claim(userId, diaryId, questionId, answerId);
             var llmResponse = llmClient.correct(work.command());
-            AnswerCorrectionResult result = persistenceService.complete(work, llmResponse);
-            emitterManager.sendAnswerCorrected(userId, diaryId, new DiarySsePayload.AnswerCorrected(
-                    questionId, answerId, result.correctedText(), result.correctionReason()));
+            result = persistenceService.complete(work, llmResponse);
+        } catch (RuntimeException exception) {
+            handleProcessingFailure(userId, diaryId, questionId, answerId, work, exception);
+            return;
+        }
+
+        runFollowUpAction("answer-corrected notification", diaryId, questionId, answerId,
+                () -> emitterManager.sendAnswerCorrected(userId, diaryId, new DiarySsePayload.AnswerCorrected(
+                        questionId, answerId, result.correctedText(), result.correctionReason())));
+        runFollowUpAction("next step", diaryId, questionId, answerId, () -> {
             if (result.nextQuestion() != null) {
                 if (result.nextQuestion().followUp()) {
                     questionTtsService.generateFollowUpQuestion(userId, diaryId, result.nextQuestion().id(),
@@ -39,19 +47,31 @@ public class AnswerCorrectionPipelineService {
             } else if (result.readyToComplete()) {
                 emitterManager.sendReadyToComplete(userId, diaryId);
             }
+        });
+    }
+
+    private void runFollowUpAction(String action, Long diaryId, Long questionId, Long answerId, Runnable runnable) {
+        try {
+            runnable.run();
         } catch (RuntimeException exception) {
-            if (exception instanceof BaseException baseException
-                    && baseException.getErrorCode() == ErrorCode.ANSWER_CORRECTION_ALREADY_PROCESSING) {
-                log.debug("Answer correction was already claimed: answerId={}", answerId);
-                return;
-            }
-            if (work != null) persistenceService.fail(answerId, exception);
-            emitterManager.sendProcessingFailed(userId, diaryId,
-                    new DiarySsePayload.ProcessingFailed("ANSWER_CORRECTION", errorCode(exception),
-                            "답변 교정 처리에 실패했습니다."));
-            log.error("Answer correction failed: diaryId={}, questionId={}, answerId={}",
-                    diaryId, questionId, answerId, exception);
+            log.error("Answer correction {} failed: diaryId={}, questionId={}, answerId={}",
+                    action, diaryId, questionId, answerId, exception);
         }
+    }
+
+    private void handleProcessingFailure(Long userId, Long diaryId, Long questionId, Long answerId,
+            AnswerCorrectionWork work, RuntimeException exception) {
+        if (exception instanceof BaseException baseException
+                && baseException.getErrorCode() == ErrorCode.ANSWER_CORRECTION_ALREADY_PROCESSING) {
+            log.debug("Answer correction was already claimed: answerId={}", answerId);
+            return;
+        }
+        if (work != null) persistenceService.fail(answerId, exception);
+        emitterManager.sendProcessingFailed(userId, diaryId,
+                new DiarySsePayload.ProcessingFailed("ANSWER_CORRECTION", errorCode(exception),
+                        "답변 교정 처리에 실패했습니다."));
+        log.error("Answer correction failed: diaryId={}, questionId={}, answerId={}",
+                diaryId, questionId, answerId, exception);
     }
 
     private String errorCode(RuntimeException exception) {

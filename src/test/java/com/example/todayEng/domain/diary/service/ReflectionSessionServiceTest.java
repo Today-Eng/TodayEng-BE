@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 import com.example.todayEng.domain.diary.client.ReflectionQuestionLlmClient;
 import com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand;
@@ -69,5 +70,23 @@ class ReflectionSessionServiceTest {
         assertThatThrownBy(() -> service.create(1L, 10L))
                 .isSameAs(failure);
         verify(persistenceService).markFailed(1L, 10L);
+    }
+
+    @Test
+    void notificationFailureDoesNotMarkSavedQuestionsFailed() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, EnglishLevel.BEGINNER, List.of(), List.of());
+        var llmResponse = new ReflectionQuestionLlmResponse(List.of());
+        var response = new ReflectionSessionResponse(10L, List.of());
+        given(persistenceService.prepare(1L, 10L)).willReturn(command);
+        given(llmClient.generateQuestions(command)).willReturn(llmResponse);
+        given(persistenceService.saveQuestions(command, llmResponse)).willReturn(response);
+        doThrow(new RuntimeException("disconnected")).when(emitterManager)
+                .sendQuestionsReady(eq(1L), eq(10L), any());
+
+        assertThat(service.create(1L, 10L)).isSameAs(response);
+
+        verify(persistenceService, never()).markFailed(1L, 10L);
+        verify(questionTtsService).generateFirstQuestion(1L, response);
     }
 }

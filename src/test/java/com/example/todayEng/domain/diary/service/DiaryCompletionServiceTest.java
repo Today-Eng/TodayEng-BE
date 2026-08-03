@@ -38,7 +38,7 @@ class DiaryCompletionServiceTest {
     }
 
     @Test void completesAndStoresFinalMemoInDiaryMemo() {
-        when(diaryRepository.findById(2L)).thenReturn(Optional.of(diary));
+        when(diaryRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(diary));
         when(questionRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of());
         when(answerRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of());
         var result = service.complete(1L, 2L, new DiaryCompleteRequest(" 최종 메모 "));
@@ -50,7 +50,7 @@ class DiaryCompletionServiceTest {
     }
 
     @Test void acceptsNullAndNormalizesBlankToNull() {
-        when(diaryRepository.findById(2L)).thenReturn(Optional.of(diary));
+        when(diaryRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(diary));
         when(questionRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of());
         when(answerRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of());
         assertThat(service.complete(1L, 2L, new DiaryCompleteRequest("  ")).finalMemo()).isNull();
@@ -58,14 +58,14 @@ class DiaryCompletionServiceTest {
 
     @Test void alreadyCompletedIsIdempotentAndDoesNotOverwriteFinalMemo() {
         diary.complete("first");
-        when(diaryRepository.findById(2L)).thenReturn(Optional.of(diary));
+        when(diaryRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(diary));
         var result = service.complete(1L, 2L, new DiaryCompleteRequest("second"));
         assertThat(result.finalMemo()).isEqualTo("first");
         verifyNoInteractions(questionRepository, answerRepository, completionPolicy);
     }
 
     @Test void rejectsOtherOwner() {
-        when(diaryRepository.findById(2L)).thenReturn(Optional.of(diary));
+        when(diaryRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(diary));
         assertThatThrownBy(() -> service.complete(9L, 2L, new DiaryCompleteRequest(null)))
                 .isInstanceOfSatisfying(BaseException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));

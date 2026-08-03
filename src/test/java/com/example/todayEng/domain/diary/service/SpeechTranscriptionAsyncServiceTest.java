@@ -53,4 +53,22 @@ class SpeechTranscriptionAsyncServiceTest {
         verify(storage, never()).deleteQuietly("key");
         verifyNoInteractions(emitterManager);
     }
+
+    @Test
+    void sseFailureDoesNotRevertTranscriptAndStillStartsCorrection() {
+        DiaryAnswer answer = mock(DiaryAnswer.class);
+        when(persistenceService.claim(4L)).thenReturn(true);
+        when(persistenceService.getOwned(1L, 2L, 3L, 4L)).thenReturn(answer);
+        when(answer.getAudioKey()).thenReturn("key");
+        when(storage.read("key")).thenReturn(new byte[]{1});
+        when(client.transcribe(any())).thenReturn("hello");
+        doThrow(new RuntimeException("disconnected")).when(emitterManager)
+                .sendAnswerTranscribed(eq(1L), eq(2L), any());
+
+        service.transcribe(1L, 2L, 3L, 4L);
+
+        verify(persistenceService).complete(4L, "hello");
+        verify(persistenceService, never()).fail(anyLong(), any());
+        verify(correctionPipelineService).process(1L, 2L, 3L, 4L);
+    }
 }

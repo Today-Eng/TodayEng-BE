@@ -22,19 +22,33 @@ public class SpeechTranscriptionAsyncService {
 
     @Async("speechTaskExecutor")
     public void transcribe(Long userId, Long diaryId, Long questionId, Long answerId) {
+        String audioKey;
+        String text;
         try {
             if (!persistenceService.claim(answerId)) return;
             DiaryAnswer answer = persistenceService.getOwned(userId, diaryId, questionId, answerId);
-            String audioKey = answer.getAudioKey();
-            String text = speechClient.transcribe(audioFileStorage.read(audioKey));
+            audioKey = answer.getAudioKey();
+            text = speechClient.transcribe(audioFileStorage.read(audioKey));
             persistenceService.complete(answerId, text);
-            audioFileStorage.deleteQuietly(audioKey);
-            emitterManager.sendAnswerTranscribed(userId, diaryId,
-                    new DiarySsePayload.AnswerTranscribed(questionId, answerId, text));
-            correctionPipelineService.process(userId, diaryId, questionId, answerId);
         } catch (RuntimeException exception) {
             persistenceService.fail(answerId, exception.getMessage());
             log.error("STT processing failed: diaryId={}, questionId={}, answerId={}",
+                    diaryId, questionId, answerId, exception);
+            return;
+        }
+
+        audioFileStorage.deleteQuietly(audioKey);
+        try {
+            emitterManager.sendAnswerTranscribed(userId, diaryId,
+                    new DiarySsePayload.AnswerTranscribed(questionId, answerId, text));
+        } catch (RuntimeException exception) {
+            log.error("STT notification failed: diaryId={}, questionId={}, answerId={}",
+                    diaryId, questionId, answerId, exception);
+        }
+        try {
+            correctionPipelineService.process(userId, diaryId, questionId, answerId);
+        } catch (RuntimeException exception) {
+            log.error("Unable to start answer correction: diaryId={}, questionId={}, answerId={}",
                     diaryId, questionId, answerId, exception);
         }
     }

@@ -23,7 +23,7 @@ public class DiaryCompletionService {
 
     @Transactional
     public DiaryCompleteResponse complete(Long userId, Long diaryId, DiaryCompleteRequest request) {
-        Diary diary = diaryRepository.findById(diaryId)
+        Diary diary = diaryRepository.findByIdForUpdate(diaryId)
                 .orElseThrow(() -> new BaseException(ErrorCode.DIARY_NOT_FOUND));
         if (!diary.getUser().getId().equals(userId)) throw new BaseException(ErrorCode.ACCESS_DENIED);
         // Diary.complete()의 기존 멱등 정책을 유지하며 재요청에서 기존 memo를 변경하지 않는다.
