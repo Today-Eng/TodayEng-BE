@@ -72,7 +72,7 @@ public class NotificationService {
                 );
             } catch (PushSubscriptionExpiredException exception) {
                 pushSubscriptionCleanupService.clearExpiredSubscription(
-                        target.notificationSettingId()
+                        target
                 );
 
                 log.info(

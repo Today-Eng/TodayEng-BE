@@ -64,7 +64,7 @@ class NotificationServiceTest {
 
         verify(pushSubscriptionCleanupService)
                 .clearExpiredSubscription(
-                        target.notificationSettingId()
+                        target
                 );
     }
 }
