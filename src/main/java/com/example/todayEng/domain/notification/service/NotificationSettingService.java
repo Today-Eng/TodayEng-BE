@@ -38,6 +38,14 @@ public class NotificationSettingService {
     ) {
         User user = getUser(userId);
 
+        String pushEndpoint =
+                request.endpoint();
+
+        clearPreviousEndpointOwner(
+                userId,
+                pushEndpoint
+        );
+
         NotificationSetting notificationSetting =
                 notificationSettingRepository.findByUserId(userId)
                         .orElse(null);
@@ -117,6 +125,22 @@ public class NotificationSettingService {
                     );
                 })
                 .orElseGet(NotificationSettingResponse::disabled);
+    }
+
+    private void clearPreviousEndpointOwner(
+            Long currentUserId,
+            String pushEndpoint
+    ) {
+        notificationSettingRepository
+                .findOtherEndpointOwnerForUpdate(
+                        pushEndpoint,
+                        currentUserId
+                )
+                .ifPresent(previousSetting -> {
+                    previousSetting.clearPushSubscription();
+
+                    notificationSettingRepository.flush();
+                });
     }
 
     private User getUser(Long userId) {

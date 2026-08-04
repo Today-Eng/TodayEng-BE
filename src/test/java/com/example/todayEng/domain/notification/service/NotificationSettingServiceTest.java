@@ -68,6 +68,14 @@ class NotificationSettingServiceTest {
         given(userRepository.findById(userId))
                 .willReturn(Optional.of(user));
 
+        given(
+                notificationSettingRepository
+                        .findOtherEndpointOwnerForUpdate(
+                                "https://example.com/push",
+                                userId
+                        )
+        ).willReturn(Optional.empty());
+
         given(notificationSettingRepository.findByUserId(userId))
                 .willReturn(Optional.empty());
 
@@ -112,6 +120,14 @@ class NotificationSettingServiceTest {
 
         given(userRepository.findById(userId))
                 .willReturn(Optional.of(user));
+
+        given(
+                notificationSettingRepository
+                        .findOtherEndpointOwnerForUpdate(
+                                "https://example.com/new-push",
+                                userId
+                        )
+        ).willReturn(Optional.empty());
 
         given(notificationSettingRepository.findByUserId(userId))
                 .willReturn(Optional.of(setting));
@@ -178,6 +194,87 @@ class NotificationSettingServiceTest {
 
         assertThat(setting.getPushEndpoint())
                 .isEqualTo("https://example.com/new-push");
+    }
+
+    @Test
+    @DisplayName("동일 endpoint가 다른 사용자에게 연결되어 있으면 이전 연결을 제거하고 현재 사용자에게 저장한다")
+    void savePushSubscription_endpointOwnedByAnotherUser_reassignsEndpoint() {
+        NotificationSetting previousSetting =
+                NotificationSetting.create(
+                        User.create()
+                );
+
+        previousSetting.updatePushSubscription(
+                "https://example.com/shared-push",
+                "previous-p256dh",
+                "previous-auth"
+        );
+        previousSetting.enable();
+
+        NotificationSetting currentSetting =
+                NotificationSetting.create(user);
+
+        currentSetting.updatePushSubscription(
+                "https://example.com/current-push",
+                "current-p256dh",
+                "current-auth"
+        );
+        currentSetting.enable();
+
+        PushSubscriptionRequest request =
+                new PushSubscriptionRequest(
+                        "https://example.com/shared-push",
+                        new PushSubscriptionRequest.PushSubscriptionKeys(
+                                "new-p256dh",
+                                "new-auth"
+                        )
+                );
+
+        given(userRepository.findById(userId))
+                .willReturn(Optional.of(user));
+
+        given(
+                notificationSettingRepository
+                        .findOtherEndpointOwnerForUpdate(
+                                "https://example.com/shared-push",
+                                userId
+                        )
+        ).willReturn(Optional.of(previousSetting));
+
+        given(notificationSettingRepository.findByUserId(userId))
+                .willReturn(Optional.of(currentSetting));
+
+        given(notificationSettingRepository.save(currentSetting))
+                .willReturn(currentSetting);
+
+        NotificationSettingResponse response =
+                notificationSettingService.savePushSubscription(
+                        userId,
+                        request
+                );
+
+        assertThat(previousSetting.isUseEnabled()).isTrue();
+        assertThat(previousSetting.hasPushSubscription()).isFalse();
+        assertThat(previousSetting.getPushEndpoint()).isNull();
+        assertThat(previousSetting.getP256dhKey()).isNull();
+        assertThat(previousSetting.getAuthKey()).isNull();
+
+        assertThat(currentSetting.isUseEnabled()).isTrue();
+        assertThat(currentSetting.getPushEndpoint())
+                .isEqualTo("https://example.com/shared-push");
+        assertThat(currentSetting.getP256dhKey())
+                .isEqualTo("new-p256dh");
+        assertThat(currentSetting.getAuthKey())
+                .isEqualTo("new-auth");
+
+        assertThat(response.isEnabled()).isTrue();
+        assertThat(response.hasPushSubscription()).isTrue();
+
+        verify(notificationSettingRepository)
+                .flush();
+
+        verify(notificationSettingRepository)
+                .save(currentSetting);
     }
 
     @Test
