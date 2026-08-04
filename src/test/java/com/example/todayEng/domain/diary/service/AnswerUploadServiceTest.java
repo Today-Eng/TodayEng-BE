@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 import com.example.todayEng.domain.diary.entity.DiaryAnswer;
@@ -51,12 +52,33 @@ class AnswerUploadServiceTest {
         doThrow(new TaskRejectedException("queue full"))
                 .when(asyncService).transcribe(3L, 1L, 2L, 9L);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(
-                () -> service.upload(3L, 1L, 2L, file))
+        assertThatThrownBy(() -> service.upload(3L, 1L, 2L, file))
                 .isInstanceOf(TaskRejectedException.class);
 
         var inOrder = inOrder(persistenceService, storage);
         inOrder.verify(persistenceService).deleteUploaded(9L);
         inOrder.verify(storage).deleteQuietly("key");
+    }
+
+    @Test
+    void preservesSubmissionFailureAndAudioWhenDatabaseCleanupFails() {
+        var file = new MockMultipartFile("audio", new byte[]{1});
+        var valid = new AudioUploadValidator.ValidatedAudio(new byte[]{1});
+        DiaryAnswer answer = mock(DiaryAnswer.class);
+        TaskRejectedException submissionFailure = new TaskRejectedException("queue full");
+        RuntimeException cleanupFailure = new RuntimeException("database unavailable");
+        when(answer.getId()).thenReturn(9L);
+        when(validator.validate(file)).thenReturn(valid);
+        when(storage.storeAnswer(1L, 2L, valid.bytes())).thenReturn("key");
+        when(persistenceService.createUploaded(3L, 1L, 2L, "key")).thenReturn(answer);
+        doThrow(submissionFailure).when(asyncService).transcribe(3L, 1L, 2L, 9L);
+        doThrow(cleanupFailure).when(persistenceService).deleteUploaded(9L);
+
+        assertThatThrownBy(() -> service.upload(3L, 1L, 2L, file))
+                .isSameAs(submissionFailure)
+                .satisfies(exception -> assertThat(exception.getSuppressed())
+                        .containsExactly(cleanupFailure));
+
+        verify(storage, never()).deleteQuietly("key");
     }
 }

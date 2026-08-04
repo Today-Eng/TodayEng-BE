@@ -141,6 +141,7 @@ class QuestionTtsServiceTest {
         service.generateQuestion(1L, 10L, 101L, "질문");
 
         verify(persistenceService).complete(command, "audio.mp3");
+        verify(emitterManager).sendQuestionReady(eq(1L), eq(10L), any());
         verify(persistenceService, never()).fail(any(), any());
         verify(audioFileStorage, never()).deleteQuietly("audio.mp3");
     }

@@ -4,9 +4,11 @@ import com.example.todayEng.domain.diary.dto.response.AnswerUploadResponse;
 import com.example.todayEng.domain.diary.entity.DiaryAnswer;
 import com.example.todayEng.domain.diary.storage.AudioFileStorage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AnswerUploadService {
@@ -31,8 +33,14 @@ public class AnswerUploadService {
             asyncService.transcribe(userId, diaryId, questionId, answer.getId());
             return new AnswerUploadResponse(answer.getId(), answer.getTranscriptionStatus());
         } catch (RuntimeException exception) {
-            persistenceService.deleteUploaded(answer.getId());
-            storage.deleteQuietly(key);
+            try {
+                persistenceService.deleteUploaded(answer.getId());
+                storage.deleteQuietly(key);
+            } catch (RuntimeException cleanupException) {
+                exception.addSuppressed(cleanupException);
+                log.error("Failed to clean up rejected answer upload: answerId={}",
+                        answer.getId(), cleanupException);
+            }
             throw exception;
         }
     }
