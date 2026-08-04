@@ -39,6 +39,11 @@ dependencies {
 	// Swagger (springdoc-openapi)
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 
+	// Google Cloud Text-to-Speech
+	implementation platform('com.google.cloud:libraries-bom:26.83.0')
+	implementation 'com.google.cloud:google-cloud-texttospeech'
+	implementation 'com.google.cloud:google-cloud-speech'
+
 	// Lombok
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'

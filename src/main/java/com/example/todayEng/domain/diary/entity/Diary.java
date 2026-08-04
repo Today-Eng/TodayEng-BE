@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.entity;
 
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
+import com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
@@ -11,6 +12,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Getter
 @Entity
@@ -46,11 +48,22 @@ public class Diary extends BaseTimeEntity {
     @Column(name = "status", nullable = false, length = 20)
     private DiaryStatus status;
 
-    @Column(name = "memo", length = 200)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "question_generation_status", nullable = false, length = 20)
+    @ColumnDefault("'NOT_STARTED'")
+    private ReflectionQuestionGenerationStatus questionGenerationStatus;
+
+    @Column(name = "memo", length = 2000)
     private String memo;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @Column(name = "paused_at")
+    private LocalDateTime pausedAt;
+
+    @Column(name = "pause_expires_at")
+    private LocalDateTime pauseExpiresAt;
 
     @Builder(access = AccessLevel.PRIVATE)
     private Diary(
@@ -60,6 +73,7 @@ public class Diary extends BaseTimeEntity {
         this.user = user;
         this.diaryDate = diaryDate;
         this.status = DiaryStatus.IN_PROGRESS;
+        this.questionGenerationStatus = ReflectionQuestionGenerationStatus.NOT_STARTED;
     }
 
     public static Diary create(
@@ -83,5 +97,31 @@ public class Diary extends BaseTimeEntity {
 
         this.status = DiaryStatus.COMPLETED;
         this.completedAt = LocalDateTime.now();
+    }
+
+    public void complete(String finalMemo) {
+        this.memo = finalMemo == null || finalMemo.isBlank() ? null : finalMemo.trim();
+        complete();
+    }
+
+    public void pause(LocalDateTime pausedAt, LocalDateTime pauseExpiresAt) {
+        if (this.status != DiaryStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Only an in-progress diary can be paused.");
+        }
+        if (pausedAt == null || pauseExpiresAt == null || !pauseExpiresAt.isAfter(pausedAt)) {
+            throw new IllegalArgumentException("Pause expiration must be after the pause time.");
+        }
+
+        this.status = DiaryStatus.PAUSED;
+        this.pausedAt = pausedAt;
+        this.pauseExpiresAt = pauseExpiresAt;
+    }
+
+    public void completeQuestionGeneration() {
+        this.questionGenerationStatus = ReflectionQuestionGenerationStatus.COMPLETED;
+    }
+
+    public void failQuestionGeneration() {
+        this.questionGenerationStatus = ReflectionQuestionGenerationStatus.FAILED;
     }
 }
