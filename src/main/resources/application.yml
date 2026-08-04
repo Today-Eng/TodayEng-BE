@@ -54,6 +54,12 @@ oauth:
       - user-read-email
       - user-read-recently-played
 
+web-push:
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY}
+    private-key: ${VAPID_PRIVATE_KEY}
+    subject: ${VAPID_SUBJECT}
+
 diary:
   sse:
     timeout-millis: 1800000

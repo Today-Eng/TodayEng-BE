@@ -1,7 +1,20 @@
-package com.example.todayEng.domain.user.entity;
+package com.example.todayEng.domain.notification.entity;
 
+import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.global.common.BaseTimeEntity;
-import jakarta.persistence.*;
+import com.example.todayEng.global.error.ErrorCode;
+import com.example.todayEng.global.error.exception.BaseException;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -58,8 +71,8 @@ public class NotificationSetting extends BaseTimeEntity {
 
     public void enable() {
         if (!hasPushSubscription()) {
-            throw new IllegalStateException(
-                    "푸시 구독 정보가 없어 알림을 활성화할 수 없습니다."
+            throw new BaseException(
+                    ErrorCode.PUSH_SUBSCRIPTION_REQUIRED
             );
         }
 
@@ -78,25 +91,23 @@ public class NotificationSetting extends BaseTimeEntity {
         if (isBlank(pushEndpoint)
                 || isBlank(p256dhKey)
                 || isBlank(authKey)) {
-            throw new IllegalArgumentException(
-                    "푸시 구독 정보는 모두 입력되어야 합니다."
+            throw new BaseException(
+                    ErrorCode.INVALID_PUSH_SUBSCRIPTION
             );
         }
 
         this.pushEndpoint = pushEndpoint;
         this.p256dhKey = p256dhKey;
         this.authKey = authKey;
-        this.useEnabled = true;
     }
 
     public void clearPushSubscription() {
         this.pushEndpoint = null;
         this.p256dhKey = null;
         this.authKey = null;
-        this.useEnabled = false;
     }
 
-    private boolean hasPushSubscription() {
+    public boolean hasPushSubscription() {
         return !isBlank(pushEndpoint)
                 && !isBlank(p256dhKey)
                 && !isBlank(authKey);

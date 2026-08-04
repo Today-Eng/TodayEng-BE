@@ -96,6 +96,10 @@ public enum ErrorCode {
     REFLECTION_CORRECTION_NOT_FINISHED(HttpStatus.CONFLICT, "D032", "답변 교정 처리가 완료되지 않았습니다."),
     DIARY_ALREADY_PAUSED(HttpStatus.CONFLICT, "D033", "이미 중단된 회고입니다."),
 
+    // Notification (N)
+    PUSH_SUBSCRIPTION_REQUIRED(HttpStatus.BAD_REQUEST, "N001", "푸시 구독 정보가 없어 알림을 활성화할 수 없습니다."),
+    INVALID_PUSH_SUBSCRIPTION(HttpStatus.BAD_REQUEST, "N002", "푸시 구독 정보는 모두 입력되어야 합니다."),
+    NOTIFICATION_DISABLED(HttpStatus.BAD_REQUEST, "N003", "알림이 비활성화되어 있습니다."),
     ;
 
     private final HttpStatus status;
