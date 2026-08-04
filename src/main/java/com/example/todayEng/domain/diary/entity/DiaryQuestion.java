@@ -2,6 +2,9 @@ package com.example.todayEng.domain.diary.entity;
 
 import com.example.todayEng.domain.diary.entity.enums.QuestionGenerationType;
 import com.example.todayEng.domain.diary.entity.enums.QuestionType;
+import com.example.todayEng.domain.diary.entity.enums.TtsStatus;
+import com.example.todayEng.domain.user.entity.enums.EnglishLevel;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import jakarta.persistence.Column;
@@ -15,16 +18,25 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
-@Table(name = "diary_question")
+@Table(
+        name = "diary_question",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_diary_question_diary_type_order",
+                columnNames = {"diary_id", "question_type", "question_order"}
+        )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DiaryQuestion {
 
@@ -44,6 +56,10 @@ public class DiaryQuestion {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "default_question_id")
     private DefaultQuestion defaultQuestion;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "context_id")
+    private DiaryContext context;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "question_type", nullable = false, length = 20)
@@ -69,6 +85,25 @@ public class DiaryQuestion {
     @Column(name = "keyword", length = 50)
     private String keyword;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "english_level_snapshot", length = 30)
+    private EnglishLevel englishLevelSnapshot;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "interest_snapshot", columnDefinition = "json")
+    private JsonNode interestSnapshot;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tts_status", nullable = false, length = 20)
+    @org.hibernate.annotations.ColumnDefault("'PENDING'")
+    private TtsStatus ttsStatus;
+
+    @Column(name = "tts_audio_key", length = 500)
+    private String ttsAudioKey;
+
+    @Column(name = "tts_error_message", length = 500)
+    private String ttsErrorMessage;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -83,7 +118,10 @@ public class DiaryQuestion {
             String questionText,
             QuestionGenerationType generationType,
             String koreanTranslation,
-            String keyword
+            String keyword,
+            DiaryContext context,
+            EnglishLevel englishLevelSnapshot,
+            JsonNode interestSnapshot
     ) {
         validateParentQuestion(questionType, parentQuestion);
         validateKeyword(questionType, keyword);
@@ -98,6 +136,46 @@ public class DiaryQuestion {
         this.generationType = generationType;
         this.koreanTranslation = koreanTranslation;
         this.keyword = keyword;
+        this.context = context;
+        this.englishLevelSnapshot = englishLevelSnapshot;
+        this.interestSnapshot = interestSnapshot;
+        this.ttsStatus = TtsStatus.PENDING;
+    }
+
+    public void completeTts(String audioKey) {
+        this.ttsStatus = TtsStatus.SUCCEEDED;
+        this.ttsAudioKey = audioKey;
+        this.ttsErrorMessage = null;
+    }
+
+    public void failTts(String errorMessage) {
+        this.ttsStatus = TtsStatus.FAILED;
+        this.ttsAudioKey = null;
+        this.ttsErrorMessage = errorMessage;
+    }
+
+    public static DiaryQuestion createGeneratedMainQuestion(
+            Diary diary,
+            DiaryContext context,
+            Integer questionOrder,
+            String questionText,
+            String koreanTranslation,
+            String keyword,
+            EnglishLevel englishLevelSnapshot,
+            JsonNode interestSnapshot
+    ) {
+        return DiaryQuestion.builder()
+                .diary(diary)
+                .context(context)
+                .questionType(QuestionType.MAIN)
+                .questionOrder(questionOrder)
+                .questionText(questionText)
+                .generationType(QuestionGenerationType.AI)
+                .koreanTranslation(koreanTranslation)
+                .keyword(keyword)
+                .englishLevelSnapshot(englishLevelSnapshot)
+                .interestSnapshot(interestSnapshot)
+                .build();
     }
 
     public static DiaryQuestion createMainQuestion(
@@ -124,7 +202,6 @@ public class DiaryQuestion {
     public static DiaryQuestion createFollowUpQuestion(
             Diary diary,
             DiaryQuestion parentQuestion,
-            Integer questionOrder,
             String questionText,
             String koreanTranslation
     ) {
@@ -132,10 +209,13 @@ public class DiaryQuestion {
                 .diary(diary)
                 .parentQuestion(parentQuestion)
                 .questionType(QuestionType.FOLLOW_UP)
-                .questionOrder(questionOrder)
+                .questionOrder(parentQuestion.getQuestionOrder() + 1)
                 .questionText(questionText)
                 .generationType(QuestionGenerationType.AI)
                 .koreanTranslation(koreanTranslation)
+                .context(parentQuestion.getContext())
+                .englishLevelSnapshot(parentQuestion.getEnglishLevelSnapshot())
+                .interestSnapshot(parentQuestion.getInterestSnapshot())
                 .build();
     }
 
@@ -153,7 +233,7 @@ public class DiaryQuestion {
         }
 
         if (parentQuestion != null
-                && parentQuestion.questionType != QuestionType.MAIN) {
+                && parentQuestion.getQuestionType() != QuestionType.MAIN) {
             throw new BaseException(ErrorCode.FOLLOW_UP_PARENT_MUST_BE_MAIN_QUESTION);
         }
     }
