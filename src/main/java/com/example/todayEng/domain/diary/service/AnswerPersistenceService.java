@@ -41,6 +41,12 @@ public class AnswerPersistenceService {
     }
 
     @Transactional
+    public void deleteUploaded(Long answerId) {
+        answerRepository.deleteById(answerId);
+        answerRepository.flush();
+    }
+
+    @Transactional
     public boolean claim(Long answerId) { return answerRepository.claimTranscription(answerId) == 1; }
 
     @Transactional(readOnly = true)

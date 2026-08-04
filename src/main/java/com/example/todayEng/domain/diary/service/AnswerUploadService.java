@@ -19,11 +19,19 @@ public class AnswerUploadService {
         AudioUploadValidator.ValidatedAudio audio = validator.validate(file);
         persistenceService.validateAnswerable(userId, diaryId, questionId);
         String key = storage.storeAnswer(diaryId, questionId, audio.bytes());
+        DiaryAnswer answer;
         try {
-            DiaryAnswer answer = persistenceService.createUploaded(userId, diaryId, questionId, key);
+            answer = persistenceService.createUploaded(userId, diaryId, questionId, key);
+        } catch (RuntimeException exception) {
+            storage.deleteQuietly(key);
+            throw exception;
+        }
+
+        try {
             asyncService.transcribe(userId, diaryId, questionId, answer.getId());
             return new AnswerUploadResponse(answer.getId(), answer.getTranscriptionStatus());
         } catch (RuntimeException exception) {
+            persistenceService.deleteUploaded(answer.getId());
             storage.deleteQuietly(key);
             throw exception;
         }

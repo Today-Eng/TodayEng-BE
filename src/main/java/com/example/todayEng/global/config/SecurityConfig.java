@@ -80,6 +80,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> {
                     authorize.requestMatchers(
                             "/health",
+                            "/files/audio/**",
                             "/auth/google",
                             "/auth/test",
                             "/v3/api-docs/**",

@@ -68,5 +68,7 @@ gemini:
 
 storage:
   audio:
+    # Local development storage only. A shared object store is required before
+    # running multiple instances or replacing an instance during deployment.
     directory: ${AUDIO_STORAGE_DIRECTORY:./storage/audio}
     public-url-prefix: ${AUDIO_PUBLIC_URL_PREFIX:/files/audio}
