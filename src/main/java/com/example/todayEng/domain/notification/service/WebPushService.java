@@ -7,13 +7,15 @@ import com.example.todayEng.domain.notification.exception.PushSubscriptionExpire
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.util.concurrent.ExecutionException;
 import lombok.RequiredArgsConstructor;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import org.apache.http.HttpResponse;
 import org.jose4j.lang.JoseException;
 import org.springframework.stereotype.Service;
+import nl.martijndwars.webpush.Encoding;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +26,7 @@ public class WebPushService {
 
     private final PushService pushService;
     private final ObjectMapper objectMapper;
+    private final CloseableHttpClient webPushHttpClient;
 
     // 테스트 알림용
     public void send(
@@ -89,8 +92,14 @@ public class WebPushService {
                     payload
             );
 
+            HttpPost request =
+                    pushService.preparePost(
+                            notification,
+                            Encoding.AES128GCM
+                    );
+
             HttpResponse response =
-                    pushService.send(notification);
+                    webPushHttpClient.execute(request);
 
             int statusCode =
                     response.getStatusLine().getStatusCode();
@@ -109,18 +118,10 @@ public class WebPushService {
         } catch (
                 GeneralSecurityException
                 | IOException
-                | JoseException
-                | ExecutionException exception
+                | JoseException exception
         ) {
             throw new IllegalStateException(
                     "Web Push 전송 중 오류가 발생했습니다.",
-                    exception
-            );
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-
-            throw new IllegalStateException(
-                    "Web Push 전송이 중단되었습니다.",
                     exception
             );
         }
