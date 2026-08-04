@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.notification.service;
 
 import com.example.todayEng.domain.notification.dto.WebPushPayload;
+import com.example.todayEng.domain.notification.dto.WebPushTarget;
 import com.example.todayEng.domain.notification.entity.NotificationSetting;
 import com.example.todayEng.domain.notification.exception.PushSubscriptionExpiredException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +25,7 @@ public class WebPushService {
     private final PushService pushService;
     private final ObjectMapper objectMapper;
 
+    // 테스트 알림용
     public void send(
             NotificationSetting notificationSetting,
             String title,
@@ -35,15 +37,55 @@ public class WebPushService {
             return;
         }
 
+        send(
+                notificationSetting.getPushEndpoint(),
+                notificationSetting.getP256dhKey(),
+                notificationSetting.getAuthKey(),
+                title,
+                body,
+                url
+        );
+    }
+
+    // 회고 알림 스케줄러용
+    public void send(
+            WebPushTarget target,
+            String title,
+            String body,
+            String url
+    ) {
+        send(
+                target.pushEndpoint(),
+                target.p256dhKey(),
+                target.authKey(),
+                title,
+                body,
+                url
+        );
+    }
+
+    // 실제 Web Push HTTP 전송
+    private void send(
+            String pushEndpoint,
+            String p256dhKey,
+            String authKey,
+            String title,
+            String body,
+            String url
+    ) {
         try {
             String payload = objectMapper.writeValueAsString(
-                    new WebPushPayload(title, body, url)
+                    new WebPushPayload(
+                            title,
+                            body,
+                            url
+                    )
             );
 
             Notification notification = new Notification(
-                    notificationSetting.getPushEndpoint(),
-                    notificationSetting.getP256dhKey(),
-                    notificationSetting.getAuthKey(),
+                    pushEndpoint,
+                    p256dhKey,
+                    authKey,
                     payload
             );
 

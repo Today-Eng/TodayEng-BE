@@ -1,13 +1,11 @@
 package com.example.todayEng.domain.notification.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verify;
 
-import com.example.todayEng.domain.notification.entity.NotificationSetting;
+import com.example.todayEng.domain.notification.dto.WebPushTarget;
 import com.example.todayEng.domain.notification.exception.PushSubscriptionExpiredException;
-import com.example.todayEng.domain.notification.repository.NotificationSettingRepository;
-import com.example.todayEng.domain.user.entity.User;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -21,38 +19,42 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class NotificationServiceTest {
 
     @Mock
-    private NotificationSettingRepository notificationSettingRepository;
+    private NotificationTargetReader notificationTargetReader;
 
     @Mock
     private WebPushService webPushService;
 
+    @Mock
+    private PushSubscriptionCleanupService pushSubscriptionCleanupService;
+
     @InjectMocks
     private NotificationService notificationService;
 
-    private final User user = User.create();
-
     @Test
-    @DisplayName("회고 알림 발송 중 구독이 만료되면 구독 정보만 제거한다")
-    void sendDiaryReminders_expiredSubscription_clearsSubscription() {
+    @DisplayName("회고 알림 발송 중 구독이 만료되면 별도 서비스로 구독 정보를 정리한다")
+    void sendDiaryReminders_expiredSubscription_cleansUp() {
         LocalDate today =
                 LocalDate.of(2026, 8, 2);
 
-        NotificationSetting setting =
-                NotificationSetting.create(user);
+        WebPushTarget target =
+                new WebPushTarget(
+                        10L,
+                        1L,
+                        "https://example.com/push",
+                        "p256dh-key",
+                        "auth-key"
+                );
 
-        setting.updatePushSubscription(
-                "https://example.com/push",
-                "p256dh-key",
-                "auth-key"
-        );
-
-        given(notificationSettingRepository.findDiaryReminderTargets(today))
-                .willReturn(List.of(setting));
+        given(
+                notificationTargetReader.findDiaryReminderTargets(
+                        today
+                )
+        ).willReturn(List.of(target));
 
         willThrow(new PushSubscriptionExpiredException())
                 .given(webPushService)
                 .send(
-                        setting,
+                        target,
                         "오늘의 회고를 남겨볼까요?",
                         "오늘 하루를 영어로 천천히 돌아보세요.",
                         "/home"
@@ -60,10 +62,9 @@ class NotificationServiceTest {
 
         notificationService.sendDiaryReminders(today);
 
-        assertThat(setting.isUseEnabled()).isTrue();
-        assertThat(setting.hasPushSubscription()).isFalse();
-        assertThat(setting.getPushEndpoint()).isNull();
-        assertThat(setting.getP256dhKey()).isNull();
-        assertThat(setting.getAuthKey()).isNull();
+        verify(pushSubscriptionCleanupService)
+                .clearExpiredSubscription(
+                        target.notificationSettingId()
+                );
     }
 }

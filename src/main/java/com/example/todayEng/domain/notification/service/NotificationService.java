@@ -1,5 +1,6 @@
 package com.example.todayEng.domain.notification.service;
 
+import com.example.todayEng.domain.notification.dto.WebPushTarget;
 import com.example.todayEng.domain.notification.entity.NotificationSetting;
 import com.example.todayEng.domain.notification.exception.PushSubscriptionExpiredException;
 import com.example.todayEng.domain.notification.repository.NotificationSettingRepository;
@@ -10,18 +11,17 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class NotificationService {
 
     private final NotificationSettingRepository notificationSettingRepository;
+    private final NotificationTargetReader notificationTargetReader;
     private final WebPushService webPushService;
+    private final PushSubscriptionCleanupService pushSubscriptionCleanupService;
 
-    @Transactional
     public void sendTestNotification(Long userId) {
         NotificationSetting notificationSetting =
                 notificationSettingRepository.findByUserId(userId)
@@ -51,10 +51,9 @@ public class NotificationService {
         );
     }
 
-    @Transactional
     public void sendDiaryReminders(LocalDate today) {
-        List<NotificationSetting> targets =
-                notificationSettingRepository.findDiaryReminderTargets(
+        List<WebPushTarget> targets =
+                notificationTargetReader.findDiaryReminderTargets(
                         today
                 );
 
@@ -63,7 +62,7 @@ public class NotificationService {
                 targets.size()
         );
 
-        for (NotificationSetting target : targets) {
+        for (WebPushTarget target : targets) {
             try {
                 webPushService.send(
                         target,
@@ -72,18 +71,20 @@ public class NotificationService {
                         "/home"
                 );
             } catch (PushSubscriptionExpiredException exception) {
-                target.clearPushSubscription();
+                pushSubscriptionCleanupService.clearExpiredSubscription(
+                        target.notificationSettingId()
+                );
 
                 log.info(
                         "만료된 푸시 구독 제거. notificationSettingId={}, userId={}",
-                        target.getId(),
-                        target.getUser().getId()
+                        target.notificationSettingId(),
+                        target.userId()
                 );
             } catch (Exception exception) {
                 log.error(
                         "회고 알림 발송 실패. notificationSettingId={}, userId={}",
-                        target.getId(),
-                        target.getUser().getId(),
+                        target.notificationSettingId(),
+                        target.userId(),
                         exception
                 );
             }
