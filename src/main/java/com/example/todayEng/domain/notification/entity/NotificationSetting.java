@@ -99,7 +99,6 @@ public class NotificationSetting extends BaseTimeEntity {
         this.pushEndpoint = pushEndpoint;
         this.p256dhKey = p256dhKey;
         this.authKey = authKey;
-        this.useEnabled = true;
     }
 
     public void clearPushSubscription() {

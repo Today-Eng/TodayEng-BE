@@ -40,15 +40,25 @@ public class NotificationSettingService {
 
         NotificationSetting notificationSetting =
                 notificationSettingRepository.findByUserId(userId)
-                        .orElseGet(() ->
-                                NotificationSetting.create(user)
-                        );
+                        .orElse(null);
+
+        boolean isNewSetting =
+                notificationSetting == null;
+
+        if (isNewSetting) {
+            notificationSetting =
+                    NotificationSetting.create(user);
+        }
 
         notificationSetting.updatePushSubscription(
                 request.endpoint(),
                 request.keys().p256dh(),
                 request.keys().auth()
         );
+
+        if (isNewSetting) {
+            notificationSetting.enable();
+        }
 
         NotificationSetting savedSetting =
                 notificationSettingRepository.save(

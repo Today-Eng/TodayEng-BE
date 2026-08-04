@@ -89,6 +89,98 @@ class NotificationSettingServiceTest {
     }
 
     @Test
+    @DisplayName("알림이 비활성화된 기존 설정의 구독 정보를 갱신해도 비활성화 상태를 유지한다")
+    void savePushSubscription_existingDisabledSetting_keepsDisabled() {
+        NotificationSetting setting =
+                NotificationSetting.create(user);
+
+        setting.updatePushSubscription(
+                "https://example.com/old-push",
+                "old-p256dh-key",
+                "old-auth-key"
+        );
+        setting.disable();
+
+        PushSubscriptionRequest request =
+                new PushSubscriptionRequest(
+                        "https://example.com/new-push",
+                        new PushSubscriptionRequest.PushSubscriptionKeys(
+                                "new-p256dh-key",
+                                "new-auth-key"
+                        )
+                );
+
+        given(userRepository.findById(userId))
+                .willReturn(Optional.of(user));
+
+        given(notificationSettingRepository.findByUserId(userId))
+                .willReturn(Optional.of(setting));
+
+        given(notificationSettingRepository.save(setting))
+                .willReturn(setting);
+
+        NotificationSettingResponse response =
+                notificationSettingService.savePushSubscription(
+                        userId,
+                        request
+                );
+
+        assertThat(response.isEnabled()).isFalse();
+        assertThat(response.hasPushSubscription()).isTrue();
+
+        assertThat(setting.getPushEndpoint())
+                .isEqualTo("https://example.com/new-push");
+        assertThat(setting.getP256dhKey())
+                .isEqualTo("new-p256dh-key");
+        assertThat(setting.getAuthKey())
+                .isEqualTo("new-auth-key");
+    }
+
+    @Test
+    @DisplayName("알림이 활성화된 기존 설정의 구독 정보를 갱신하면 활성화 상태를 유지한다")
+    void savePushSubscription_existingEnabledSetting_keepsEnabled() {
+        NotificationSetting setting =
+                NotificationSetting.create(user);
+
+        setting.updatePushSubscription(
+                "https://example.com/old-push",
+                "old-p256dh-key",
+                "old-auth-key"
+        );
+        setting.enable();
+
+        PushSubscriptionRequest request =
+                new PushSubscriptionRequest(
+                        "https://example.com/new-push",
+                        new PushSubscriptionRequest.PushSubscriptionKeys(
+                                "new-p256dh-key",
+                                "new-auth-key"
+                        )
+                );
+
+        given(userRepository.findById(userId))
+                .willReturn(Optional.of(user));
+
+        given(notificationSettingRepository.findByUserId(userId))
+                .willReturn(Optional.of(setting));
+
+        given(notificationSettingRepository.save(setting))
+                .willReturn(setting);
+
+        NotificationSettingResponse response =
+                notificationSettingService.savePushSubscription(
+                        userId,
+                        request
+                );
+
+        assertThat(response.isEnabled()).isTrue();
+        assertThat(response.hasPushSubscription()).isTrue();
+
+        assertThat(setting.getPushEndpoint())
+                .isEqualTo("https://example.com/new-push");
+    }
+
+    @Test
     @DisplayName("구독 정보가 없는 상태에서 알림 활성화를 요청하면 예외가 발생한다")
     void updateNotificationEnabled_withoutSubscription_throws() {
         given(userRepository.existsById(userId))
@@ -152,6 +244,9 @@ class NotificationSettingServiceTest {
                 "p256dh-key",
                 "auth-key"
         );
+
+        // 삭제 전 알림 ON 상태를 명시적으로 준비
+        setting.enable();
 
         given(userRepository.existsById(userId))
                 .willReturn(true);
