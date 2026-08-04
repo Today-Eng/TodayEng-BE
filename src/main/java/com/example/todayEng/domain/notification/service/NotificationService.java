@@ -71,15 +71,24 @@ public class NotificationService {
                         "/home"
                 );
             } catch (PushSubscriptionExpiredException exception) {
-                pushSubscriptionCleanupService.clearExpiredSubscription(
-                        target
-                );
+                try {
+                    pushSubscriptionCleanupService.clearExpiredSubscription(
+                            target
+                    );
 
-                log.info(
-                        "만료된 푸시 구독 제거. notificationSettingId={}, userId={}",
-                        target.notificationSettingId(),
-                        target.userId()
-                );
+                    log.info(
+                            "만료된 푸시 구독 정리 완료. notificationSettingId={}, userId={}",
+                            target.notificationSettingId(),
+                            target.userId()
+                    );
+                } catch (Exception cleanupException) {
+                    log.error(
+                            "만료된 푸시 구독 정리 실패. notificationSettingId={}, userId={}",
+                            target.notificationSettingId(),
+                            target.userId(),
+                            cleanupException
+                    );
+                }
             } catch (Exception exception) {
                 log.error(
                         "회고 알림 발송 실패. notificationSettingId={}, userId={}",
