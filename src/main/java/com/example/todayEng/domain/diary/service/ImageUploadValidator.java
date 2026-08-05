@@ -2,10 +2,13 @@ package com.example.todayEng.domain.diary.service;
 
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
+import javax.imageio.ImageIO;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,7 +19,6 @@ public class ImageUploadValidator {
     private static final int MAX_IMAGE_COUNT = 2;
     private static final long MAX_IMAGE_SIZE = 7L * 1024 * 1024;
     private static final long MAX_TOTAL_IMAGE_SIZE = 14L * 1024 * 1024;
-    private static final int SIGNATURE_LENGTH = 12;
 
     public List<MultipartFile> validate(List<MultipartFile> images) {
         if (images == null || images.isEmpty()) {
@@ -47,8 +49,12 @@ public class ImageUploadValidator {
 
         String mediaType = baseMediaType(image.getContentType());
         try (InputStream inputStream = image.getInputStream()) {
-            byte[] signature = inputStream.readNBytes(SIGNATURE_LENGTH);
-            if (!hasMatchingSignature(mediaType, signature)) {
+            byte[] bytes = inputStream.readNBytes((int) MAX_IMAGE_SIZE + 1);
+            if (bytes.length > MAX_IMAGE_SIZE) {
+                throw new BaseException(ErrorCode.FILE_SIZE_EXCEEDED);
+            }
+            if (!hasMatchingSignature(mediaType, bytes)
+                    || !isDecodableImage(mediaType, bytes)) {
                 throw new BaseException(ErrorCode.INVALID_FILE_EXTENSION);
             }
         } catch (IOException exception) {
@@ -76,6 +82,18 @@ public class ImageUploadValidator {
             case "image/webp" -> isWebp(bytes);
             default -> false;
         };
+    }
+
+    private boolean isDecodableImage(String mediaType, byte[] bytes) {
+        if ("image/webp".equals(mediaType)) {
+            return true;
+        }
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(bytes)) {
+            BufferedImage image = ImageIO.read(inputStream);
+            return image != null && image.getWidth() > 0 && image.getHeight() > 0;
+        } catch (IOException exception) {
+            return false;
+        }
     }
 
     private boolean isJpeg(byte[] bytes) {
