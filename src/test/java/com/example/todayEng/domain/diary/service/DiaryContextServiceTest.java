@@ -19,9 +19,13 @@ import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -68,7 +72,7 @@ class DiaryContextServiceTest {
     void analyzesImagesAndStoresOnlyAnalysis() throws Exception {
         var image = new MockMultipartFile(
                 "images", "day.jpg", "image/jpeg",
-                new byte[]{(byte) 0xff, (byte) 0xd8, (byte) 0xff});
+                imageBytes(true));
         var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
         given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
 
@@ -86,8 +90,7 @@ class DiaryContextServiceTest {
     void imageAnalysisFailureIsStoredAsPartialFailure() {
         var image = new MockMultipartFile(
                 "images", "day.png", "image/png",
-                new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47,
-                        0x0d, 0x0a, 0x1a, 0x0a});
+                imageBytes(false));
         given(imageAnalysisClient.analyze(List.of(image)))
                 .willThrow(new RuntimeException("timeout"));
 
@@ -108,5 +111,19 @@ class DiaryContextServiceTest {
                 .isInstanceOf(BaseException.class)
                 .extracting(exception -> ((BaseException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_FILE_EXTENSION);
+    }
+
+    private byte[] imageBytes(boolean jpeg) {
+        try {
+            BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB);
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            String format = jpeg
+                    ? new String(new char[]{'j', 'p', 'g'})
+                    : new String(new char[]{'p', 'n', 'g'});
+            ImageIO.write(image, format, outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException exception) {
+            throw new AssertionError(exception);
+        }
     }
 }
