@@ -282,7 +282,6 @@ class DiaryQueryServiceTest {
                 12L,
                 diary,
                 mainQuestion,
-                2,
                 "Why did you feel that way?",
                 "왜 그렇게 느꼈나요?"
         );
@@ -534,7 +533,6 @@ class DiaryQueryServiceTest {
             Long questionId,
             Diary diary,
             DiaryQuestion parentQuestion,
-            int questionOrder,
             String questionText,
             String koreanTranslation
     ) {
@@ -542,7 +540,6 @@ class DiaryQueryServiceTest {
                 DiaryQuestion.createFollowUpQuestion(
                         diary,
                         parentQuestion,
-                        questionOrder,
                         questionText,
                         koreanTranslation
                 );

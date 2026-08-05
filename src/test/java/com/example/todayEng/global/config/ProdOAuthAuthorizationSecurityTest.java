@@ -64,6 +64,12 @@ class ProdOAuthAuthorizationSecurityTest {
     }
 
     @Test
+    void audioResource_withoutAuthentication_isAllowedThroughSecurity() throws Exception {
+        mockMvc.perform(get("/files/audio/missing.mp3"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void protectedEndpoint_withInvalidToken_isUnauthorized() throws Exception {
         given(jwtTokenProvider.parse("invalid", "access"))
                 .willThrow(new BaseException(ErrorCode.INVALID_TOKEN));

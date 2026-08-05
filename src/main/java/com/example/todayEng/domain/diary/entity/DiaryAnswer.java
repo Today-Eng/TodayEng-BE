@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.entity;
 
 import com.example.todayEng.domain.diary.entity.enums.CorrectionStatus;
+import com.example.todayEng.domain.diary.entity.enums.TranscriptionStatus;
 import com.example.todayEng.global.common.BaseTimeEntity;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.Column;
@@ -43,8 +44,21 @@ public class DiaryAnswer extends BaseTimeEntity {
     )
     private DiaryQuestion question;
 
-    @Column(name = "original_text", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "original_text", columnDefinition = "TEXT")
     private String originalText;
+
+    @Column(name = "audio_key", length = 500)
+    private String audioKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transcription_status", nullable = false, length = 20)
+    private TranscriptionStatus transcriptionStatus;
+
+    @Column(name = "transcription_error", length = 500)
+    private String transcriptionError;
+
+    @Column(name = "correction_error", length = 500)
+    private String correctionError;
 
     @Column(name = "corrected_text", columnDefinition = "TEXT")
     private String correctedText;
@@ -63,10 +77,14 @@ public class DiaryAnswer extends BaseTimeEntity {
     @Builder(access = AccessLevel.PRIVATE)
     private DiaryAnswer(
             DiaryQuestion question,
-            String originalText
+            String originalText,
+            String audioKey,
+            TranscriptionStatus transcriptionStatus
     ) {
         this.question = question;
         this.originalText = originalText;
+        this.audioKey = audioKey;
+        this.transcriptionStatus = transcriptionStatus;
         this.correctionStatus = CorrectionStatus.PENDING;
     }
 
@@ -77,7 +95,28 @@ public class DiaryAnswer extends BaseTimeEntity {
         return DiaryAnswer.builder()
                 .question(question)
                 .originalText(originalText)
+                .transcriptionStatus(TranscriptionStatus.SUCCEEDED)
                 .build();
+    }
+
+    public static DiaryAnswer createUploaded(DiaryQuestion question, String audioKey) {
+        return DiaryAnswer.builder()
+                .question(question)
+                .audioKey(audioKey)
+                .transcriptionStatus(TranscriptionStatus.UPLOADED)
+                .build();
+    }
+
+    public void completeTranscription(String text) {
+        this.originalText = text;
+        this.audioKey = null;
+        this.transcriptionStatus = TranscriptionStatus.SUCCEEDED;
+        this.transcriptionError = null;
+    }
+
+    public void failTranscription(String error) {
+        this.transcriptionStatus = TranscriptionStatus.FAILED;
+        this.transcriptionError = error;
     }
 
     public void updateOriginalText(String originalText) {
@@ -86,10 +125,12 @@ public class DiaryAnswer extends BaseTimeEntity {
         this.correctionReason = null;
         this.alternativeExpression = null;
         this.correctionStatus = CorrectionStatus.PENDING;
+        this.correctionError = null;
     }
 
     public void startCorrection() {
-        this.correctionStatus = CorrectionStatus.PENDING;
+        this.correctionStatus = CorrectionStatus.PROCESSING;
+        this.correctionError = null;
     }
 
     public void completeCorrection(
@@ -101,9 +142,17 @@ public class DiaryAnswer extends BaseTimeEntity {
         this.correctionReason = correctionReason;
         this.alternativeExpression = alternativeExpression;
         this.correctionStatus = CorrectionStatus.SUCCEEDED;
+        this.correctionError = null;
     }
 
     public void failCorrection() {
         this.correctionStatus = CorrectionStatus.FAILED;
+    }
+
+    public void failCorrection(String error) {
+        if (this.correctionStatus != CorrectionStatus.SUCCEEDED) {
+            this.correctionStatus = CorrectionStatus.FAILED;
+            this.correctionError = error;
+        }
     }
 }

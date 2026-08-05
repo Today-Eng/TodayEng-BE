@@ -1,5 +1,6 @@
 package com.example.todayEng.domain.user.service;
 
+import com.example.todayEng.domain.notification.repository.NotificationSettingRepository;
 import com.example.todayEng.domain.user.dto.UserDtos.*;
 import com.example.todayEng.domain.user.entity.*;
 import com.example.todayEng.domain.user.entity.enums.TermsType;
@@ -65,12 +66,17 @@ public class UserService {
     @Transactional
     public void withdraw(Long userId) {
         User user = getUser(userId);
+
         refreshTokenRepository.deleteAllByUserId(userId);
+
         userTermsRepository.deleteAllByUserId(userId);
         userInterestRepository.deleteAllByUserId(userId);
+
         externalAccountRepository.deleteAllByUserId(userId);
-        notificationSettingRepository.deleteAllByUserId(userId);
         authAccountRepository.deleteAllByUserId(userId);
+
+        notificationSettingRepository.deleteAllByUserId(userId);
+
         userRepository.delete(user);
     }
 
