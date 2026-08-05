@@ -401,8 +401,8 @@ class DiaryQueryServiceTest {
     }
 
     @Test
-    @DisplayName("메모와 답변이 없는 완료 회고도 정상적으로 상세 조회한다")
-    void getDiaryDetail_withoutMemoAndAnswer_success() {
+    @DisplayName("메모가 없는 완료 회고도 정상적으로 상세 조회한다")
+    void getDiaryDetail_withoutMemo_success() {
         Diary diary = createCompletedDiary(
                 1L,
                 LocalDate.of(2026, 7, 10)
@@ -415,6 +415,14 @@ class DiaryQueryServiceTest {
                 "What did you do today?",
                 "오늘 무엇을 했나요?",
                 "daily"
+        );
+
+        DiaryAnswer answer = createSucceededAnswer(
+                101L,
+                mainQuestion,
+                "I studied English today.",
+                "I studied English today.",
+                null
         );
 
         given(
@@ -436,7 +444,7 @@ class DiaryQueryServiceTest {
                 diaryAnswerRepository.findAllByQuestionIdIn(
                         List.of(11L)
                 )
-        ).willReturn(List.of());
+        ).willReturn(List.of(answer));
 
         DiaryDetailResponse response =
                 diaryQueryService.getDiaryDetail(
@@ -448,8 +456,15 @@ class DiaryQueryServiceTest {
         assertThat(response.keywords())
                 .containsExactly("daily");
         assertThat(response.qaList()).hasSize(1);
-        assertThat(response.qaList().get(0).answer())
-                .isNull();
+
+        DiaryDetailResponse.QuestionAnswer questionAnswer =
+                response.qaList().get(0);
+
+        assertThat(questionAnswer.answer()).isNotNull();
+        assertThat(questionAnswer.answer().originalText())
+                .isEqualTo("I studied English today.");
+        assertThat(questionAnswer.answer().correctedText())
+                .isEqualTo("I studied English today.");
     }
 
     @Test

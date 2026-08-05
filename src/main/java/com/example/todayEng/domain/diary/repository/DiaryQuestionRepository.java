@@ -24,8 +24,6 @@ public interface DiaryQuestionRepository extends JpaRepository<DiaryQuestion, Lo
             """)
     java.util.List<DiaryQuestion> findAllByDiaryIdInReflectionOrder(@Param("diaryId") Long diaryId);
 
-    List<DiaryQuestion> findAllByDiaryIdOrderByQuestionOrder(Long diaryId);
-
     List<DiaryQuestion>
     findAllByDiaryIdInAndQuestionTypeOrderByDiaryIdAscQuestionOrderAsc(
             List<Long> diaryIds,
