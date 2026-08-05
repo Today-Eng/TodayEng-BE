@@ -23,6 +23,19 @@ jwt:
 
 google:
   client-id: ${GOOGLE_CLIENT_ID}
+  tts:
+    language-code: en-US
+    voice-name: en-US-Neural2-F
+    speaking-rate: 0.95
+    audio-encoding: MP3
+    credentials-location: ${GOOGLE_TTS_CREDENTIALS:classpath:google-credentials.json}
+  speech:
+    language-code: en-US
+    audio-encoding: WEBM_OPUS
+    content-type: audio/webm
+    file-extension: webm
+    credentials-location: ${GOOGLE_SPEECH_CREDENTIALS:classpath:google-credentials.json}
+    max-file-size-bytes: 10485760
 
 oauth:
   google-calendar:
@@ -40,3 +53,28 @@ oauth:
     scopes:
       - user-read-email
       - user-read-recently-played
+
+web-push:
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY}
+    private-key: ${VAPID_PRIVATE_KEY}
+    subject: ${VAPID_SUBJECT}
+
+diary:
+  sse:
+    timeout-millis: 1800000
+    heartbeat-interval-millis: 30000
+
+gemini:
+  base-url: https://generativelanguage.googleapis.com
+  api-key: ${GEMINI_API_KEY:}
+  model: gemini-2.5-flash
+  connect-timeout-seconds: 3
+  read-timeout-seconds: 30
+
+storage:
+  audio:
+    # Local development storage only. A shared object store is required before
+    # running multiple instances or replacing an instance during deployment.
+    directory: ${AUDIO_STORAGE_DIRECTORY:./storage/audio}
+    public-url-prefix: ${AUDIO_PUBLIC_URL_PREFIX:/files/audio}
