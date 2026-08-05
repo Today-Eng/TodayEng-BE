@@ -30,11 +30,6 @@ public interface DiaryQuestionRepository extends JpaRepository<DiaryQuestion, Lo
             QuestionType questionType
     );
 
-    List<DiaryQuestion>
-    findAllByDiaryIdOrderByQuestionOrderAscIdAsc(
-            Long diaryId
-    );
-
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update DiaryQuestion q

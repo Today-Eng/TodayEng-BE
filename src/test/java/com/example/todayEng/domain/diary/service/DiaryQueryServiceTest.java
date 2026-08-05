@@ -323,7 +323,7 @@ class DiaryQueryServiceTest {
 
         given(
                 diaryQuestionRepository
-                        .findAllByDiaryIdOrderByQuestionOrderAscIdAsc(
+                        .findAllByDiaryIdInReflectionOrder(
                                 1L
                         )
         ).willReturn(List.of(
@@ -435,7 +435,7 @@ class DiaryQueryServiceTest {
 
         given(
                 diaryQuestionRepository
-                        .findAllByDiaryIdOrderByQuestionOrderAscIdAsc(
+                        .findAllByDiaryIdInReflectionOrder(
                                 1L
                         )
         ).willReturn(List.of(mainQuestion));

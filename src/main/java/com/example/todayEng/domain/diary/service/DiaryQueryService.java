@@ -126,7 +126,7 @@ public class DiaryQueryService {
 
         List<DiaryQuestion> questions =
                 diaryQuestionRepository
-                        .findAllByDiaryIdOrderByQuestionOrderAscIdAsc(
+                        .findAllByDiaryIdInReflectionOrder(
                                 diaryId
                         );
 
