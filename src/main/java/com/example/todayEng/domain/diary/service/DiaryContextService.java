@@ -23,7 +23,6 @@ import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
@@ -37,17 +36,16 @@ public class DiaryContextService {
     private final DiaryContextDataClient contextDataClient;
     private final DiaryImageAnalysisClient imageAnalysisClient;
     private final ImageUploadValidator imageUploadValidator;
+    private final DiaryMemoryService diaryMemoryService;
     private final ObjectMapper objectMapper;
 
-    @Transactional
     public DiaryContextCreateResponse createContexts(
             Long userId,
             Long diaryId,
             DiaryContextCreateRequest request,
             List<MultipartFile> images
     ) {
-        Diary diary = diaryRepository.findById(diaryId)
-                .filter(found -> found.getUser().getId().equals(userId))
+        Diary diary = diaryRepository.findByIdAndUserId(diaryId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ENTITY_NOT_FOUND));
         if (diary.getStatus() != DiaryStatus.IN_PROGRESS) {
             throw new BaseException(ErrorCode.DIARY_ALREADY_COMPLETED);
@@ -59,6 +57,7 @@ public class DiaryContextService {
 
         if (request.memo() != null) {
             diary.updateMemo(request.memo());
+            diaryRepository.save(diary);
             contexts.add(saveSuccess(diary, DiaryContextType.MEMO,
                     objectMapper.valueToTree(new MemoData(request.memo()))));
         }
@@ -71,6 +70,7 @@ public class DiaryContextService {
                     () -> contextDataClient.fetchWeather(
                             request.location(), diary.getDiaryDate())));
         }
+        diaryMemoryService.create(userId, diaryId).ifPresent(contexts::add);
 
         externalAccountRepository.findAllByUser_Id(userId).stream()
                 .filter(ExternalAccount::isUseEnabled)

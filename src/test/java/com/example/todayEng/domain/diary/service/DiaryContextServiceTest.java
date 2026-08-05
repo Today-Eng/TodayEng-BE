@@ -41,6 +41,7 @@ class DiaryContextServiceTest {
     @Mock ExternalAccountRepository accountRepository;
     @Mock DiaryContextDataClient dataClient;
     @Mock DiaryImageAnalysisClient imageAnalysisClient;
+    @Mock DiaryMemoryService diaryMemoryService;
     DiaryContextService service;
     Diary diary;
 
@@ -48,12 +49,15 @@ class DiaryContextServiceTest {
     void setUp() {
         service = new DiaryContextService(diaryRepository, contextRepository,
                 accountRepository, dataClient, imageAnalysisClient,
-                new ImageUploadValidator(), new ObjectMapper());
+                new ImageUploadValidator(), diaryMemoryService, new ObjectMapper());
         User user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
         diary = Diary.create(user, LocalDate.of(2026, 7, 30));
         ReflectionTestUtils.setField(diary, "id", 10L);
-        given(diaryRepository.findById(10L)).willReturn(Optional.of(diary));
+        given(diaryRepository.findByIdAndUserId(10L, 1L))
+                .willReturn(Optional.of(diary));
+        given(diaryMemoryService.create(1L, 10L))
+                .willReturn(Optional.empty());
         given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of());
         given(contextRepository.findByDiaryAndContextType(any(), any()))
                 .willReturn(Optional.empty());
