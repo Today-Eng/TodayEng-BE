@@ -22,6 +22,7 @@ public enum ErrorCode {
     INVALID_HTTP_BODY(HttpStatus.BAD_REQUEST, "C008", "HTTP 요청 바디(JSON) 파싱에 실패했습니다."),
     MULTIPART_FILE_ERROR(HttpStatus.BAD_REQUEST, "C009", "파일 업로드 처리 중 오류가 발생했습니다."),
     DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "C010", "이미 존재하는 리소스입니다."),
+    INVALID_CALENDAR_DATE(HttpStatus.BAD_REQUEST, "C011", "조회할 연도와 월을 확인해주세요."),
 
 
     // Auth (A)
