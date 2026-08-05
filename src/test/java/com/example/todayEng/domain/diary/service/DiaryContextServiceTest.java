@@ -47,7 +47,8 @@ class DiaryContextServiceTest {
     @BeforeEach
     void setUp() {
         service = new DiaryContextService(diaryRepository, contextRepository,
-                accountRepository, dataClient, imageAnalysisClient, new ObjectMapper());
+                accountRepository, dataClient, imageAnalysisClient,
+                new ImageUploadValidator(), new ObjectMapper());
         User user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
         diary = Diary.create(user, LocalDate.of(2026, 7, 30));
@@ -62,7 +63,8 @@ class DiaryContextServiceTest {
     @Test
     void analyzesImagesAndStoresOnlyAnalysis() throws Exception {
         var image = new MockMultipartFile(
-                "images", "day.jpg", "image/jpeg", new byte[]{1, 2, 3});
+                "images", "day.jpg", "image/jpeg",
+                new byte[]{(byte) 0xff, (byte) 0xd8, (byte) 0xff});
         var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
         given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
 
@@ -79,7 +81,9 @@ class DiaryContextServiceTest {
     @Test
     void imageAnalysisFailureIsStoredAsPartialFailure() {
         var image = new MockMultipartFile(
-                "images", "day.png", "image/png", new byte[]{1});
+                "images", "day.png", "image/png",
+                new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47,
+                        0x0d, 0x0a, 0x1a, 0x0a});
         given(imageAnalysisClient.analyze(List.of(image)))
                 .willThrow(new RuntimeException("timeout"));
 

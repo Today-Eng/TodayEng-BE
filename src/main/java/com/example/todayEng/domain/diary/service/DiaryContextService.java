@@ -19,7 +19,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,18 +31,12 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class DiaryContextService {
 
-    private static final int MAX_IMAGE_COUNT = 2;
-    private static final long MAX_IMAGE_SIZE = 7L * 1024 * 1024;
-    private static final long MAX_TOTAL_IMAGE_SIZE = 14L * 1024 * 1024;
-    private static final Set<String> SUPPORTED_IMAGE_TYPES = Set.of(
-            "image/jpeg", "image/png", "image/webp"
-    );
-
     private final DiaryRepository diaryRepository;
     private final DiaryContextRepository diaryContextRepository;
     private final ExternalAccountRepository externalAccountRepository;
     private final DiaryContextDataClient contextDataClient;
     private final DiaryImageAnalysisClient imageAnalysisClient;
+    private final ImageUploadValidator imageUploadValidator;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -60,7 +53,7 @@ public class DiaryContextService {
             throw new BaseException(ErrorCode.DIARY_ALREADY_COMPLETED);
         }
 
-        List<MultipartFile> validatedImages = validateImages(images);
+        List<MultipartFile> validatedImages = imageUploadValidator.validate(images);
         validateLocation(request.location());
         List<DiaryContext> contexts = new ArrayList<>();
 
@@ -133,33 +126,6 @@ public class DiaryContextService {
                 .orElseGet(() -> DiaryContext.failure(diary, type));
         context.markFailed();
         return diaryContextRepository.save(context);
-    }
-
-    private List<MultipartFile> validateImages(List<MultipartFile> images) {
-        if (images == null || images.isEmpty()) {
-            return List.of();
-        }
-        if (images.size() > MAX_IMAGE_COUNT) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        long totalSize = 0;
-        for (MultipartFile image : images) {
-            if (image == null || image.isEmpty()) {
-                throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
-            }
-            if (!SUPPORTED_IMAGE_TYPES.contains(image.getContentType())) {
-                throw new BaseException(ErrorCode.INVALID_FILE_EXTENSION);
-            }
-            if (image.getSize() > MAX_IMAGE_SIZE) {
-                throw new BaseException(ErrorCode.FILE_SIZE_EXCEEDED);
-            }
-            totalSize += image.getSize();
-        }
-        if (totalSize > MAX_TOTAL_IMAGE_SIZE) {
-            throw new BaseException(ErrorCode.FILE_SIZE_EXCEEDED);
-        }
-        return List.copyOf(images);
     }
 
     private void validateLocation(DiaryContextCreateRequest.Location location) {
