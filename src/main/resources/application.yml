@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
   jackson:
@@ -74,7 +76,14 @@ gemini:
 
 storage:
   audio:
+    type: ${AUDIO_STORAGE_TYPE:local}
     # Local development storage only. A shared object store is required before
     # running multiple instances or replacing an instance during deployment.
     directory: ${AUDIO_STORAGE_DIRECTORY:./storage/audio}
     public-url-prefix: ${AUDIO_PUBLIC_URL_PREFIX:/files/audio}
+    s3:
+      bucket: ${AUDIO_S3_BUCKET:}
+      region: ${AWS_REGION:ap-northeast-2}
+      tts-prefix: ${AUDIO_S3_TTS_PREFIX:tts}
+      stt-prefix: ${AUDIO_S3_STT_PREFIX:stt}
+      playback-url-expiration: ${AUDIO_PLAYBACK_URL_EXPIRATION:30m}
