@@ -75,6 +75,7 @@ class DiaryMemoryPersistenceServiceTest {
         );
 
         verify(sourceRepository).deleteAllByContextId(100L);
+        verify(sourceRepository).flush();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<DiaryContextSource>> captor =
                 ArgumentCaptor.forClass(List.class);

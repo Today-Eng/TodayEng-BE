@@ -8,7 +8,6 @@ import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
-import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
@@ -31,7 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class DiaryContextService {
 
     private final DiaryRepository diaryRepository;
-    private final DiaryContextRepository diaryContextRepository;
+    private final DiaryContextPersistenceService persistenceService;
     private final ExternalAccountRepository externalAccountRepository;
     private final DiaryContextDataClient contextDataClient;
     private final DiaryImageAnalysisClient imageAnalysisClient;
@@ -56,17 +55,15 @@ public class DiaryContextService {
         List<DiaryContext> contexts = new ArrayList<>();
 
         if (request.memo() != null) {
-            diary.updateMemo(request.memo());
-            diaryRepository.save(diary);
-            contexts.add(saveSuccess(diary, DiaryContextType.MEMO,
+            contexts.add(persistenceService.saveMemo(userId, diaryId, request.memo(),
                     objectMapper.valueToTree(new MemoData(request.memo()))));
         }
         if (!validatedImages.isEmpty()) {
-            contexts.add(collect(diary, DiaryContextType.PHOTO,
+            contexts.add(collect(userId, diaryId, DiaryContextType.PHOTO,
                     () -> imageAnalysisClient.analyze(validatedImages)));
         }
         if (request.location() != null) {
-            contexts.add(collect(diary, DiaryContextType.WEATHER,
+            contexts.add(collect(userId, diaryId, DiaryContextType.WEATHER,
                     () -> contextDataClient.fetchWeather(
                             request.location(), diary.getDiaryDate())));
         }
@@ -74,30 +71,34 @@ public class DiaryContextService {
 
         externalAccountRepository.findAllByUser_Id(userId).stream()
                 .filter(ExternalAccount::isUseEnabled)
-                .forEach(account -> collectExternal(diary, account, contexts));
+                .forEach(account -> collectExternal(
+                        userId, diaryId, diary, account, contexts));
 
         return new DiaryContextCreateResponse(diary.getId(), contexts.stream()
                 .map(DiaryContextCreateResponse.ContextResult::from).toList());
     }
 
     private void collectExternal(
+            Long userId,
+            Long diaryId,
             Diary diary,
             ExternalAccount account,
             List<DiaryContext> contexts
     ) {
         if (account.getProvider() == ExternalServiceProvider.GOOGLE_CALENDAR) {
-            contexts.add(collect(diary, DiaryContextType.CALENDAR,
+            contexts.add(collect(userId, diaryId, DiaryContextType.CALENDAR,
                     () -> contextDataClient.fetchCalendar(
                             account.getAccessToken(), diary.getDiaryDate())));
         } else if (account.getProvider() == ExternalServiceProvider.SPOTIFY) {
-            contexts.add(collect(diary, DiaryContextType.SPOTIFY,
+            contexts.add(collect(userId, diaryId, DiaryContextType.SPOTIFY,
                     () -> contextDataClient.fetchSpotify(
                             account.getAccessToken(), diary.getDiaryDate())));
         }
     }
 
     private DiaryContext collect(
-            Diary diary,
+            Long userId,
+            Long diaryId,
             DiaryContextType type,
             Supplier<JsonNode> collector
     ) {
@@ -106,26 +107,12 @@ public class DiaryContextService {
             if (data == null) {
                 throw new IllegalStateException("Context collector returned no data");
             }
-            return saveSuccess(diary, type, data);
+            return persistenceService.saveSuccess(userId, diaryId, type, data);
         } catch (RuntimeException exception) {
             log.warn("Diary context collection failed: diaryId={}, type={}, exception={}",
-                    diary.getId(), type, exception.getClass().getSimpleName());
-            return saveFailure(diary, type);
+                    diaryId, type, exception.getClass().getSimpleName());
+            return persistenceService.saveFailure(userId, diaryId, type);
         }
-    }
-
-    private DiaryContext saveSuccess(Diary diary, DiaryContextType type, JsonNode data) {
-        DiaryContext context = diaryContextRepository.findByDiaryAndContextType(diary, type)
-                .orElseGet(() -> DiaryContext.success(diary, type, data));
-        context.updateContextData(data);
-        return diaryContextRepository.save(context);
-    }
-
-    private DiaryContext saveFailure(Diary diary, DiaryContextType type) {
-        DiaryContext context = diaryContextRepository.findByDiaryAndContextType(diary, type)
-                .orElseGet(() -> DiaryContext.failure(diary, type));
-        context.markFailed();
-        return diaryContextRepository.save(context);
     }
 
     private void validateLocation(DiaryContextCreateRequest.Location location) {

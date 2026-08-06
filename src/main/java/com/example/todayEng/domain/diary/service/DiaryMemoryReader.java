@@ -23,6 +23,7 @@ public class DiaryMemoryReader {
 
     private static final int MEMORY_DAYS = 30;
     private static final int MAX_DIARY_COUNT = 10;
+    private static final int MAX_MEMO_LENGTH = 2000;
     private static final int MAX_QUESTION_LENGTH = 1000;
     private static final int MAX_ANSWER_LENGTH = 4000;
 
@@ -97,7 +98,7 @@ public class DiaryMemoryReader {
         return new DiaryInput(
                 diary.getId(),
                 diary.getDiaryDate(),
-                diary.getMemo(),
+                truncate(diary.getMemo(), MAX_MEMO_LENGTH),
                 reflections
         );
     }

@@ -7,8 +7,12 @@ import static org.mockito.Mockito.mock;
 
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,8 +25,8 @@ class ImageUploadValidatorTest {
 
     @Test
     void acceptsTwoImagesAtCountLimit() {
-        var jpeg = image("first.jpg", "image/jpeg", jpegBytes(3));
-        var png = image("second.png", "image/png", pngBytes(8));
+        var jpeg = image("first.jpg", "image/jpeg", jpegBytes(1024));
+        var png = image("second.png", "image/png", pngBytes(1024));
 
         assertThat(validator.validate(List.of(jpeg, png)))
                 .containsExactly(jpeg, png);
@@ -30,7 +34,7 @@ class ImageUploadValidatorTest {
 
     @Test
     void rejectsThreeImagesAboveCountLimit() {
-        var image = image("day.jpg", "image/jpeg", jpegBytes(3));
+        var image = image("day.jpg", "image/jpeg", jpegBytes(1024));
 
         assertError(
                 () -> validator.validate(List.of(image, image, image)),
@@ -43,6 +47,15 @@ class ImageUploadValidatorTest {
         var image = image("day.jpg", "image/jpeg", jpegBytes(MAX_IMAGE_SIZE));
 
         assertThat(validator.validate(List.of(image))).containsExactly(image);
+    }
+
+    @Test
+    void acceptsTwoImagesAtTotalSizeLimit() {
+        var first = image("first.jpg", "image/jpeg", jpegBytes(MAX_IMAGE_SIZE));
+        var second = image("second.png", "image/png", pngBytes(MAX_IMAGE_SIZE));
+
+        assertThat(validator.validate(List.of(first, second)))
+                .containsExactly(first, second);
     }
 
     @Test
@@ -74,6 +87,20 @@ class ImageUploadValidatorTest {
     }
 
     @Test
+    void rejectsCorruptedJpegWithMatchingSignature() {
+        byte[] corrupted = {
+                (byte) 0xff, (byte) 0xd8, (byte) 0xff,
+                0x00, 0x01, 0x02, 0x03
+        };
+        var image = image("corrupted.jpg", "image/jpeg", corrupted);
+
+        assertError(
+                () -> validator.validate(List.of(image)),
+                ErrorCode.INVALID_FILE_EXTENSION
+        );
+    }
+
+    @Test
     void convertsImageReadFailureToMultipartError() throws IOException {
         MultipartFile image = mock(MultipartFile.class);
         given(image.isEmpty()).willReturn(false);
@@ -92,21 +119,30 @@ class ImageUploadValidatorTest {
     }
 
     private byte[] jpegBytes(int size) {
-        byte[] bytes = new byte[size];
-        bytes[0] = (byte) 0xff;
-        bytes[1] = (byte) 0xd8;
-        bytes[2] = (byte) 0xff;
-        return bytes;
+        return validImageBytes("jpg", size);
     }
 
     private byte[] pngBytes(int size) {
-        byte[] bytes = new byte[size];
-        byte[] signature = {
-                (byte) 0x89, 0x50, 0x4e, 0x47,
-                0x0d, 0x0a, 0x1a, 0x0a
-        };
-        System.arraycopy(signature, 0, bytes, 0, signature.length);
-        return bytes;
+        return validImageBytes("png", size);
+    }
+
+    private byte[] validImageBytes(String format, int size) {
+        try {
+            BufferedImage image = new BufferedImage(
+                    2,
+                    2,
+                    BufferedImage.TYPE_INT_RGB
+            );
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            ImageIO.write(image, format, outputStream);
+            byte[] encoded = outputStream.toByteArray();
+            if (encoded.length > size) {
+                throw new IllegalArgumentException("Requested image size is too small");
+            }
+            return Arrays.copyOf(encoded, size);
+        } catch (IOException exception) {
+            throw new AssertionError(exception);
+        }
     }
 
     private void assertError(Runnable action, ErrorCode errorCode) {
