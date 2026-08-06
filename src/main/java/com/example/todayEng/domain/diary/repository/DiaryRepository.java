@@ -1,17 +1,19 @@
 package com.example.todayEng.domain.diary.repository;
 
 import com.example.todayEng.domain.diary.entity.Diary;
+import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
 import com.example.todayEng.domain.user.entity.User;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 
 public interface DiaryRepository extends JpaRepository<Diary, Long> {
 
@@ -68,5 +70,18 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
             @Param("fromDate") LocalDate fromDate,
             @Param("currentDate") LocalDate currentDate,
             Pageable pageable
+    );
+
+    List<Diary> findAllByUserIdAndStatusAndDiaryDateBetweenOrderByDiaryDateDesc(
+            Long userId,
+            DiaryStatus status,
+            LocalDate startDate,
+            LocalDate endDate
+    );
+
+    Optional<Diary> findByIdAndUserIdAndStatus(
+            Long diaryId,
+            Long userId,
+            DiaryStatus status
     );
 }

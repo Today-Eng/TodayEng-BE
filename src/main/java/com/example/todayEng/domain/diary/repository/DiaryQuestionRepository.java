@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.repository;
 
 import com.example.todayEng.domain.diary.entity.DiaryQuestion;
+import com.example.todayEng.domain.diary.entity.enums.QuestionType;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -12,7 +13,7 @@ public interface DiaryQuestionRepository extends JpaRepository<DiaryQuestion, Lo
     long countByDiaryId(Long diaryId);
 
     long countByDiaryIdAndQuestionType(Long diaryId,
-            com.example.todayEng.domain.diary.entity.enums.QuestionType questionType);
+                                       com.example.todayEng.domain.diary.entity.enums.QuestionType questionType);
 
     @Query("""
             select q from DiaryQuestion q
@@ -23,7 +24,11 @@ public interface DiaryQuestionRepository extends JpaRepository<DiaryQuestion, Lo
             """)
     java.util.List<DiaryQuestion> findAllByDiaryIdInReflectionOrder(@Param("diaryId") Long diaryId);
 
-    List<DiaryQuestion> findAllByDiaryIdOrderByQuestionOrder(Long diaryId);
+    List<DiaryQuestion>
+    findAllByDiaryIdInAndQuestionTypeOrderByDiaryIdAscQuestionOrderAsc(
+            List<Long> diaryIds,
+            QuestionType questionType
+    );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
