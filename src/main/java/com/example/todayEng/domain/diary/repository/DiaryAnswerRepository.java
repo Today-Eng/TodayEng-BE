@@ -2,6 +2,7 @@ package com.example.todayEng.domain.diary.repository;
 
 import com.example.todayEng.domain.diary.entity.DiaryAnswer;
 import java.util.Optional;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -56,4 +57,15 @@ public interface DiaryAnswerRepository extends JpaRepository<DiaryAnswer, Long> 
                 com.example.todayEng.domain.diary.entity.enums.CorrectionStatus.FAILED)
             """)
     int claimCorrection(@Param("answerId") Long answerId);
+
+    @Query("""
+            select a from DiaryAnswer a
+            join fetch a.question q
+            join fetch q.diary d
+            where d.id in :diaryIds
+            order by d.diaryDate desc, d.id desc, q.questionOrder asc
+            """)
+    List<DiaryAnswer> findAllForMemoryAnalysis(
+            @Param("diaryIds") List<Long> diaryIds
+    );
 }
