@@ -62,6 +62,7 @@ public class DiaryMemoryPersistenceService {
         DiaryContext saved = contextRepository.saveAndFlush(context);
 
         sourceRepository.deleteAllByContextId(saved.getId());
+        sourceRepository.flush();
         sourceRepository.saveAll(sources.stream()
                 .map(source -> DiaryContextSource.create(saved, source))
                 .toList());

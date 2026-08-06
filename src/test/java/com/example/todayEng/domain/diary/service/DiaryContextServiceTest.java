@@ -12,7 +12,6 @@ import com.example.todayEng.domain.diary.dto.request.DiaryContextCreateRequest;
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
-import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
@@ -41,7 +40,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class DiaryContextServiceTest {
 
     @Mock DiaryRepository diaryRepository;
-    @Mock DiaryContextRepository contextRepository;
+    @Mock DiaryContextPersistenceService persistenceService;
     @Mock ExternalAccountRepository accountRepository;
     @Mock DiaryContextDataClient dataClient;
     @Mock DiaryImageAnalysisClient imageAnalysisClient;
@@ -51,7 +50,7 @@ class DiaryContextServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DiaryContextService(diaryRepository, contextRepository,
+        service = new DiaryContextService(diaryRepository, persistenceService,
                 accountRepository, dataClient, imageAnalysisClient,
                 new ImageUploadValidator(), diaryMemoryService, new ObjectMapper());
         User user = User.create();
@@ -63,9 +62,12 @@ class DiaryContextServiceTest {
         given(diaryMemoryService.create(1L, 10L))
                 .willReturn(Optional.empty());
         given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of());
-        given(contextRepository.findByDiaryAndContextType(any(), any()))
-                .willReturn(Optional.empty());
-        given(contextRepository.save(any())).willAnswer(call -> call.getArgument(0));
+        given(persistenceService.saveSuccess(any(), any(), any(), any()))
+                .willAnswer(call -> DiaryContext.success(
+                        diary, call.getArgument(2), call.getArgument(3)));
+        given(persistenceService.saveFailure(any(), any(), any()))
+                .willAnswer(call -> DiaryContext.failure(
+                        diary, call.getArgument(2)));
     }
 
     @Test
