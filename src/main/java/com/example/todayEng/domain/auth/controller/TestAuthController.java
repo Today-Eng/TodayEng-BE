@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Profile("local")
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Tag(name = "회원 테스트 로그인", description = "로컬 환경에서 Google 인증 없이 회원 API를 테스트하기 위한 로그인")
 public class TestAuthController {

@@ -22,6 +22,7 @@ public enum ErrorCode {
     INVALID_HTTP_BODY(HttpStatus.BAD_REQUEST, "C008", "HTTP 요청 바디(JSON) 파싱에 실패했습니다."),
     MULTIPART_FILE_ERROR(HttpStatus.BAD_REQUEST, "C009", "파일 업로드 처리 중 오류가 발생했습니다."),
     DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "C010", "이미 존재하는 리소스입니다."),
+    INVALID_CALENDAR_DATE(HttpStatus.BAD_REQUEST, "C011", "조회할 연도와 월을 확인해주세요."),
 
 
     // Auth (A)
@@ -95,6 +96,8 @@ public enum ErrorCode {
     INCOMPLETE_REFLECTION_ANSWERS(HttpStatus.CONFLICT, "D031", "모든 회고 답변이 완료되지 않았습니다."),
     REFLECTION_CORRECTION_NOT_FINISHED(HttpStatus.CONFLICT, "D032", "답변 교정 처리가 완료되지 않았습니다."),
     DIARY_ALREADY_PAUSED(HttpStatus.CONFLICT, "D033", "이미 중단된 회고입니다."),
+    INVALID_DIARY_YEAR_MONTH(HttpStatus.BAD_REQUEST, "D034", "조회할 연도 또는 월이 올바르지 않습니다."),
+    DIARY_NOT_COMPLETED(HttpStatus.CONFLICT, "D035", "완료된 회고만 메모를 수정할 수 있습니다."),
 
     // Notification (N)
     PUSH_SUBSCRIPTION_REQUIRED(HttpStatus.BAD_REQUEST, "N001", "푸시 구독 정보가 없어 알림을 활성화할 수 없습니다."),

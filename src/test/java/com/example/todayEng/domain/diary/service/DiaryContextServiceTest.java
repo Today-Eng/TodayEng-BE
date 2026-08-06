@@ -12,7 +12,6 @@ import com.example.todayEng.domain.diary.dto.request.DiaryContextCreateRequest;
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
-import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
@@ -41,27 +40,34 @@ import org.springframework.test.util.ReflectionTestUtils;
 class DiaryContextServiceTest {
 
     @Mock DiaryRepository diaryRepository;
-    @Mock DiaryContextRepository contextRepository;
+    @Mock DiaryContextPersistenceService persistenceService;
     @Mock ExternalAccountRepository accountRepository;
     @Mock DiaryContextDataClient dataClient;
     @Mock DiaryImageAnalysisClient imageAnalysisClient;
+    @Mock DiaryMemoryService diaryMemoryService;
     DiaryContextService service;
     Diary diary;
 
     @BeforeEach
     void setUp() {
-        service = new DiaryContextService(diaryRepository, contextRepository,
+        service = new DiaryContextService(diaryRepository, persistenceService,
                 accountRepository, dataClient, imageAnalysisClient,
-                new ImageUploadValidator(), new ObjectMapper());
+                new ImageUploadValidator(), diaryMemoryService, new ObjectMapper());
         User user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
         diary = Diary.create(user, LocalDate.of(2026, 7, 30));
         ReflectionTestUtils.setField(diary, "id", 10L);
-        given(diaryRepository.findById(10L)).willReturn(Optional.of(diary));
-        given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of());
-        given(contextRepository.findByDiaryAndContextType(any(), any()))
+        given(diaryRepository.findByIdAndUserId(10L, 1L))
+                .willReturn(Optional.of(diary));
+        given(diaryMemoryService.create(1L, 10L))
                 .willReturn(Optional.empty());
-        given(contextRepository.save(any())).willAnswer(call -> call.getArgument(0));
+        given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of());
+        given(persistenceService.saveSuccess(any(), any(), any(), any()))
+                .willAnswer(call -> DiaryContext.success(
+                        diary, call.getArgument(2), call.getArgument(3)));
+        given(persistenceService.saveFailure(any(), any(), any()))
+                .willAnswer(call -> DiaryContext.failure(
+                        diary, call.getArgument(2)));
     }
 
     @Test
