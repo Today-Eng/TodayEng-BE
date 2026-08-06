@@ -79,10 +79,10 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(authorize -> {
                     authorize.requestMatchers(
-                            "/health",
+                            "/api/health",
                             "/files/audio/**",
-                            "/auth/google",
-                            "/auth/test",
+                            "/api/auth/google",
+                            "/api/auth/test",
                             "/v3/api-docs/**",
                             "/swagger-ui/**",
                             "/swagger-ui.html",

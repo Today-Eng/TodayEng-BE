@@ -52,7 +52,7 @@ class DiaryMemoControllerTest {
                 org.mockito.ArgumentMatchers.any()
         )).willReturn(new DiaryMemoUpdateResponse(10L, "수정된 메모"));
 
-        mockMvc.perform(patch("/diaries/10/memo")
+        mockMvc.perform(patch("/api/diaries/10/memo")
                         .header("Authorization", "Bearer valid-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -77,7 +77,7 @@ class DiaryMemoControllerTest {
         given(jwtTokenProvider.parse("valid-token", "access"))
                 .willReturn(Jwts.claims().subject("1").build());
 
-        mockMvc.perform(patch("/diaries/10/memo")
+        mockMvc.perform(patch("/api/diaries/10/memo")
                         .header("Authorization", "Bearer valid-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
