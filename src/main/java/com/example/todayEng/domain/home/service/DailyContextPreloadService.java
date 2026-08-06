@@ -7,6 +7,7 @@ import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
+import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceService.SnapshotClaim;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -67,8 +68,8 @@ public class DailyContextPreloadService {
             DiaryContextType type,
             Supplier<JsonNode> collector
     ) {
-        Long snapshotId = claimSnapshot(userId, date, type);
-        if (snapshotId == null) {
+        SnapshotClaim claim = claimSnapshot(userId, date, type);
+        if (claim == null) {
             return;
         }
 
@@ -77,15 +78,15 @@ public class DailyContextPreloadService {
             if (data == null) {
                 throw new IllegalStateException("Context collector returned no data");
             }
-            persistenceService.succeed(snapshotId, data);
+            persistenceService.succeed(claim.id(), claim.leaseVersion(), data);
         } catch (RuntimeException exception) {
             log.warn("Daily context preload failed: type={}, exception={}",
                     type, exception.getClass().getSimpleName());
-            persistenceService.fail(snapshotId);
+            persistenceService.fail(claim.id(), claim.leaseVersion());
         }
     }
 
-    private Long claimSnapshot(Long userId, LocalDate date, DiaryContextType type) {
+    private SnapshotClaim claimSnapshot(Long userId, LocalDate date, DiaryContextType type) {
         try {
             return persistenceService.start(userId, date, type);
         } catch (DataIntegrityViolationException exception) {

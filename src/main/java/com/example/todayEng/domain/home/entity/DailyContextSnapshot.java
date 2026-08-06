@@ -60,6 +60,9 @@ public class DailyContextSnapshot extends BaseTimeEntity {
     @Column(name = "collection_status", nullable = false, length = 20)
     private DailyContextCollectionStatus collectionStatus;
 
+    @Column(name = "lease_version", nullable = false)
+    private long leaseVersion;
+
     private DailyContextSnapshot(
             User user,
             LocalDate contextDate,
@@ -69,6 +72,7 @@ public class DailyContextSnapshot extends BaseTimeEntity {
         this.contextDate = contextDate;
         this.contextType = contextType;
         this.collectionStatus = DailyContextCollectionStatus.IN_PROGRESS;
+        this.leaseVersion = 0L;
     }
 
     public static DailyContextSnapshot start(
@@ -87,5 +91,9 @@ public class DailyContextSnapshot extends BaseTimeEntity {
     public void fail() {
         this.contextData = null;
         this.collectionStatus = DailyContextCollectionStatus.FAILED;
+    }
+
+    public void attachData(JsonNode contextData) {
+        this.contextData = contextData;
     }
 }

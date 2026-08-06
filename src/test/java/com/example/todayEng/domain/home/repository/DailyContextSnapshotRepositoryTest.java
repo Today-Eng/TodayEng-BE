@@ -62,6 +62,7 @@ class DailyContextSnapshotRepositoryTest {
         assertThat(reclaimed.getCollectionStatus())
                 .isEqualTo(DailyContextCollectionStatus.IN_PROGRESS);
         assertThat(reclaimed.getUpdatedAt()).isEqualTo(now);
+        assertThat(reclaimed.getLeaseVersion()).isEqualTo(1L);
     }
 
     @Test
@@ -106,6 +107,100 @@ class DailyContextSnapshotRepositoryTest {
         );
 
         assertThat(updated).isEqualTo(0);
+    }
+
+    @Test
+    void finishIfOwnedTransitionsMatchingInProgressSnapshotToSucceeded() {
+        User user = userRepository.save(User.create());
+        LocalDate date = LocalDate.of(2026, 8, 6);
+        DailyContextSnapshot snapshot = snapshotRepository.saveAndFlush(
+                DailyContextSnapshot.start(user, date, DiaryContextType.WEATHER));
+
+        int updated = snapshotRepository.finishIfOwned(
+                snapshot.getId(),
+                DailyContextCollectionStatus.SUCCEEDED,
+                DailyContextCollectionStatus.IN_PROGRESS,
+                0L
+        );
+
+        assertThat(updated).isEqualTo(1);
+        DailyContextSnapshot finished = snapshotRepository.findById(snapshot.getId())
+                .orElseThrow();
+        assertThat(finished.getCollectionStatus())
+                .isEqualTo(DailyContextCollectionStatus.SUCCEEDED);
+        assertThat(finished.getLeaseVersion()).isEqualTo(1L);
+    }
+
+    @Test
+    void finishIfOwnedRejectsMismatchedLeaseVersion() {
+        User user = userRepository.save(User.create());
+        LocalDate date = LocalDate.of(2026, 8, 6);
+        DailyContextSnapshot snapshot = snapshotRepository.saveAndFlush(
+                DailyContextSnapshot.start(user, date, DiaryContextType.WEATHER));
+
+        int updated = snapshotRepository.finishIfOwned(
+                snapshot.getId(),
+                DailyContextCollectionStatus.SUCCEEDED,
+                DailyContextCollectionStatus.IN_PROGRESS,
+                99L
+        );
+
+        assertThat(updated).isEqualTo(0);
+        DailyContextSnapshot untouched = snapshotRepository.findById(snapshot.getId())
+                .orElseThrow();
+        assertThat(untouched.getCollectionStatus())
+                .isEqualTo(DailyContextCollectionStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void overlappingCollectorsOnlyReclaimerWinsFinalWrite() {
+        User user = userRepository.save(User.create());
+        LocalDate date = LocalDate.of(2026, 8, 6);
+        DailyContextSnapshot snapshot = snapshotRepository.saveAndFlush(
+                DailyContextSnapshot.start(user, date, DiaryContextType.WEATHER));
+        long originalLeaseVersion = snapshot.getLeaseVersion();
+
+        // The first collector's snapshot goes stale (e.g. it hangs past the timeout)
+        // and a second request reclaims the same row.
+        backdateUpdatedAt(snapshot.getId(), LocalDateTime.now().minusMinutes(10));
+        LocalDateTime now = LocalDateTime.now();
+        int reclaimed = snapshotRepository.reclaimStale(
+                user.getId(),
+                date,
+                DiaryContextType.WEATHER,
+                DailyContextCollectionStatus.IN_PROGRESS,
+                now,
+                now.minusMinutes(5)
+        );
+        assertThat(reclaimed).isEqualTo(1);
+        long reclaimerLeaseVersion = snapshotRepository
+                .findByUser_IdAndContextDateAndContextType(
+                        user.getId(), date, DiaryContextType.WEATHER)
+                .orElseThrow()
+                .getLeaseVersion();
+
+        // The original (now-stale) collector finally finishes and tries to write
+        // using the lease version it captured before the reclaim happened.
+        int staleWrite = snapshotRepository.finishIfOwned(
+                snapshot.getId(),
+                DailyContextCollectionStatus.SUCCEEDED,
+                DailyContextCollectionStatus.IN_PROGRESS,
+                originalLeaseVersion
+        );
+        assertThat(staleWrite).isEqualTo(0);
+        assertThat(snapshotRepository.findById(snapshot.getId()).orElseThrow()
+                .getCollectionStatus()).isEqualTo(DailyContextCollectionStatus.IN_PROGRESS);
+
+        // The reclaimer finishes and writes using its own lease version.
+        int winningWrite = snapshotRepository.finishIfOwned(
+                snapshot.getId(),
+                DailyContextCollectionStatus.SUCCEEDED,
+                DailyContextCollectionStatus.IN_PROGRESS,
+                reclaimerLeaseVersion
+        );
+        assertThat(winningWrite).isEqualTo(1);
+        assertThat(snapshotRepository.findById(snapshot.getId()).orElseThrow()
+                .getCollectionStatus()).isEqualTo(DailyContextCollectionStatus.SUCCEEDED);
     }
 
     private void backdateUpdatedAt(Long snapshotId, LocalDateTime updatedAt) {

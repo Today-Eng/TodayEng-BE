@@ -30,7 +30,7 @@ public interface DailyContextSnapshotRepository
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE DailyContextSnapshot s
-            SET s.updatedAt = :now
+            SET s.updatedAt = :now, s.leaseVersion = s.leaseVersion + 1
             WHERE s.user.id = :userId
               AND s.contextDate = :contextDate
               AND s.contextType = :contextType
@@ -44,5 +44,20 @@ public interface DailyContextSnapshotRepository
             @Param("inProgress") DailyContextCollectionStatus inProgress,
             @Param("now") LocalDateTime now,
             @Param("staleBefore") LocalDateTime staleBefore
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE DailyContextSnapshot s
+            SET s.collectionStatus = :targetStatus, s.leaseVersion = s.leaseVersion + 1
+            WHERE s.id = :id
+              AND s.collectionStatus = :inProgress
+              AND s.leaseVersion = :expectedLeaseVersion
+            """)
+    int finishIfOwned(
+            @Param("id") Long id,
+            @Param("targetStatus") DailyContextCollectionStatus targetStatus,
+            @Param("inProgress") DailyContextCollectionStatus inProgress,
+            @Param("expectedLeaseVersion") long expectedLeaseVersion
     );
 }

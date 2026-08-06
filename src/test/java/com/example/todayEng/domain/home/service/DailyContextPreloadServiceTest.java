@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.home.service;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -11,6 +12,7 @@ import com.example.todayEng.domain.diary.dto.request.DiaryContextCreateRequest.L
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
+import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceService.SnapshotClaim;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
@@ -68,9 +70,9 @@ class DailyContextPreloadServiceTest {
         given(account.getAccessToken()).willReturn("token");
         given(accountRepository.findAllByUser_Id(USER_ID)).willReturn(List.of(account));
         given(persistenceService.start(USER_ID, TODAY, DiaryContextType.WEATHER))
-                .willReturn(10L);
+                .willReturn(new SnapshotClaim(10L, 0L));
         given(persistenceService.start(USER_ID, TODAY, DiaryContextType.CALENDAR))
-                .willReturn(11L);
+                .willReturn(new SnapshotClaim(11L, 0L));
         given(dataClient.fetchWeather(location, TODAY))
                 .willReturn(new ObjectMapper().createObjectNode());
         given(dataClient.fetchCalendar("token", TODAY))
@@ -78,9 +80,9 @@ class DailyContextPreloadServiceTest {
 
         service.preload(USER_ID, location);
 
-        verify(persistenceService).succeed(10L,
+        verify(persistenceService).succeed(10L, 0L,
                 new ObjectMapper().createObjectNode());
-        verify(persistenceService).succeed(11L,
+        verify(persistenceService).succeed(11L, 0L,
                 new ObjectMapper().createObjectNode());
     }
 
@@ -94,8 +96,8 @@ class DailyContextPreloadServiceTest {
         service.preload(USER_ID, new Location(37.5, 127.0));
 
         verify(dataClient, never()).fetchWeather(any(), any());
-        verify(persistenceService, never()).succeed(any(), any());
-        verify(persistenceService, never()).fail(any());
+        verify(persistenceService, never()).succeed(any(), anyLong(), any());
+        verify(persistenceService, never()).fail(any(), anyLong());
     }
 
     @Test
@@ -103,25 +105,25 @@ class DailyContextPreloadServiceTest {
         given(persistenceService.start(USER_ID, TODAY, DiaryContextType.WEATHER))
                 .willThrow(new DataIntegrityViolationException("duplicate"));
         given(persistenceService.reclaimStale(USER_ID, TODAY, DiaryContextType.WEATHER))
-                .willReturn(Optional.of(10L));
+                .willReturn(Optional.of(new SnapshotClaim(10L, 1L)));
         given(dataClient.fetchWeather(any(), any()))
                 .willReturn(new ObjectMapper().createObjectNode());
 
         service.preload(USER_ID, new Location(37.5, 127.0));
 
-        verify(persistenceService).succeed(10L, new ObjectMapper().createObjectNode());
+        verify(persistenceService).succeed(10L, 1L, new ObjectMapper().createObjectNode());
     }
 
     @Test
     void recordsFailureWithoutThrowingWhenExternalCallFails() {
         given(persistenceService.start(USER_ID, TODAY, DiaryContextType.WEATHER))
-                .willReturn(10L);
+                .willReturn(new SnapshotClaim(10L, 0L));
         given(dataClient.fetchWeather(any(), any()))
                 .willThrow(new RuntimeException("timeout"));
 
         service.preload(USER_ID, new Location(37.5, 127.0));
 
-        verify(persistenceService).fail(10L);
+        verify(persistenceService).fail(10L, 0L);
     }
 
     @Test
@@ -132,9 +134,9 @@ class DailyContextPreloadServiceTest {
         given(account.getAccessToken()).willReturn("token");
         given(accountRepository.findAllByUser_Id(USER_ID)).willReturn(List.of(account));
         given(persistenceService.start(USER_ID, TODAY, DiaryContextType.WEATHER))
-                .willReturn(10L);
+                .willReturn(new SnapshotClaim(10L, 0L));
         given(persistenceService.start(USER_ID, TODAY, DiaryContextType.CALENDAR))
-                .willReturn(11L);
+                .willReturn(new SnapshotClaim(11L, 0L));
         given(dataClient.fetchWeather(location, TODAY))
                 .willThrow(new RuntimeException("timeout"));
         given(dataClient.fetchCalendar("token", TODAY))
@@ -142,8 +144,8 @@ class DailyContextPreloadServiceTest {
 
         service.preload(USER_ID, location);
 
-        verify(persistenceService).fail(10L);
-        verify(persistenceService).succeed(11L, new ObjectMapper().createObjectNode());
+        verify(persistenceService).fail(10L, 0L);
+        verify(persistenceService).succeed(11L, 0L, new ObjectMapper().createObjectNode());
     }
 
     @Test
