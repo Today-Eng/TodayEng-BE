@@ -11,6 +11,8 @@ public record S3AudioStorageProperties(
         String sttPrefix,
         Duration playbackUrlExpiration
 ) {
+    private static final Duration MAX_PLAYBACK_URL_EXPIRATION = Duration.ofDays(7);
+
     public S3AudioStorageProperties {
         region = defaultIfBlank(region, "ap-northeast-2");
         ttsPrefix = normalizePrefix(defaultIfBlank(ttsPrefix, "tts"));
@@ -24,8 +26,18 @@ public record S3AudioStorageProperties(
         if (bucket == null || bucket.isBlank()) {
             throw new IllegalStateException("storage.audio.s3.bucket must be configured for S3 audio storage");
         }
+        if (ttsPrefix.isBlank()) {
+            throw new IllegalStateException("storage.audio.s3.tts-prefix must not resolve to an empty prefix");
+        }
+        if (sttPrefix.isBlank()) {
+            throw new IllegalStateException("storage.audio.s3.stt-prefix must not resolve to an empty prefix");
+        }
         if (playbackUrlExpiration.isZero() || playbackUrlExpiration.isNegative()) {
             throw new IllegalStateException("storage.audio.s3.playback-url-expiration must be positive");
+        }
+        if (playbackUrlExpiration.compareTo(MAX_PLAYBACK_URL_EXPIRATION) > 0) {
+            throw new IllegalStateException(
+                    "storage.audio.s3.playback-url-expiration must not exceed 7 days");
         }
     }
 
