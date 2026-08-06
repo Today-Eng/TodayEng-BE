@@ -79,7 +79,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(authorize -> {
                     authorize.requestMatchers(
-                            "/api/health",
+                            "/health",
                             "/files/audio/**",
                             "/api/auth/google",
                             "/api/auth/test",

@@ -92,7 +92,7 @@ jobs:
 
             for attempt in $(seq 1 30); do
               if curl --fail --silent --output /dev/null \
-                http://127.0.0.1:8080/api/health; then
+                http://127.0.0.1:8080/health; then
                 echo "Application health check passed."
                 docker compose \
                   --env-file .env \
