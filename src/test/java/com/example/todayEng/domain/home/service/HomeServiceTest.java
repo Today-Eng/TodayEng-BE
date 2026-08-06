@@ -11,6 +11,9 @@ import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
+import com.example.todayEng.domain.home.entity.DailyContextSnapshot;
+import com.example.todayEng.domain.home.entity.enums.DailyContextCollectionStatus;
+import com.example.todayEng.domain.home.repository.DailyContextSnapshotRepository;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
@@ -44,6 +47,7 @@ class HomeServiceTest {
     @Mock UserRepository userRepository;
     @Mock DiaryRepository diaryRepository;
     @Mock DiaryContextRepository diaryContextRepository;
+    @Mock DailyContextSnapshotRepository snapshotRepository;
     @Mock ExternalAccountRepository externalAccountRepository;
 
     HomeService homeService;
@@ -59,6 +63,7 @@ class HomeServiceTest {
                 userRepository,
                 diaryRepository,
                 diaryContextRepository,
+                snapshotRepository,
                 externalAccountRepository,
                 clock
         );
@@ -73,6 +78,9 @@ class HomeServiceTest {
         given(diaryRepository.findByUserIdAndDiaryDate(USER_ID, TODAY))
                 .willReturn(Optional.empty());
         given(externalAccountRepository.findAllByUser_Id(USER_ID)).willReturn(List.of());
+        given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
+                USER_ID, TODAY, DailyContextCollectionStatus.SUCCEEDED
+        )).willReturn(List.of());
     }
 
     @Test
@@ -156,5 +164,59 @@ class HomeServiceTest {
                 .isInstanceOf(BaseException.class)
                 .extracting(exception -> ((BaseException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_CALENDAR_DATE);
+    }
+
+    @Test
+    void usesSuccessfulSnapshotBeforeDiaryIsCreated() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        DailyContextSnapshot snapshot = DailyContextSnapshot.start(
+                user, TODAY, DiaryContextType.WEATHER);
+        snapshot.succeed(objectMapper.readTree("""
+                {"daily":{"weather_code":[0],
+                "temperature_2m_max":[22.0],"temperature_2m_min":[18.0]}}
+                """));
+        given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
+                USER_ID, TODAY, DailyContextCollectionStatus.SUCCEEDED
+        )).willReturn(List.of(snapshot));
+
+        var response = homeService.getHome(USER_ID, null, null);
+
+        assertThat(response.today().diaryStatus()).isEqualTo("NOT_STARTED");
+        assertThat(response.materials().weather().available()).isTrue();
+        assertThat(response.materials().weather().condition()).isEqualTo("CLEAR");
+    }
+
+    @Test
+    void prefersDiaryContextOverSnapshotForSameType() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        DailyContextSnapshot snapshot = DailyContextSnapshot.start(
+                user, TODAY, DiaryContextType.WEATHER);
+        snapshot.succeed(objectMapper.readTree("""
+                {"daily":{"weather_code":[0],
+                "temperature_2m_max":[22.0],"temperature_2m_min":[18.0]}}
+                """));
+        given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
+                USER_ID, TODAY, DailyContextCollectionStatus.SUCCEEDED
+        )).willReturn(List.of(snapshot));
+
+        Diary diary = Diary.create(user, TODAY);
+        ReflectionTestUtils.setField(diary, "id", 10L);
+        given(diaryRepository.findByUserIdAndDiaryDate(USER_ID, TODAY))
+                .willReturn(Optional.of(diary));
+        DiaryContext weather = DiaryContext.success(
+                diary,
+                DiaryContextType.WEATHER,
+                objectMapper.readTree("""
+                        {"daily":{"weather_code":[95],
+                        "temperature_2m_max":[30.0],"temperature_2m_min":[26.0]}}
+                        """)
+        );
+        given(diaryContextRepository.findAllByDiaryIdAndSuccessTrueOrderById(10L))
+                .willReturn(List.of(weather));
+
+        var response = homeService.getHome(USER_ID, null, null);
+
+        assertThat(response.materials().weather().condition()).isEqualTo("THUNDERSTORM");
+        assertThat(response.materials().weather().temperature()).isEqualTo(28);
     }
 }
