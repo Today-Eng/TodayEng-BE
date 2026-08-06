@@ -40,6 +40,23 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
             @Param("userId") Long userId
     );
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Diary d
+               set d.contextCollectionStatus = com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus.COLLECTING
+             where d.id = :diaryId
+               and d.user.id = :userId
+               and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.IN_PROGRESS
+               and d.contextCollectionStatus in (
+                   com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus.NOT_STARTED,
+                   com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus.FAILED
+               )
+            """)
+    int claimContextCollection(
+            @Param("diaryId") Long diaryId,
+            @Param("userId") Long userId
+    );
+
     Optional<Diary> findByIdAndUserId(Long diaryId, Long userId);
 
     Optional<Diary> findByUserAndDiaryDate(

@@ -42,6 +42,18 @@ public class DiaryContextPersistenceService {
         return contextRepository.save(context);
     }
 
+    @Transactional
+    public void completeContextCollection(Long userId, Long diaryId) {
+        diaryRepository.findByIdAndUserId(diaryId, userId)
+                .ifPresent(Diary::completeContextCollection);
+    }
+
+    @Transactional
+    public void failContextCollection(Long userId, Long diaryId) {
+        diaryRepository.findByIdAndUserId(diaryId, userId)
+                .ifPresent(Diary::failContextCollection);
+    }
+
     private DiaryContext saveSuccess(Diary diary, DiaryContextType type, JsonNode data) {
         DiaryContext context = contextRepository.findByDiaryAndContextType(diary, type)
                 .orElseGet(() -> DiaryContext.success(diary, type, data));

@@ -203,6 +203,23 @@ class DailyContextSnapshotRepositoryTest {
                 .getCollectionStatus()).isEqualTo(DailyContextCollectionStatus.SUCCEEDED);
     }
 
+    @Test
+    void deletesOnlyTheSnapshotMatchingUserDateAndType() {
+        User user = userRepository.save(User.create());
+        LocalDate date = LocalDate.of(2026, 8, 6);
+        DailyContextSnapshot weather = snapshotRepository.saveAndFlush(
+                DailyContextSnapshot.start(user, date, DiaryContextType.WEATHER));
+        DailyContextSnapshot calendar = snapshotRepository.saveAndFlush(
+                DailyContextSnapshot.start(user, date, DiaryContextType.CALENDAR));
+
+        long deleted = snapshotRepository.deleteAllByUserIdAndContextDateAndContextType(
+                user.getId(), date, DiaryContextType.WEATHER);
+
+        assertThat(deleted).isEqualTo(1);
+        assertThat(snapshotRepository.findById(weather.getId())).isEmpty();
+        assertThat(snapshotRepository.findById(calendar.getId())).isPresent();
+    }
+
     private void backdateUpdatedAt(Long snapshotId, LocalDateTime updatedAt) {
         entityManager.getEntityManager()
                 .createQuery(
