@@ -87,7 +87,7 @@ public class Diary extends BaseTimeEntity {
     }
 
     public void updateMemo(String memo) {
-        this.memo = memo;
+        this.memo = normalizeMemo(memo);
     }
 
     public void complete() {
@@ -100,7 +100,7 @@ public class Diary extends BaseTimeEntity {
     }
 
     public void complete(String finalMemo) {
-        this.memo = finalMemo == null || finalMemo.isBlank() ? null : finalMemo.trim();
+        this.memo = normalizeMemo(finalMemo);
         complete();
     }
 
@@ -123,5 +123,12 @@ public class Diary extends BaseTimeEntity {
 
     public void failQuestionGeneration() {
         this.questionGenerationStatus = ReflectionQuestionGenerationStatus.FAILED;
+    }
+
+    private String normalizeMemo(String memo) {
+        if (memo == null || memo.isBlank()) {
+            return null;
+        }
+        return memo.strip();
     }
 }

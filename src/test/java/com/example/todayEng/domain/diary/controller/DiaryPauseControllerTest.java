@@ -46,7 +46,7 @@ class DiaryPauseControllerTest {
         given(diaryPauseService.pause(1L, 10L)).willReturn(new DiaryPauseResponse(
                 10L, DiaryStatus.PAUSED, pausedAt, pausedAt.plusHours(24)));
 
-        mockMvc.perform(patch("/diaries/10/pause")
+        mockMvc.perform(patch("/api/diaries/10/pause")
                         .header("Authorization", "Bearer valid-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -59,7 +59,7 @@ class DiaryPauseControllerTest {
 
     @Test
     void unauthenticatedUserCannotPauseDiary() throws Exception {
-        mockMvc.perform(patch("/diaries/10/pause"))
+        mockMvc.perform(patch("/api/diaries/10/pause"))
                 .andExpect(status().isUnauthorized());
     }
 }

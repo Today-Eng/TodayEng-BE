@@ -48,7 +48,7 @@ class ReflectionSessionControllerTest {
         given(reflectionSessionService.create(1L, 10L))
                 .willReturn(new ReflectionSessionResponse(10L, List.of()));
 
-        mockMvc.perform(post("/diaries/10/reflection-sessions")
+        mockMvc.perform(post("/api/diaries/10/reflection-sessions")
                         .header("Authorization", "Bearer valid-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -59,7 +59,7 @@ class ReflectionSessionControllerTest {
 
     @Test
     void unauthenticatedUserCannotCreateReflectionSession() throws Exception {
-        mockMvc.perform(post("/diaries/10/reflection-sessions"))
+        mockMvc.perform(post("/api/diaries/10/reflection-sessions"))
                 .andExpect(status().isUnauthorized());
     }
 }
