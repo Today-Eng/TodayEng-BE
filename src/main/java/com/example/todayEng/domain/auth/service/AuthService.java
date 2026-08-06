@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.auth.service;
 
 import com.example.todayEng.domain.auth.dto.LoginResponse;
+import com.example.todayEng.domain.auth.dto.TokenRefreshResponse;
 import com.example.todayEng.domain.user.entity.*;
 import com.example.todayEng.domain.user.entity.enums.AuthProvider;
 import com.example.todayEng.domain.user.repository.*;
@@ -36,6 +37,35 @@ public class AuthService {
         ProvisionedAccount provisioned = getOrCreate(AuthProvider.TEST, socialUid, null);
         return authTokenService.issueTokens(
                 provisioned.account().getUser(), provisioned.created());
+    }
+
+    @Transactional
+    public TokenRefreshResponse refresh(String token) {
+        Claims claims = jwtTokenProvider.parse(token, "refresh");
+        String jti = claims.getId();
+        String subject = claims.getSubject();
+        if (jti == null || jti.isBlank() || subject == null || subject.isBlank()) {
+            throw new BaseException(ErrorCode.INVALID_TOKEN);
+        }
+
+        RefreshToken storedToken = refreshTokenRepository.findByJtiForUpdate(jti)
+                .orElseThrow(() -> new BaseException(ErrorCode.INVALID_TOKEN));
+        if (!storedToken.getUser().getId().toString().equals(subject)) {
+            throw new BaseException(ErrorCode.INVALID_TOKEN);
+        }
+        if (storedToken.isExpired()) {
+            throw new BaseException(ErrorCode.EXPIRED_TOKEN);
+        }
+
+        Long userId = storedToken.getUser().getId();
+        JwtTokenProvider.IssuedToken newAccessToken = jwtTokenProvider.issueAccessToken(userId);
+        JwtTokenProvider.IssuedToken newRefreshToken = jwtTokenProvider.issueRefreshToken(userId);
+
+        refreshTokenRepository.delete(storedToken);
+        refreshTokenRepository.save(RefreshToken.create(
+                storedToken.getUser(), newRefreshToken.jti(), newRefreshToken.expiresAt()));
+
+        return new TokenRefreshResponse(newAccessToken.value(), newRefreshToken.value());
     }
 
     @Transactional

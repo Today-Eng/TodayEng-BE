@@ -1,6 +1,8 @@
 package com.example.todayEng.domain.auth.service;
 
 import com.example.todayEng.domain.auth.dto.LoginResponse;
+import com.example.todayEng.domain.auth.dto.TokenRefreshResponse;
+import com.example.todayEng.domain.user.entity.RefreshToken;
 import com.example.todayEng.domain.user.entity.AuthAccount;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.entity.enums.AuthProvider;
@@ -10,6 +12,7 @@ import com.example.todayEng.global.security.JwtTokenProvider;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -17,11 +20,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -65,6 +70,74 @@ class AuthServiceTest {
         authService.logout(1L, "refresh");
 
         verify(refreshTokenRepository).deleteByJti("refresh-jti");
+    }
+
+    @Test
+    void refreshRotatesStoredRefreshTokenAndIssuesNewTokenPair() {
+        User user = User.create("user@example.com");
+        ReflectionTestUtils.setField(user, "id", 1L);
+        RefreshToken storedToken = RefreshToken.create(
+                user, "old-jti", LocalDateTime.now().plusDays(1));
+        Claims claims = mock(Claims.class);
+        when(claims.getId()).thenReturn("old-jti");
+        when(claims.getSubject()).thenReturn("1");
+        when(jwtTokenProvider.parse("old-refresh", "refresh")).thenReturn(claims);
+        when(refreshTokenRepository.findByJtiForUpdate("old-jti"))
+                .thenReturn(Optional.of(storedToken));
+        when(jwtTokenProvider.issueAccessToken(1L)).thenReturn(
+                new JwtTokenProvider.IssuedToken("new-access", "access-jti", LocalDateTime.now().plusHours(1)));
+        when(jwtTokenProvider.issueRefreshToken(1L)).thenReturn(
+                new JwtTokenProvider.IssuedToken("new-refresh", "new-jti", LocalDateTime.now().plusDays(14)));
+
+        TokenRefreshResponse response = authService.refresh("old-refresh");
+
+        assertThat(response.accessToken()).isEqualTo("new-access");
+        assertThat(response.refreshToken()).isEqualTo("new-refresh");
+        verify(refreshTokenRepository).delete(storedToken);
+        ArgumentCaptor<RefreshToken> tokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository).save(tokenCaptor.capture());
+        assertThat(tokenCaptor.getValue().getJti()).isEqualTo("new-jti");
+        assertThat(tokenCaptor.getValue().getUser()).isSameAs(user);
+    }
+
+    @Test
+    void refreshRejectsTokenThatIsNotStored() {
+        Claims claims = mock(Claims.class);
+        when(claims.getId()).thenReturn("revoked-jti");
+        when(claims.getSubject()).thenReturn("1");
+        when(jwtTokenProvider.parse("revoked-refresh", "refresh")).thenReturn(claims);
+        when(refreshTokenRepository.findByJtiForUpdate("revoked-jti"))
+                .thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> authService.refresh("revoked-refresh"))
+                .isInstanceOf(com.example.todayEng.global.error.exception.BaseException.class)
+                .extracting("errorCode")
+                .isEqualTo(com.example.todayEng.global.error.ErrorCode.INVALID_TOKEN);
+
+        verify(jwtTokenProvider, never()).issueAccessToken(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void refreshRejectsExpiredStoredToken() {
+        User user = User.create("user@example.com");
+        ReflectionTestUtils.setField(user, "id", 1L);
+        RefreshToken storedToken = RefreshToken.create(
+                user, "expired-jti", LocalDateTime.now().minusSeconds(1));
+        Claims claims = mock(Claims.class);
+        when(claims.getId()).thenReturn("expired-jti");
+        when(claims.getSubject()).thenReturn("1");
+        when(jwtTokenProvider.parse("expired-refresh", "refresh")).thenReturn(claims);
+        when(refreshTokenRepository.findByJtiForUpdate("expired-jti"))
+                .thenReturn(Optional.of(storedToken));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> authService.refresh("expired-refresh"))
+                .isInstanceOf(com.example.todayEng.global.error.exception.BaseException.class)
+                .extracting("errorCode")
+                .isEqualTo(com.example.todayEng.global.error.ErrorCode.EXPIRED_TOKEN);
+
+        verify(jwtTokenProvider, never()).issueAccessToken(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
