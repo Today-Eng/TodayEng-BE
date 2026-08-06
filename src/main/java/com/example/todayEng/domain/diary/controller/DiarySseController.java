@@ -15,7 +15,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Tag(name = "회고 진행", description = "질문 생성·조회, 음성 답변 및 진행 결과 구독 API")
 @RestController
-@RequestMapping("/diaries")
+@RequestMapping("/api/diaries")
 @RequiredArgsConstructor
 public class DiarySseController {
 

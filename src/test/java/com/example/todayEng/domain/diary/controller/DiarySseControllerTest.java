@@ -47,7 +47,7 @@ class DiarySseControllerTest {
 
     @Test
     void unauthenticatedUserCannotSubscribe() throws Exception {
-        mockMvc.perform(get("/diaries/10/subscribe"))
+        mockMvc.perform(get("/api/diaries/10/subscribe"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -59,7 +59,7 @@ class DiarySseControllerTest {
         given(subscriptionService.subscribe(1L, 10L))
                 .willReturn(emitter);
 
-        mockMvc.perform(get("/diaries/10/subscribe")
+        mockMvc.perform(get("/api/diaries/10/subscribe")
                         .header(
                                 "Authorization",
                                 "Bearer valid-token"
@@ -73,7 +73,7 @@ class DiarySseControllerTest {
 
     @Test
     void invalidJwtCannotSubscribe() throws Exception {
-        mockMvc.perform(get("/diaries/10/subscribe")
+        mockMvc.perform(get("/api/diaries/10/subscribe")
                         .header("Authorization", "invalid"))
                 .andExpect(status().isUnauthorized());
     }

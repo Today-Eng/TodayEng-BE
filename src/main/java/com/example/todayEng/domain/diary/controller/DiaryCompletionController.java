@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/diaries")
+@RequestMapping("/api/diaries")
 @RequiredArgsConstructor
-@Tag(name = "회고 관리", description = "회고 시작 및 완료 API")
+@Tag(name = "회고 관리", description = "회고 시작, 중단, 완료 및 메모 수정 API")
 public class DiaryCompletionController {
     private final DiaryCompletionService completionService;
 

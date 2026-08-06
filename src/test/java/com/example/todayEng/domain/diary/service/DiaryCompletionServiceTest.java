@@ -41,7 +41,7 @@ class DiaryCompletionServiceTest {
         when(diaryRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(diary));
         when(questionRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of());
         when(answerRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of());
-        var result = service.complete(1L, 2L, new DiaryCompleteRequest(" 최종 메모 "));
+        var result = service.complete(1L, 2L, new DiaryCompleteRequest("　최종 메모　"));
         assertThat(result.status()).isEqualTo(DiaryStatus.COMPLETED);
         assertThat(result.finalMemo()).isEqualTo("최종 메모");
         assertThat(result.completedAt()).isNotNull();
@@ -53,7 +53,7 @@ class DiaryCompletionServiceTest {
         when(diaryRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(diary));
         when(questionRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of());
         when(answerRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of());
-        assertThat(service.complete(1L, 2L, new DiaryCompleteRequest("  ")).finalMemo()).isNull();
+        assertThat(service.complete(1L, 2L, new DiaryCompleteRequest("　　")).finalMemo()).isNull();
     }
 
     @Test void alreadyCompletedIsIdempotentAndDoesNotOverwriteFinalMemo() {

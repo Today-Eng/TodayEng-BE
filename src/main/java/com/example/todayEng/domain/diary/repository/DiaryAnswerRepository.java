@@ -29,6 +29,10 @@ public interface DiaryAnswerRepository extends JpaRepository<DiaryAnswer, Long> 
             """)
     java.util.List<DiaryAnswer> findAllByDiaryIdInReflectionOrder(@Param("diaryId") Long diaryId);
 
+    List<DiaryAnswer> findAllByQuestionIdIn(
+            List<Long> questionIds
+    );
+
     boolean existsByQuestionId(Long questionId);
 
     Optional<DiaryAnswer> findByIdAndQuestionIdAndQuestionDiaryIdAndQuestionDiaryUserId(
@@ -69,3 +73,4 @@ public interface DiaryAnswerRepository extends JpaRepository<DiaryAnswer, Long> 
             @Param("diaryIds") List<Long> diaryIds
     );
 }
+

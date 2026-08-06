@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
 
 @RestController
-@RequestMapping("/users/me")
+@RequestMapping("/api/users/me")
 @RequiredArgsConstructor
 @Tag(
         name = "알림",
