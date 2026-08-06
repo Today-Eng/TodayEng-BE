@@ -233,6 +233,67 @@ class DiaryQueryServiceTest {
     }
 
     @Test
+    @DisplayName("대표 답변의 교정문이 비어 있으면 원문으로 대체한다")
+    void getMonthlyDiaries_representativeCorrectedTextFallbackToOriginal() {
+        Diary diary = createCompletedDiary(
+                1L,
+                LocalDate.of(2026, 7, 26)
+        );
+
+        DiaryQuestion mainQuestion = createMainQuestion(
+                11L,
+                diary,
+                1,
+                "How was the weather today?",
+                "오늘 날씨는 어땠나요?",
+                "weather"
+        );
+
+        DiaryAnswer answer = createSucceededAnswer(
+                101L,
+                mainQuestion,
+                "It cloudy today.",
+                null,
+                null
+        );
+
+        given(
+                diaryRepository
+                        .findAllByUserIdAndStatusAndDiaryDateBetweenOrderByDiaryDateDesc(
+                                userId,
+                                DiaryStatus.COMPLETED,
+                                LocalDate.of(2026, 7, 1),
+                                LocalDate.of(2026, 7, 31)
+                        )
+        ).willReturn(List.of(diary));
+
+        given(
+                diaryQuestionRepository
+                        .findAllByDiaryIdInAndQuestionTypeOrderByDiaryIdAscQuestionOrderAsc(
+                                List.of(1L),
+                                QuestionType.MAIN
+                        )
+        ).willReturn(List.of(mainQuestion));
+
+        given(
+                diaryAnswerRepository.findAllByQuestionIdIn(
+                        List.of(11L)
+                )
+        ).willReturn(List.of(answer));
+
+        DiaryMonthlyListResponse response =
+                diaryQueryService.getMonthlyDiaries(
+                        userId,
+                        2026,
+                        7
+                );
+
+        assertThat(response.diaries()).hasSize(1);
+        assertThat(response.diaries().get(0).correctedText())
+                .isEqualTo("It cloudy today.");
+    }
+
+    @Test
     @DisplayName("조회 월이 1에서 12 사이가 아니면 예외가 발생한다")
     void getMonthlyDiaries_invalidMonth_throws() {
         assertThatThrownBy(() ->

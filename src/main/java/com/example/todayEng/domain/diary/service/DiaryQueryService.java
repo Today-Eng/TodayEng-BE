@@ -281,7 +281,9 @@ public class DiaryQueryService {
         String correctedText =
                 representativeAnswer == null
                         ? null
-                        : representativeAnswer.getCorrectedText();
+                        : resolveRepresentativeText(
+                        representativeAnswer
+                );
 
         return DiaryMonthlyListResponse.DiarySummary.of(
                 diary.getId(),
@@ -306,6 +308,17 @@ public class DiaryQueryService {
                         answer -> answer.getQuestion().getId(),
                         Function.identity()
                 ));
+    }
+
+    private String resolveRepresentativeText(
+            DiaryAnswer answer
+    ) {
+        String correctedText = answer.getCorrectedText();
+        if (correctedText != null && !correctedText.isBlank()) {
+            return correctedText;
+        }
+
+        return answer.getOriginalText();
     }
 
     private DiaryDetailResponse.QuestionAnswer toQuestionAnswer(
