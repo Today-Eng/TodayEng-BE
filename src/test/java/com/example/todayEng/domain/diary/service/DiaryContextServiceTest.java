@@ -12,16 +12,19 @@ import com.example.todayEng.domain.diary.dto.request.DiaryContextCreateRequest;
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
-import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,32 +40,41 @@ import org.springframework.test.util.ReflectionTestUtils;
 class DiaryContextServiceTest {
 
     @Mock DiaryRepository diaryRepository;
-    @Mock DiaryContextRepository contextRepository;
+    @Mock DiaryContextPersistenceService persistenceService;
     @Mock ExternalAccountRepository accountRepository;
     @Mock DiaryContextDataClient dataClient;
     @Mock DiaryImageAnalysisClient imageAnalysisClient;
+    @Mock DiaryMemoryService diaryMemoryService;
     DiaryContextService service;
     Diary diary;
 
     @BeforeEach
     void setUp() {
-        service = new DiaryContextService(diaryRepository, contextRepository,
-                accountRepository, dataClient, imageAnalysisClient, new ObjectMapper());
+        service = new DiaryContextService(diaryRepository, persistenceService,
+                accountRepository, dataClient, imageAnalysisClient,
+                new ImageUploadValidator(), diaryMemoryService, new ObjectMapper());
         User user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
         diary = Diary.create(user, LocalDate.of(2026, 7, 30));
         ReflectionTestUtils.setField(diary, "id", 10L);
-        given(diaryRepository.findById(10L)).willReturn(Optional.of(diary));
-        given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of());
-        given(contextRepository.findByDiaryAndContextType(any(), any()))
+        given(diaryRepository.findByIdAndUserId(10L, 1L))
+                .willReturn(Optional.of(diary));
+        given(diaryMemoryService.create(1L, 10L))
                 .willReturn(Optional.empty());
-        given(contextRepository.save(any())).willAnswer(call -> call.getArgument(0));
+        given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of());
+        given(persistenceService.saveSuccess(any(), any(), any(), any()))
+                .willAnswer(call -> DiaryContext.success(
+                        diary, call.getArgument(2), call.getArgument(3)));
+        given(persistenceService.saveFailure(any(), any(), any()))
+                .willAnswer(call -> DiaryContext.failure(
+                        diary, call.getArgument(2)));
     }
 
     @Test
     void analyzesImagesAndStoresOnlyAnalysis() throws Exception {
         var image = new MockMultipartFile(
-                "images", "day.jpg", "image/jpeg", new byte[]{1, 2, 3});
+                "images", "day.jpg", "image/jpeg",
+                imageBytes(true));
         var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
         given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
 
@@ -79,7 +91,8 @@ class DiaryContextServiceTest {
     @Test
     void imageAnalysisFailureIsStoredAsPartialFailure() {
         var image = new MockMultipartFile(
-                "images", "day.png", "image/png", new byte[]{1});
+                "images", "day.png", "image/png",
+                imageBytes(false));
         given(imageAnalysisClient.analyze(List.of(image)))
                 .willThrow(new RuntimeException("timeout"));
 
@@ -100,5 +113,19 @@ class DiaryContextServiceTest {
                 .isInstanceOf(BaseException.class)
                 .extracting(exception -> ((BaseException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_FILE_EXTENSION);
+    }
+
+    private byte[] imageBytes(boolean jpeg) {
+        try {
+            BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB);
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            String format = jpeg
+                    ? new String(new char[]{'j', 'p', 'g'})
+                    : new String(new char[]{'p', 'n', 'g'});
+            ImageIO.write(image, format, outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException exception) {
+            throw new AssertionError(exception);
+        }
     }
 }
