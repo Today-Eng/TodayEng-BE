@@ -83,6 +83,25 @@ class DiaryMemoryReaderTest {
         verify(answerRepository, never()).findAllForMemoryAnalysis(any());
     }
 
+    @Test
+    void truncatesMemoAtMaximumLength() {
+        LocalDate currentDate = LocalDate.of(2026, 8, 5);
+        Diary current = diary(10L, currentDate, null, DiaryStatus.IN_PROGRESS);
+        Diary source = diary(1L, currentDate.minusDays(1),
+                String.valueOf('a').repeat(2001), DiaryStatus.COMPLETED);
+        given(diaryRepository.findByIdAndUserId(10L, 1L))
+                .willReturn(Optional.of(current));
+        given(diaryRepository.findRecentCompletedForMemory(
+                any(), any(), any(), any(), any()
+        )).willReturn(List.of(source));
+        given(answerRepository.findAllForMemoryAnalysis(List.of(1L)))
+                .willReturn(List.of());
+
+        var command = reader.prepare(1L, 10L).orElseThrow();
+
+        assertThat(command.diaries().get(0).memo()).hasSize(2000);
+    }
+
     private Diary diary(
             Long id,
             LocalDate date,
