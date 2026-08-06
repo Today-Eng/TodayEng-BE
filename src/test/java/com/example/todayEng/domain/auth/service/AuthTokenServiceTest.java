@@ -33,7 +33,7 @@ class AuthTokenServiceTest {
         when(jwtTokenProvider.issueAccessToken(1L))
                 .thenReturn(new JwtTokenProvider.IssuedToken(
                         "access", "access-jti", expiresAt));
-        when(jwtTokenProvider.issueRefreshToken(1L))
+        when(jwtTokenProvider.issueRefreshToken(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(new JwtTokenProvider.IssuedToken(
                         "refresh", "refresh-jti", expiresAt));
 
@@ -46,5 +46,6 @@ class AuthTokenServiceTest {
                 ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(tokenCaptor.capture());
         assertThat(tokenCaptor.getValue().getJti()).isEqualTo("refresh-jti");
+        assertThat(tokenCaptor.getValue().getSessionId()).isNotBlank();
     }
 }

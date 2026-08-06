@@ -11,9 +11,8 @@ import java.util.Optional;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select rt from RefreshToken rt join fetch rt.user where rt.jti = :jti")
-    Optional<RefreshToken> findByJtiForUpdate(@Param("jti") String jti);
+    @Query("select rt from RefreshToken rt join fetch rt.user where rt.sessionId = :sessionId")
+    Optional<RefreshToken> findBySessionIdForUpdate(@Param("sessionId") String sessionId);
 
-    void deleteByJti(String jti);
     void deleteAllByUserId(Long userId);
 }

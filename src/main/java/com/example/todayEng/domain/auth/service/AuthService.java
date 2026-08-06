@@ -44,13 +44,13 @@ public class AuthService {
         Claims claims = jwtTokenProvider.parse(token, "refresh");
         String jti = claims.getId();
         String subject = claims.getSubject();
-        if (jti == null || jti.isBlank() || subject == null || subject.isBlank()) {
-            throw new BaseException(ErrorCode.INVALID_TOKEN);
-        }
+        String sessionId = claims.get("sid", String.class);
+        validateRefreshClaims(jti, subject, sessionId);
 
-        RefreshToken storedToken = refreshTokenRepository.findByJtiForUpdate(jti)
+        RefreshToken storedToken = refreshTokenRepository.findBySessionIdForUpdate(sessionId)
                 .orElseThrow(() -> new BaseException(ErrorCode.INVALID_TOKEN));
-        if (!storedToken.getUser().getId().toString().equals(subject)) {
+        if (!storedToken.getUser().getId().toString().equals(subject)
+                || !storedToken.getJti().equals(jti)) {
             throw new BaseException(ErrorCode.INVALID_TOKEN);
         }
         if (storedToken.isExpired()) {
@@ -59,11 +59,10 @@ public class AuthService {
 
         Long userId = storedToken.getUser().getId();
         JwtTokenProvider.IssuedToken newAccessToken = jwtTokenProvider.issueAccessToken(userId);
-        JwtTokenProvider.IssuedToken newRefreshToken = jwtTokenProvider.issueRefreshToken(userId);
+        JwtTokenProvider.IssuedToken newRefreshToken =
+                jwtTokenProvider.issueRefreshToken(userId, sessionId);
 
-        refreshTokenRepository.delete(storedToken);
-        refreshTokenRepository.save(RefreshToken.create(
-                storedToken.getUser(), newRefreshToken.jti(), newRefreshToken.expiresAt()));
+        storedToken.rotate(newRefreshToken.jti(), newRefreshToken.expiresAt());
 
         return new TokenRefreshResponse(newAccessToken.value(), newRefreshToken.value());
     }
@@ -71,10 +70,28 @@ public class AuthService {
     @Transactional
     public void logout(Long authenticatedUserId, String token) {
         Claims claims = jwtTokenProvider.parse(token, "refresh");
-        if (!authenticatedUserId.toString().equals(claims.getSubject())) {
+        String jti = claims.getId();
+        String subject = claims.getSubject();
+        String sessionId = claims.get("sid", String.class);
+        validateRefreshClaims(jti, subject, sessionId);
+        if (!authenticatedUserId.toString().equals(subject)) {
             throw new BaseException(ErrorCode.INVALID_TOKEN);
         }
-        refreshTokenRepository.deleteByJti(claims.getId());
+
+        refreshTokenRepository.findBySessionIdForUpdate(sessionId).ifPresent(storedToken -> {
+            if (!storedToken.getUser().getId().equals(authenticatedUserId)) {
+                throw new BaseException(ErrorCode.INVALID_TOKEN);
+            }
+            refreshTokenRepository.delete(storedToken);
+        });
+    }
+
+    private void validateRefreshClaims(String jti, String subject, String sessionId) {
+        if (jti == null || jti.isBlank()
+                || subject == null || subject.isBlank()
+                || sessionId == null || sessionId.isBlank()) {
+            throw new BaseException(ErrorCode.INVALID_TOKEN);
+        }
     }
 
     private ProvisionedAccount getOrCreate(
