@@ -129,6 +129,6 @@ public class Diary extends BaseTimeEntity {
         if (memo == null || memo.isBlank()) {
             return null;
         }
-        return memo.trim();
+        return memo.strip();
     }
 }

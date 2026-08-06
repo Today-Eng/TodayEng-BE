@@ -60,6 +60,21 @@ class DiaryMemoServiceTest {
     }
 
     @Test
+    void stripsUnicodeWhitespaceInMemoUpdate() {
+        given(diaryRepository.findByIdForUpdate(10L))
+                .willReturn(Optional.of(completedDiary));
+
+        var response = diaryMemoService.updateMemo(
+                1L,
+                10L,
+                new DiaryMemoUpdateRequest("　수정된 메모　")
+        );
+
+        assertThat(response.memo()).isEqualTo("수정된 메모");
+        assertThat(completedDiary.getMemo()).isEqualTo("수정된 메모");
+    }
+
+    @Test
     void normalizesNullAndBlankToNull() {
         given(diaryRepository.findByIdForUpdate(10L))
                 .willReturn(Optional.of(completedDiary));
@@ -67,7 +82,7 @@ class DiaryMemoServiceTest {
         var blankResponse = diaryMemoService.updateMemo(
                 1L,
                 10L,
-                new DiaryMemoUpdateRequest("   ")
+                new DiaryMemoUpdateRequest("　　")
         );
 
         assertThat(blankResponse.memo()).isNull();
