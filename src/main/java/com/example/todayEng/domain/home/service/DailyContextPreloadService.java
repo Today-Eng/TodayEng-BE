@@ -67,10 +67,8 @@ public class DailyContextPreloadService {
             DiaryContextType type,
             Supplier<JsonNode> collector
     ) {
-        Long snapshotId;
-        try {
-            snapshotId = persistenceService.start(userId, date, type);
-        } catch (DataIntegrityViolationException exception) {
+        Long snapshotId = claimSnapshot(userId, date, type);
+        if (snapshotId == null) {
             return;
         }
 
@@ -84,6 +82,14 @@ public class DailyContextPreloadService {
             log.warn("Daily context preload failed: type={}, exception={}",
                     type, exception.getClass().getSimpleName());
             persistenceService.fail(snapshotId);
+        }
+    }
+
+    private Long claimSnapshot(Long userId, LocalDate date, DiaryContextType type) {
+        try {
+            return persistenceService.start(userId, date, type);
+        } catch (DataIntegrityViolationException exception) {
+            return persistenceService.reclaimStale(userId, date, type).orElse(null);
         }
     }
 

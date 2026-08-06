@@ -185,4 +185,38 @@ class HomeServiceTest {
         assertThat(response.materials().weather().available()).isTrue();
         assertThat(response.materials().weather().condition()).isEqualTo("CLEAR");
     }
+
+    @Test
+    void prefersDiaryContextOverSnapshotForSameType() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        DailyContextSnapshot snapshot = DailyContextSnapshot.start(
+                user, TODAY, DiaryContextType.WEATHER);
+        snapshot.succeed(objectMapper.readTree("""
+                {"daily":{"weather_code":[0],
+                "temperature_2m_max":[22.0],"temperature_2m_min":[18.0]}}
+                """));
+        given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
+                USER_ID, TODAY, DailyContextCollectionStatus.SUCCEEDED
+        )).willReturn(List.of(snapshot));
+
+        Diary diary = Diary.create(user, TODAY);
+        ReflectionTestUtils.setField(diary, "id", 10L);
+        given(diaryRepository.findByUserIdAndDiaryDate(USER_ID, TODAY))
+                .willReturn(Optional.of(diary));
+        DiaryContext weather = DiaryContext.success(
+                diary,
+                DiaryContextType.WEATHER,
+                objectMapper.readTree("""
+                        {"daily":{"weather_code":[95],
+                        "temperature_2m_max":[30.0],"temperature_2m_min":[26.0]}}
+                        """)
+        );
+        given(diaryContextRepository.findAllByDiaryIdAndSuccessTrueOrderById(10L))
+                .willReturn(List.of(weather));
+
+        var response = homeService.getHome(USER_ID, null, null);
+
+        assertThat(response.materials().weather().condition()).isEqualTo("THUNDERSTORM");
+        assertThat(response.materials().weather().temperature()).isEqualTo(28);
+    }
 }

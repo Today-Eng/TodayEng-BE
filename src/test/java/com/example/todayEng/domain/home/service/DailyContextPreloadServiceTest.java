@@ -85,13 +85,31 @@ class DailyContextPreloadServiceTest {
     }
 
     @Test
-    void skipsExternalCallWhenSnapshotWasAlreadyClaimed() {
+    void skipsExternalCallWhenActiveSnapshotCannotBeReclaimed() {
         given(persistenceService.start(USER_ID, TODAY, DiaryContextType.WEATHER))
                 .willThrow(new DataIntegrityViolationException("duplicate"));
+        given(persistenceService.reclaimStale(USER_ID, TODAY, DiaryContextType.WEATHER))
+                .willReturn(Optional.empty());
 
         service.preload(USER_ID, new Location(37.5, 127.0));
 
         verify(dataClient, never()).fetchWeather(any(), any());
+        verify(persistenceService, never()).succeed(any(), any());
+        verify(persistenceService, never()).fail(any());
+    }
+
+    @Test
+    void retriesContextAfterStaleInProgressSnapshotIsReclaimed() {
+        given(persistenceService.start(USER_ID, TODAY, DiaryContextType.WEATHER))
+                .willThrow(new DataIntegrityViolationException("duplicate"));
+        given(persistenceService.reclaimStale(USER_ID, TODAY, DiaryContextType.WEATHER))
+                .willReturn(Optional.of(10L));
+        given(dataClient.fetchWeather(any(), any()))
+                .willReturn(new ObjectMapper().createObjectNode());
+
+        service.preload(USER_ID, new Location(37.5, 127.0));
+
+        verify(persistenceService).succeed(10L, new ObjectMapper().createObjectNode());
     }
 
     @Test
@@ -104,6 +122,28 @@ class DailyContextPreloadServiceTest {
         service.preload(USER_ID, new Location(37.5, 127.0));
 
         verify(persistenceService).fail(10L);
+    }
+
+    @Test
+    void collectsCalendarSuccessfullyWhenWeatherFails() {
+        Location location = new Location(37.5, 127.0);
+        given(account.isUseEnabled()).willReturn(true);
+        given(account.getProvider()).willReturn(ExternalServiceProvider.GOOGLE_CALENDAR);
+        given(account.getAccessToken()).willReturn("token");
+        given(accountRepository.findAllByUser_Id(USER_ID)).willReturn(List.of(account));
+        given(persistenceService.start(USER_ID, TODAY, DiaryContextType.WEATHER))
+                .willReturn(10L);
+        given(persistenceService.start(USER_ID, TODAY, DiaryContextType.CALENDAR))
+                .willReturn(11L);
+        given(dataClient.fetchWeather(location, TODAY))
+                .willThrow(new RuntimeException("timeout"));
+        given(dataClient.fetchCalendar("token", TODAY))
+                .willReturn(new ObjectMapper().createObjectNode());
+
+        service.preload(USER_ID, location);
+
+        verify(persistenceService).fail(10L);
+        verify(persistenceService).succeed(11L, new ObjectMapper().createObjectNode());
     }
 
     @Test
