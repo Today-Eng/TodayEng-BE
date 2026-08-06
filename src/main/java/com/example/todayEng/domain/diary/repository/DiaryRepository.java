@@ -47,6 +47,14 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
             LocalDate diaryDate
     );
 
+    Optional<Diary> findByUserIdAndDiaryDate(Long userId, LocalDate diaryDate);
+
+    List<Diary> findAllByUserIdAndDiaryDateBetweenOrderByDiaryDate(
+            Long userId,
+            LocalDate fromDate,
+            LocalDate toDate
+    );
+
     @Query("""
             select d from Diary d
             where d.user.id = :userId
