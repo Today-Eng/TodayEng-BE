@@ -10,10 +10,12 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "storage.audio.type", havingValue = "local", matchIfMissing = true)
 public class LocalAudioFileStorage implements AudioFileStorage {
 
     private final Path rootDirectory;

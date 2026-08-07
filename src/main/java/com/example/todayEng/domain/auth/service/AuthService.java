@@ -1,6 +1,8 @@
 package com.example.todayEng.domain.auth.service;
 
 import com.example.todayEng.domain.auth.dto.LoginResponse;
+import com.example.todayEng.domain.auth.dto.TokenRefreshResponse;
+import com.example.todayEng.domain.auth.exception.RefreshTokenReuseException;
 import com.example.todayEng.domain.user.entity.*;
 import com.example.todayEng.domain.user.entity.enums.AuthProvider;
 import com.example.todayEng.domain.user.repository.*;
@@ -38,13 +40,62 @@ public class AuthService {
                 provisioned.account().getUser(), provisioned.created());
     }
 
+    @Transactional(noRollbackFor = RefreshTokenReuseException.class)
+    public TokenRefreshResponse refresh(String token) {
+        Claims claims = jwtTokenProvider.parse(token, "refresh");
+        String jti = claims.getId();
+        String subject = claims.getSubject();
+        String sessionId = claims.get("sid", String.class);
+        validateRefreshClaims(jti, subject, sessionId);
+
+        RefreshToken storedToken = refreshTokenRepository.findBySessionIdForUpdate(sessionId)
+                .orElseThrow(() -> new BaseException(ErrorCode.INVALID_TOKEN));
+        if (!storedToken.getUser().getId().toString().equals(subject)) {
+            throw new BaseException(ErrorCode.INVALID_TOKEN);
+        }
+        if (!storedToken.getJti().equals(jti)) {
+            refreshTokenRepository.delete(storedToken);
+            throw new RefreshTokenReuseException();
+        }
+        if (storedToken.isExpired()) {
+            throw new BaseException(ErrorCode.EXPIRED_TOKEN);
+        }
+
+        Long userId = storedToken.getUser().getId();
+        JwtTokenProvider.IssuedToken newAccessToken = jwtTokenProvider.issueAccessToken(userId);
+        JwtTokenProvider.IssuedToken newRefreshToken =
+                jwtTokenProvider.issueRefreshToken(userId, sessionId);
+
+        storedToken.rotate(newRefreshToken.jti(), newRefreshToken.expiresAt());
+
+        return new TokenRefreshResponse(newAccessToken.value(), newRefreshToken.value());
+    }
+
     @Transactional
     public void logout(Long authenticatedUserId, String token) {
         Claims claims = jwtTokenProvider.parse(token, "refresh");
-        if (!authenticatedUserId.toString().equals(claims.getSubject())) {
+        String jti = claims.getId();
+        String subject = claims.getSubject();
+        String sessionId = claims.get("sid", String.class);
+        validateRefreshClaims(jti, subject, sessionId);
+        if (!authenticatedUserId.toString().equals(subject)) {
             throw new BaseException(ErrorCode.INVALID_TOKEN);
         }
-        refreshTokenRepository.deleteByJti(claims.getId());
+
+        refreshTokenRepository.findBySessionIdForUpdate(sessionId).ifPresent(storedToken -> {
+            if (!storedToken.getUser().getId().equals(authenticatedUserId)) {
+                throw new BaseException(ErrorCode.INVALID_TOKEN);
+            }
+            refreshTokenRepository.delete(storedToken);
+        });
+    }
+
+    private void validateRefreshClaims(String jti, String subject, String sessionId) {
+        if (jti == null || jti.isBlank()
+                || subject == null || subject.isBlank()
+                || sessionId == null || sessionId.isBlank()) {
+            throw new BaseException(ErrorCode.INVALID_TOKEN);
+        }
     }
 
     private ProvisionedAccount getOrCreate(

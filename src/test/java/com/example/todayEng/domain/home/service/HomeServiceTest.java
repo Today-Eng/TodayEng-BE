@@ -9,7 +9,9 @@ import static org.mockito.Mockito.mock;
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
+import com.example.todayEng.domain.diary.repository.DiaryAnswerRepository;
 import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
+import com.example.todayEng.domain.diary.repository.DiaryQuestionRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.home.entity.DailyContextSnapshot;
 import com.example.todayEng.domain.home.entity.enums.DailyContextCollectionStatus;
@@ -46,6 +48,8 @@ class HomeServiceTest {
 
     @Mock UserRepository userRepository;
     @Mock DiaryRepository diaryRepository;
+    @Mock DiaryQuestionRepository diaryQuestionRepository;
+    @Mock DiaryAnswerRepository diaryAnswerRepository;
     @Mock DiaryContextRepository diaryContextRepository;
     @Mock DailyContextSnapshotRepository snapshotRepository;
     @Mock ExternalAccountRepository externalAccountRepository;
@@ -62,6 +66,8 @@ class HomeServiceTest {
         homeService = new HomeService(
                 userRepository,
                 diaryRepository,
+                diaryQuestionRepository,
+                diaryAnswerRepository,
                 diaryContextRepository,
                 snapshotRepository,
                 externalAccountRepository,

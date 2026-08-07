@@ -62,4 +62,15 @@ public interface DiaryQuestionRepository extends JpaRepository<DiaryQuestion, Lo
             com.example.todayEng.domain.diary.entity.enums.QuestionType questionType,
             Integer questionOrder
     );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM DiaryQuestion q WHERE q.diary.id = :diaryId AND q.parentQuestion IS NOT NULL")
+    void deleteFollowUpsByDiaryId(@Param("diaryId") Long diaryId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM DiaryQuestion q WHERE q.diary.id = :diaryId")
+    void deleteAllByDiaryId(@Param("diaryId") Long diaryId);
+
+    @Query("SELECT q.ttsAudioKey FROM DiaryQuestion q WHERE q.diary.id = :diaryId AND q.ttsAudioKey IS NOT NULL")
+    java.util.List<String> findTtsAudioKeysByDiaryId(@Param("diaryId") Long diaryId);
 }

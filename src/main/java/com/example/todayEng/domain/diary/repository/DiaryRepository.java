@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.repository;
 
 import com.example.todayEng.domain.diary.entity.Diary;
+import com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
 import com.example.todayEng.domain.user.entity.User;
 import jakarta.persistence.LockModeType;
@@ -64,7 +65,8 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
     @Query("""
             update Diary d
                set d.contextCollectionStatus = com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus.COLLECTING,
-                   d.contextCollectionClaimedAt = :now
+                   d.contextCollectionClaimedAt = :now,
+                   d.contextCollectionLeaseVersion = d.contextCollectionLeaseVersion + 1
              where d.id = :diaryId
                and d.user.id = :userId
                and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.IN_PROGRESS
@@ -82,7 +84,8 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Diary d
-               set d.contextCollectionClaimedAt = :now
+               set d.contextCollectionClaimedAt = :now,
+                   d.contextCollectionLeaseVersion = d.contextCollectionLeaseVersion + 1
              where d.id = :diaryId
                and d.user.id = :userId
                and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.IN_PROGRESS
@@ -94,6 +97,38 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
             @Param("userId") Long userId,
             @Param("now") LocalDateTime now,
             @Param("staleBefore") LocalDateTime staleBefore
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Diary d
+               set d.contextCollectionClaimedAt = :now
+             where d.id = :diaryId
+               and d.user.id = :userId
+               and d.contextCollectionStatus = com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus.COLLECTING
+               and d.contextCollectionLeaseVersion = :expectedLeaseVersion
+            """)
+    int verifyContextCollectionLease(
+            @Param("diaryId") Long diaryId,
+            @Param("userId") Long userId,
+            @Param("now") LocalDateTime now,
+            @Param("expectedLeaseVersion") long expectedLeaseVersion
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Diary d
+               set d.contextCollectionStatus = :targetStatus
+             where d.id = :diaryId
+               and d.user.id = :userId
+               and d.contextCollectionStatus = com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus.COLLECTING
+               and d.contextCollectionLeaseVersion = :expectedLeaseVersion
+            """)
+    int finishContextCollectionIfOwned(
+            @Param("diaryId") Long diaryId,
+            @Param("userId") Long userId,
+            @Param("targetStatus") DiaryContextCollectionStatus targetStatus,
+            @Param("expectedLeaseVersion") long expectedLeaseVersion
     );
 
     Optional<Diary> findByIdAndUserId(Long diaryId, Long userId);

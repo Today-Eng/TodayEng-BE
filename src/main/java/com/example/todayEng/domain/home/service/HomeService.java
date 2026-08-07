@@ -1,10 +1,16 @@
 package com.example.todayEng.domain.home.service;
 
 import com.example.todayEng.domain.diary.entity.Diary;
+import com.example.todayEng.domain.diary.entity.DiaryAnswer;
+import com.example.todayEng.domain.diary.entity.DiaryQuestion;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
+import com.example.todayEng.domain.diary.entity.enums.QuestionType;
+import com.example.todayEng.domain.diary.repository.DiaryAnswerRepository;
 import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
+import com.example.todayEng.domain.diary.repository.DiaryQuestionRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
+import com.example.todayEng.domain.home.dto.HomeDiaryDateResponse;
 import com.example.todayEng.domain.home.dto.HomeResponse;
 import com.example.todayEng.domain.home.dto.HomeResponse.CalendarMaterial;
 import com.example.todayEng.domain.home.dto.HomeResponse.RepresentativeEvent;
@@ -31,6 +37,7 @@ import java.time.YearMonth;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,6 +51,8 @@ public class HomeService {
 
     private final UserRepository userRepository;
     private final DiaryRepository diaryRepository;
+    private final DiaryQuestionRepository diaryQuestionRepository;
+    private final DiaryAnswerRepository diaryAnswerRepository;
     private final DiaryContextRepository diaryContextRepository;
     private final DailyContextSnapshotRepository snapshotRepository;
     private final ExternalAccountRepository externalAccountRepository;
@@ -59,6 +68,7 @@ public class HomeService {
                 .findAllByUserIdAndDiaryDateBetweenOrderByDiaryDate(
                         userId, targetMonth.atDay(1), targetMonth.atEndOfMonth())
                 .stream()
+                .filter(d -> d.getStatus() != DiaryStatus.DELETED)
                 .map(Diary::getDiaryDate)
                 .toList();
         Optional<Diary> todayDiary = diaryRepository.findByUserIdAndDiaryDate(userId, today);
@@ -98,6 +108,89 @@ public class HomeService {
                                 contexts.get(DiaryContextType.SPOTIFY)
                         )
                 )
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public HomeDiaryDateResponse getDiaryByDate(Long userId, LocalDate date) {
+        Optional<Diary> found = diaryRepository.findByUserIdAndDiaryDate(userId, date);
+
+        if (found.isEmpty()) {
+            return new HomeDiaryDateResponse(
+                    null,
+                    date,
+                    date.getDayOfWeek().name(),
+                    "NOT_STARTED",
+                    List.of(),
+                    null,
+                    null
+            );
+        }
+
+        Diary diary = found.get();
+
+        if (diary.getStatus() == DiaryStatus.DELETED) {
+            return new HomeDiaryDateResponse(
+                    diary.getId(),
+                    diary.getDiaryDate(),
+                    diary.getDiaryDate().getDayOfWeek().name(),
+                    "UNAVAILABLE",
+                    List.of(),
+                    null,
+                    null
+            );
+        }
+
+        String diaryStatus = diary.getStatus() == DiaryStatus.COMPLETED
+                ? "COMPLETED"
+                : "IN_PROGRESS";
+
+        if (diary.getStatus() != DiaryStatus.COMPLETED) {
+            return new HomeDiaryDateResponse(
+                    diary.getId(),
+                    diary.getDiaryDate(),
+                    diary.getDiaryDate().getDayOfWeek().name(),
+                    diaryStatus,
+                    List.of(),
+                    null,
+                    null
+            );
+        }
+
+        List<DiaryQuestion> mainQuestions = diaryQuestionRepository
+                .findAllByDiaryIdInAndQuestionTypeOrderByDiaryIdAscQuestionOrderAsc(
+                        List.of(diary.getId()),
+                        QuestionType.MAIN
+                );
+
+        List<String> keywords = mainQuestions.stream()
+                .map(DiaryQuestion::getKeyword)
+                .filter(Objects::nonNull)
+                .filter(keyword -> !keyword.isBlank())
+                .toList();
+
+        DiaryQuestion firstQuestion = mainQuestions.isEmpty() ? null : mainQuestions.get(0);
+        String questionText = firstQuestion == null ? null : firstQuestion.getQuestionText();
+
+        String correctedText = null;
+        if (firstQuestion != null) {
+            List<DiaryAnswer> answers = diaryAnswerRepository
+                    .findAllByQuestionIdIn(List.of(firstQuestion.getId()));
+            if (!answers.isEmpty()) {
+                DiaryAnswer answer = answers.get(0);
+                String ct = answer.getCorrectedText();
+                correctedText = (ct != null && !ct.isBlank()) ? ct : answer.getOriginalText();
+            }
+        }
+
+        return new HomeDiaryDateResponse(
+                diary.getId(),
+                diary.getDiaryDate(),
+                diary.getDiaryDate().getDayOfWeek().name(),
+                diaryStatus,
+                keywords,
+                questionText,
+                correctedText
         );
     }
 
@@ -148,7 +241,15 @@ public class HomeService {
     ) {
         String status = diary
                 .map(Diary::getStatus)
-                .map(value -> value == DiaryStatus.COMPLETED ? "COMPLETED" : "IN_PROGRESS")
+                .map(value -> {
+                    if (value == DiaryStatus.COMPLETED) {
+                        return "COMPLETED";
+                    }
+                    if (value == DiaryStatus.DELETED) {
+                        return "UNAVAILABLE";
+                    }
+                    return "IN_PROGRESS";
+                })
                 .orElse("NOT_STARTED");
         return new HomeResponse.TodaySummary(
                 today,
