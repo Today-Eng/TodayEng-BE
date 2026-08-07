@@ -16,11 +16,11 @@ public class SwaggerConfig {
 
     private static final String JWT_SCHEME_NAME = "JWT";
 
-    @Value("${swagger.server-url:https://34-50-27-108.nip.io}")
+    @Value("${swagger.server-url}")
     private String serverUrl;
 
-    @Value("${swagger.local-server-url:http://localhost:8080}")
-    private String localServerUrl;
+    @Value("${swagger.server-description}")
+    private String serverDescription;
 
     @Bean
     public OpenAPI openAPI() {
@@ -41,10 +41,7 @@ public class SwaggerConfig {
     }
 
     private List<Server> apiServers() {
-        return List.of(
-                new Server().url(serverUrl).description("배포 서버"),
-                new Server().url(localServerUrl).description("로컬 서버")
-        );
+        return List.of(new Server().url(serverUrl).description(serverDescription));
     }
 
     private Info apiInfo() {
