@@ -1,6 +1,5 @@
 package com.example.todayEng.domain.user.entity;
 
-
 import com.example.todayEng.domain.user.entity.enums.TermsType;
 import com.example.todayEng.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
@@ -12,12 +11,10 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(
         name = "terms",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_terms_type",
-                        columnNames = "terms_type"
-                )
-        }
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_terms_type_version",
+                columnNames = {"terms_type", "version"}
+        )
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Terms extends BaseTimeEntity {
@@ -28,45 +25,35 @@ public class Terms extends BaseTimeEntity {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            name = "terms_type",
-            nullable = false,
-            length = 60
-    )
+    @Column(name = "terms_type", nullable = false, length = 60)
     private TermsType termsType;
 
-    /*
-     * 기존 로컬 DB 스키마에 남아 있는 NOT NULL `term` 컬럼과의 호환 필드입니다.
-     * 약관의 실제 식별과 필수 여부는 termsType을 기준으로 사용합니다.
-     */
-    @Column(
-            name = "term",
-            nullable = false,
-            length = 255
-    )
+    @Column(name = "term", nullable = false, length = 255)
     private String term;
 
-    @Column(
-            name = "content",
-            nullable = false,
-            columnDefinition = "TEXT"
-    )
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    private Terms(
-            TermsType termsType,
-            String content
-    ) {
+    @Column(name = "version", nullable = false)
+    private int version;
+
+    @Column(name = "active", nullable = false)
+    private boolean active;
+
+    private Terms(TermsType termsType, String content, int version) {
         this.termsType = termsType;
         this.term = termsType.getDisplayName();
         this.content = content;
+        this.version = version;
+        this.active = true;
     }
 
-    public static Terms create(
-            TermsType termsType,
-            String content
-    ) {
-        return new Terms(termsType, content);
+    public static Terms create(TermsType termsType, String content, int version) {
+        return new Terms(termsType, content, version);
+    }
+
+    public static Terms create(TermsType termsType, String content) {
+        return create(termsType, content, 1);
     }
 
     public String getDisplayName() {
@@ -81,8 +68,11 @@ public class Terms extends BaseTimeEntity {
         return termsType.getDisplayOrder();
     }
 
-    public void synchronize(String content) {
-        this.term = termsType.getDisplayName();
-        this.content = content;
+    public void activate() {
+        this.active = true;
+    }
+
+    public void deactivate() {
+        this.active = false;
     }
 }
