@@ -17,6 +17,6 @@ class TermsSeedCatalogTest {
     void containsNoDeploymentPlaceholders() {
         assertThat(TermsSeedCatalog.values())
                 .allSatisfy(seed -> assertThat(seed.content())
-                        .doesNotMatch(PLACEHOLDER));
+                        .doesNotContainPattern(PLACEHOLDER));
     }
 }
