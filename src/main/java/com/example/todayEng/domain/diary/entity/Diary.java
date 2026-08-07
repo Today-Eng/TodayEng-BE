@@ -63,6 +63,7 @@ public class Diary extends BaseTimeEntity {
     private LocalDateTime contextCollectionClaimedAt;
 
     @Column(name = "context_collection_lease_version", nullable = false)
+    @ColumnDefault("0")
     private long contextCollectionLeaseVersion;
 
     @Column(name = "memo", length = 2000)

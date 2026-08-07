@@ -21,27 +21,40 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 
 /**
- * Exercises the lease-guarded writes against a real database, since these methods run their
- * own {@code @Transactional} boundary per call and a mock-based test can't prove the
- * cross-table CAS actually serializes overlapping claimants correctly.
+ * DiaryContextPersistenceService is injected through {@code @Import} rather than
+ * constructed with {@code new}, so its {@code @Transactional} methods run through the real
+ * Spring proxy and the verify-then-write sequence inside saveSuccess/saveFailure executes as
+ * the single atomic unit it does in production.
+ *
+ * Note that {@code @DataJpaTest} still wraps the whole test method in one transaction, so all
+ * calls here share that transaction and persistence context. What this proves is that the
+ * lease CAS conditions (WHERE collectionStatus = COLLECTING AND leaseVersion = ?) correctly
+ * accept or reject each write against the row's current state, and that saveSuccess's atomic
+ * verify+persist no longer skips the verify step. It does not prove row-lock based
+ * serialization between two genuinely concurrent transactions.
  */
 @DataJpaTest
+@Import({
+        DiaryContextPersistenceService.class,
+        DiaryContextPersistenceServiceTest.Config.class
+})
 class DiaryContextPersistenceServiceTest {
 
     @Autowired UserRepository userRepository;
     @Autowired DiaryRepository diaryRepository;
     @Autowired DiaryContextRepository contextRepository;
+    @Autowired DiaryContextPersistenceService service;
 
-    DiaryContextPersistenceService service;
     User user;
     Diary diary;
 
     @BeforeEach
     void setUp() {
-        Clock clock = Clock.systemDefaultZone().withZone(ZoneId.of("Asia/Seoul"));
-        service = new DiaryContextPersistenceService(diaryRepository, contextRepository, clock);
         user = userRepository.save(User.create());
         diary = diaryRepository.saveAndFlush(Diary.create(user, LocalDate.of(2026, 8, 7)));
     }
@@ -118,5 +131,14 @@ class DiaryContextPersistenceServiceTest {
         return diaryRepository.findById(diary.getId())
                 .orElseThrow()
                 .getContextCollectionLeaseVersion();
+    }
+
+    @TestConfiguration
+    static class Config {
+
+        @Bean
+        Clock clock() {
+            return Clock.system(ZoneId.of("Asia/Seoul"));
+        }
     }
 }
