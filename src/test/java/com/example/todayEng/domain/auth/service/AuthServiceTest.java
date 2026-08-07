@@ -20,12 +20,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doAnswer;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -79,26 +81,45 @@ class AuthServiceTest {
     }
 
     @Test
-    void refreshRejectsPreviousJtiFromSameSession() {
+    void refreshReuseRevokesSessionSoCurrentTokenCanNoLongerRefresh() {
         User user = User.create("user@example.com");
         ReflectionTestUtils.setField(user, "id", 1L);
         RefreshToken storedToken = RefreshToken.create(
                 user, "session-id", "current-jti", LocalDateTime.now().plusDays(1));
-        Claims claims = mock(Claims.class);
-        when(claims.getSubject()).thenReturn("1");
-        when(claims.getId()).thenReturn("previous-jti");
-        when(claims.get("sid", String.class)).thenReturn("session-id");
-        when(jwtTokenProvider.parse("previous-refresh", "refresh")).thenReturn(claims);
+        AtomicReference<RefreshToken> storedSession = new AtomicReference<>(storedToken);
+        Claims previousClaims = refreshClaims("1", "previous-jti", "session-id");
+        Claims currentClaims = refreshClaims("1", "current-jti", "session-id");
+        when(jwtTokenProvider.parse("previous-refresh", "refresh")).thenReturn(previousClaims);
+        when(jwtTokenProvider.parse("current-refresh", "refresh")).thenReturn(currentClaims);
         when(refreshTokenRepository.findBySessionIdForUpdate("session-id"))
-                .thenReturn(Optional.of(storedToken));
+                .thenAnswer(invocation -> Optional.ofNullable(storedSession.get()));
+        doAnswer(invocation -> {
+            storedSession.set(null);
+            return null;
+        }).when(refreshTokenRepository).delete(storedToken);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> authService.refresh("previous-refresh"))
                 .isInstanceOf(com.example.todayEng.global.error.exception.BaseException.class)
                 .extracting("errorCode")
                 .isEqualTo(com.example.todayEng.global.error.ErrorCode.INVALID_TOKEN);
+        verify(refreshTokenRepository).delete(storedToken);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> authService.refresh("current-refresh"))
+                .isInstanceOf(com.example.todayEng.global.error.exception.BaseException.class)
+                .extracting("errorCode")
+                .isEqualTo(com.example.todayEng.global.error.ErrorCode.INVALID_TOKEN);
 
         verify(jwtTokenProvider, never()).issueAccessToken(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    private Claims refreshClaims(String subject, String jti, String sessionId) {
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn(subject);
+        when(claims.getId()).thenReturn(jti);
+        when(claims.get("sid", String.class)).thenReturn(sessionId);
+        return claims;
     }
 
     @Test
