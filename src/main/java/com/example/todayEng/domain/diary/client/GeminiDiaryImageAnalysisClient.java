@@ -10,7 +10,8 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -18,8 +19,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 
+@Slf4j
 @Component
-@RequiredArgsConstructor
 public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient {
 
     private static final String API_URI =
@@ -34,6 +35,14 @@ public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
+    public GeminiDiaryImageAnalysisClient(
+            @Qualifier("geminiRestClient") RestClient restClient,
+            ObjectMapper objectMapper
+    ) {
+        this.restClient = restClient;
+        this.objectMapper = objectMapper;
+    }
+
     @Value("${GEMINI_API_KEY:}")
     private String apiKey;
 
@@ -43,6 +52,7 @@ public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient 
     @Override
     public JsonNode analyze(List<MultipartFile> images) {
         if (apiKey == null || apiKey.isBlank()) {
+            log.warn("Gemini image analysis skipped: GEMINI_API_KEY is not configured");
             throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
         }
 
@@ -58,12 +68,16 @@ public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient 
                     .path("candidates").path(0).path("content")
                     .path("parts").path(0).path("text").asText(null);
             if (analysis == null || analysis.isBlank()) {
+                log.warn("Gemini image analysis returned no text: model={}, response={}",
+                        model, response);
                 throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
             }
             return objectMapper.readTree(analysis);
         } catch (BaseException exception) {
             throw exception;
         } catch (IOException | RestClientException exception) {
+            log.warn("Gemini image analysis failed: model={}, imageCount={}, message={}",
+                    model, images.size(), exception.getMessage(), exception);
             throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }

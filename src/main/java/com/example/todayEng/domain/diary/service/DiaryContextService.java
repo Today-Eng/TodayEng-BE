@@ -235,8 +235,9 @@ public class DiaryContextService {
             context.ifPresent(ignored -> cleanupSnapshot(userId, diaryDate, type));
             return context;
         } catch (RuntimeException exception) {
-            log.warn("Diary context collection failed: diaryId={}, type={}, exception={}",
-                    diaryId, type, exception.getClass().getSimpleName());
+            log.warn("Diary context collection failed: diaryId={}, type={}, exception={}, message={}",
+                    diaryId, type, exception.getClass().getName(), exception.getMessage(),
+                    exception);
             return persistenceService.saveFailure(userId, diaryId, leaseVersion, type);
         }
     }

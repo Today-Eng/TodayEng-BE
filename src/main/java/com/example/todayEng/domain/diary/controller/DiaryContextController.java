@@ -10,6 +10,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Encoding;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.SchemaProperty;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -37,14 +42,37 @@ public class DiaryContextController {
                     + "request part는 memo와 location을 담은 JSON 문자열이며 생략할 수 있습니다. "
                     + "images part는 jpeg·png·webp만 허용하고 최대 2장, 장당 7MB, 합계 14MB이며 보내지 않아도 됩니다."
     )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false,
+            content = @Content(
+                    mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                    schemaProperties = {
+                            @SchemaProperty(
+                                    name = "request",
+                                    schema = @Schema(implementation = DiaryContextCreateRequest.class)
+                            ),
+                            @SchemaProperty(
+                                    name = "images",
+                                    array = @ArraySchema(
+                                            maxItems = 2,
+                                            schema = @Schema(type = "string", format = "binary")
+                                    )
+                            )
+                    },
+                    encoding = @Encoding(
+                            name = "request",
+                            contentType = MediaType.APPLICATION_JSON_VALUE
+                    )
+            )
+    )
     @PostMapping(value = "/{diaryId}/contexts",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<DiaryContextCreateResponse> createContexts(
             @Parameter(hidden = true) @AuthenticationPrincipal Long userId,
             @Parameter(description = "회고 ID", example = "1") @PathVariable Long diaryId,
-            @Parameter(description = "memo와 location을 담은 JSON 문자열")
+            @Parameter(hidden = true)
             @RequestPart(value = "request", required = false) String request,
-            @Parameter(description = "첨부 이미지 (0~2장)")
+            @Parameter(hidden = true)
             @RequestPart(value = "images", required = false) List<MultipartFile> images
     ) {
         return ApiResponse.success(
