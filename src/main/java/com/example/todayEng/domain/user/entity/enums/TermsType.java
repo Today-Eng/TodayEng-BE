@@ -50,7 +50,7 @@ public enum TermsType {
     ),
 
     PHOTO_EXIF_LOCATION_COLLECTION(
-            "사진 EXIF 위치정보(GPS) 수집 및 이용 동의",
+            "위치 메타데이터(EXIF GPS) 수집 동의",
             false,
             8
     ),
