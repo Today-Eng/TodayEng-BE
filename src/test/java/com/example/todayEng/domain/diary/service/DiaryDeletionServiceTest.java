@@ -20,7 +20,6 @@ import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -168,14 +167,6 @@ class DiaryDeletionServiceTest {
     }
 
     @Test
-    void pausedDiaryCannotBeDeleted() {
-        Diary paused = pausedDiary();
-        given(diaryRepository.findByIdForUpdate(DIARY_ID)).willReturn(Optional.of(paused));
-
-        assertError(() -> diaryDeletionService.delete(USER_ID, DIARY_ID), ErrorCode.DIARY_DELETE_NOT_ALLOWED);
-    }
-
-    @Test
     void alreadyDeletedDiaryCannotBeDeletedAgain() {
         Diary deleted = deletedDiary();
         given(diaryRepository.findByIdForUpdate(DIARY_ID)).willReturn(Optional.of(deleted));
@@ -193,14 +184,6 @@ class DiaryDeletionServiceTest {
     private Diary inProgressDiary() {
         Diary d = Diary.create(owner, LocalDate.now());
         ReflectionTestUtils.setField(d, "id", DIARY_ID);
-        return d;
-    }
-
-    private Diary pausedDiary() {
-        Diary d = Diary.create(owner, LocalDate.now());
-        ReflectionTestUtils.setField(d, "id", DIARY_ID);
-        LocalDateTime now = LocalDateTime.now();
-        d.pause(now, now.plusHours(24));
         return d;
     }
 

@@ -52,7 +52,9 @@ public class DiaryDeletionService {
         questionRepository.deleteAllByDiaryId(diaryId);
         contextRepository.deleteAllByDiaryId(diaryId);
 
-        diary.delete();
+        Diary refreshedDiary = diaryRepository.findByIdForUpdate(diaryId)
+                .orElseThrow(() -> new BaseException(ErrorCode.DIARY_NOT_FOUND));
+        refreshedDiary.delete();
 
         eventPublisher.publishEvent(
                 DiaryAudioCleanupEvent.of(answerAudioKeys, ttsAudioKeys)
