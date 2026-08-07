@@ -11,6 +11,7 @@ import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -44,8 +45,10 @@ public class DiaryService {
                         ErrorCode.USER_NOT_FOUND
                 ));
 
-        diaryRepository.findByUserAndDiaryDate(user, diaryDate)
-                .ifPresent(this::throwAlreadyExistingDiaryException);
+        Optional<Diary> existingDiary = diaryRepository.findByUserAndDiaryDate(user, diaryDate);
+        if (existingDiary.isPresent()) {
+            return resumeOrReject(existingDiary.get());
+        }
 
         Diary diary = Diary.create(user, diaryDate);
 
@@ -95,11 +98,9 @@ public class DiaryService {
         }
     }
 
-    private void throwAlreadyExistingDiaryException(Diary diary) {
+    private DiaryStartResponse resumeOrReject(Diary diary) {
         if (diary.getStatus() == DiaryStatus.IN_PROGRESS) {
-            throw new BaseException(
-                    ErrorCode.DIARY_ALREADY_IN_PROGRESS
-            );
+            return DiaryStartResponse.from(diary, true);
         }
 
         if (diary.getStatus() == DiaryStatus.COMPLETED) {
