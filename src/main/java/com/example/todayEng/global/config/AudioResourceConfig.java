@@ -27,7 +27,7 @@ public class AudioResourceConfig implements WebMvcConfigurer {
         if (!location.endsWith("/")) {
             location += "/";
         }
-        registry.addResourceHandler(properties.publicUrlPrefix().replaceAll("/+$", "") + "/**")
+        registry.addResourceHandler(properties.publicUrlPrefix() + "/**")
                 .addResourceLocations(location);
     }
 }

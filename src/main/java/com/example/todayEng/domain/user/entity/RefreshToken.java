@@ -10,7 +10,10 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "refresh_token", indexes = @Index(name = "idx_refresh_token_jti", columnList = "jti", unique = true))
+@Table(name = "refresh_token", indexes = {
+        @Index(name = "idx_refresh_token_jti", columnList = "jti", unique = true),
+        @Index(name = "idx_refresh_token_session_id", columnList = "session_id", unique = true)
+})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RefreshToken extends BaseTimeEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,16 +27,30 @@ public class RefreshToken extends BaseTimeEntity {
     @Column(nullable = false, length = 36)
     private String jti;
 
+    @Column(name = "session_id", length = 36)
+    private String sessionId;
+
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
-    private RefreshToken(User user, String jti, LocalDateTime expiresAt) {
+    private RefreshToken(User user, String sessionId, String jti, LocalDateTime expiresAt) {
         this.user = user;
+        this.sessionId = sessionId;
         this.jti = jti;
         this.expiresAt = expiresAt;
     }
 
-    public static RefreshToken create(User user, String jti, LocalDateTime expiresAt) {
-        return new RefreshToken(user, jti, expiresAt);
+    public static RefreshToken create(
+            User user, String sessionId, String jti, LocalDateTime expiresAt) {
+        return new RefreshToken(user, sessionId, jti, expiresAt);
+    }
+
+    public boolean isExpired() {
+        return !expiresAt.isAfter(LocalDateTime.now());
+    }
+
+    public void rotate(String jti, LocalDateTime expiresAt) {
+        this.jti = jti;
+        this.expiresAt = expiresAt;
     }
 }
