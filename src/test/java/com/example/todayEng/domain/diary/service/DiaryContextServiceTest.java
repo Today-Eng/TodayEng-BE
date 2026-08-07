@@ -97,6 +97,31 @@ class DiaryContextServiceTest {
     }
 
     @Test
+    void rejectsNonFiniteCoordinates() {
+        var request = new DiaryContextCreateRequest(
+                null, new DiaryContextCreateRequest.Location(Double.NaN, 127.0));
+
+        assertThatThrownBy(() -> service.createContexts(1L, 10L, request, List.of()))
+                .isInstanceOf(BaseException.class)
+                .extracting(exception -> ((BaseException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_DIARY_LOCATION);
+
+        verify(dataClient, never()).fetchWeather(any(), any());
+    }
+
+    @Test
+    void rejectsInfiniteCoordinates() {
+        var request = new DiaryContextCreateRequest(
+                null,
+                new DiaryContextCreateRequest.Location(37.5, Double.POSITIVE_INFINITY));
+
+        assertThatThrownBy(() -> service.createContexts(1L, 10L, request, List.of()))
+                .isInstanceOf(BaseException.class)
+                .extracting(exception -> ((BaseException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_DIARY_LOCATION);
+    }
+
+    @Test
     void analyzesImagesAndStoresOnlyAnalysis() throws Exception {
         var image = new MockMultipartFile(
                 "images", "day.jpg", "image/jpeg",

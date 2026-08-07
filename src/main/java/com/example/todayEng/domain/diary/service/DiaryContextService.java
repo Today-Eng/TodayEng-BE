@@ -259,7 +259,9 @@ public class DiaryContextService {
 
     private void validateLocation(DiaryContextCreateRequest.Location location) {
         if (location != null
-                && (location.latitude() < -90 || location.latitude() > 90
+                && (!Double.isFinite(location.latitude())
+                || !Double.isFinite(location.longitude())
+                || location.latitude() < -90 || location.latitude() > 90
                 || location.longitude() < -180 || location.longitude() > 180)) {
             throw new BaseException(ErrorCode.INVALID_DIARY_LOCATION);
         }
