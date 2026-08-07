@@ -60,4 +60,10 @@ public interface DailyContextSnapshotRepository
             @Param("inProgress") DailyContextCollectionStatus inProgress,
             @Param("expectedLeaseVersion") long expectedLeaseVersion
     );
+
+    long deleteAllByUserIdAndContextDateAndContextType(
+            Long userId,
+            LocalDate contextDate,
+            DiaryContextType contextType
+    );
 }
