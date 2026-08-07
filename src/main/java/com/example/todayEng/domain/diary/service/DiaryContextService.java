@@ -198,10 +198,9 @@ public class DiaryContextService {
                 .sorted(Comparator.comparing(
                         (JsonNode item) -> item.path("played_at").asText()).reversed())
                 .forEach(merged::add);
-        ObjectNode result = objectMapper.createObjectNode();
-        if (fresh.isObject()) {
-            result.setAll((ObjectNode) fresh);
-        }
+        ObjectNode result = fresh.isObject()
+                ? fresh.deepCopy()
+                : objectMapper.createObjectNode();
         result.set("items", merged);
         return result;
     }

@@ -317,7 +317,12 @@ class DiaryContextServiceTest {
                 .willReturn(Optional.of(preloadData));
 
         JsonNode freshData = objectMapper.readTree("""
-                {"cursors":{"after":"123456"},"limit":50,"items":[
+                {"href":"https://api.spotify.com/v1/me/player/recently-played",
+                 "next":null,
+                 "cursors":{"after":"123456","before":"654321"},
+                 "limit":50,
+                 "total":2,
+                 "items":[
                   {"played_at":"2026-07-30T09:00:00.000Z","track":{"name":"Morning Song"}},
                   {"track":{"name":"Untimed Song"}}
                 ]}
@@ -334,8 +339,12 @@ class DiaryContextServiceTest {
         assertThat(saved.path("items").size()).isEqualTo(1);
         assertThat(saved.path("items").get(0).path("track").path("name").asText())
                 .isEqualTo("Morning Song");
+        assertThat(saved.path("href").asText())
+                .isEqualTo("https://api.spotify.com/v1/me/player/recently-played");
         assertThat(saved.path("cursors").path("after").asText()).isEqualTo("123456");
+        assertThat(saved.path("cursors").path("before").asText()).isEqualTo("654321");
         assertThat(saved.path("limit").asInt()).isEqualTo(50);
+        assertThat(saved.path("total").asInt()).isEqualTo(2);
     }
 
     @Test
