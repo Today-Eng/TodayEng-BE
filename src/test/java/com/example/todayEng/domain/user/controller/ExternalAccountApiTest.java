@@ -1,10 +1,8 @@
 package com.example.todayEng.domain.user.controller;
 
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -119,8 +117,7 @@ class ExternalAccountApiTest {
         mockMvc.perform(get("/api/integrations/external-accounts"))
                 .andExpect(status().isUnauthorized());
 
-        verify(externalAccountService, never())
-                .getExternalAccounts(USER_ID);
+        verifyNoInteractions(externalAccountService);
     }
 
     @Test
@@ -176,11 +173,7 @@ class ExternalAccountApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
 
-        verify(externalAccountService, never()).updateUseEnabled(
-                eq(USER_ID),
-                eq(ExternalServiceProvider.SPOTIFY),
-                anyBoolean()
-        );
+        verifyNoInteractions(externalAccountService);
     }
 
     @Test

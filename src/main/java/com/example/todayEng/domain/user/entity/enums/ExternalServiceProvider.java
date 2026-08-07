@@ -3,6 +3,7 @@ package com.example.todayEng.domain.user.entity.enums;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import java.util.Arrays;
+import java.util.Locale;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -27,14 +28,18 @@ public enum ExternalServiceProvider {
         }
 
         String normalized = value.trim()
-                .replace('_', '-')
-                .toLowerCase();
+                .toLowerCase(Locale.ROOT);
 
         return Arrays.stream(values())
-                .filter(provider -> provider.slug.equals(normalized))
+                .filter(provider -> provider.matches(normalized))
                 .findFirst()
                 .orElseThrow(() -> new BaseException(
                         ErrorCode.UNSUPPORTED_OAUTH_PROVIDER
                 ));
+    }
+
+    private boolean matches(String normalized) {
+        return slug.equals(normalized)
+                || name().toLowerCase(Locale.ROOT).equals(normalized);
     }
 }
