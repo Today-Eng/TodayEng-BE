@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,9 +17,7 @@ import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
-import com.example.todayEng.domain.home.entity.DailyContextSnapshot;
-import com.example.todayEng.domain.home.entity.enums.DailyContextCollectionStatus;
-import com.example.todayEng.domain.home.repository.DailyContextSnapshotRepository;
+import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceService;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
@@ -58,7 +57,7 @@ class DiaryContextServiceTest {
     @Mock DiaryContextDataClient dataClient;
     @Mock DiaryImageAnalysisClient imageAnalysisClient;
     @Mock DiaryMemoryService diaryMemoryService;
-    @Mock DailyContextSnapshotRepository snapshotRepository;
+    @Mock DailyContextSnapshotPersistenceService snapshotPersistenceService;
     DiaryContextService service;
     Diary diary;
 
@@ -70,7 +69,7 @@ class DiaryContextServiceTest {
         );
         service = new DiaryContextService(diaryRepository, persistenceService,
                 accountRepository, dataClient, imageAnalysisClient,
-                new ImageUploadValidator(), diaryMemoryService, snapshotRepository,
+                new ImageUploadValidator(), diaryMemoryService, snapshotPersistenceService,
                 new ObjectMapper(), clock);
         User user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
@@ -78,13 +77,13 @@ class DiaryContextServiceTest {
         ReflectionTestUtils.setField(diary, "id", 10L);
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary));
-        given(diaryRepository.claimContextCollection(eq(10L), eq(1L), any()))
-                .willReturn(1);
+        given(persistenceService.claimContextCollection(eq(10L), eq(1L), any()))
+                .willReturn(true);
         given(diaryMemoryService.create(1L, 10L))
                 .willReturn(Optional.empty());
         given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of());
-        given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
-                any(), any(), any())).willReturn(List.of());
+        given(snapshotPersistenceService.findSuccessfulContextData(any(), any(), any()))
+                .willReturn(Optional.empty());
         given(persistenceService.saveSuccess(any(), any(), any(), any()))
                 .willAnswer(call -> DiaryContext.success(
                         diary, call.getArgument(2), call.getArgument(3)));
@@ -111,7 +110,7 @@ class DiaryContextServiceTest {
         });
         verify(persistenceService).completeContextCollection(1L, 10L);
         verify(persistenceService, never()).failContextCollection(any(), any());
-        verify(snapshotRepository).deleteAllByUserIdAndContextDateAndContextType(
+        verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.PHOTO);
     }
 
@@ -129,7 +128,7 @@ class DiaryContextServiceTest {
         assertThat(response.contexts()).singleElement()
                 .matches(result -> !result.success());
         verify(persistenceService).completeContextCollection(1L, 10L);
-        verify(snapshotRepository, never()).deleteAllByUserIdAndContextDateAndContextType(
+        verify(snapshotPersistenceService, never()).cleanupCollected(
                 any(), any(), eq(DiaryContextType.PHOTO));
     }
 
@@ -150,10 +149,10 @@ class DiaryContextServiceTest {
 
     @Test
     void rejectsDuplicateContextGenerationBeforeCollecting() {
-        given(diaryRepository.claimContextCollection(eq(10L), eq(1L), any()))
-                .willReturn(0);
-        given(diaryRepository.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
-                .willReturn(0);
+        given(persistenceService.claimContextCollection(eq(10L), eq(1L), any()))
+                .willReturn(false);
+        given(persistenceService.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
+                .willReturn(false);
 
         assertThatThrownBy(() -> service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of()))
@@ -174,10 +173,10 @@ class DiaryContextServiceTest {
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary))
                 .willReturn(Optional.of(completedDiary));
-        given(diaryRepository.claimContextCollection(eq(10L), eq(1L), any()))
-                .willReturn(0);
-        given(diaryRepository.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
-                .willReturn(0);
+        given(persistenceService.claimContextCollection(eq(10L), eq(1L), any()))
+                .willReturn(false);
+        given(persistenceService.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
+                .willReturn(false);
 
         assertThatThrownBy(() -> service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of()))
@@ -188,10 +187,10 @@ class DiaryContextServiceTest {
 
     @Test
     void reclaimsStaleCollectingClaimAfterCrashAndProceeds() throws Exception {
-        given(diaryRepository.claimContextCollection(eq(10L), eq(1L), any()))
-                .willReturn(0);
-        given(diaryRepository.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
-                .willReturn(1);
+        given(persistenceService.claimContextCollection(eq(10L), eq(1L), any()))
+                .willReturn(false);
+        given(persistenceService.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
+                .willReturn(true);
         var image = new MockMultipartFile(
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
@@ -226,8 +225,9 @@ class DiaryContextServiceTest {
                 imageBytes(true));
         var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
         given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
-        given(snapshotRepository.deleteAllByUserIdAndContextDateAndContextType(
-                any(), any(), any())).willThrow(new RuntimeException("db blip"));
+        willThrow(new RuntimeException("db blip"))
+                .given(snapshotPersistenceService)
+                .cleanupCollected(any(), any(), any());
 
         var response = service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of(image));
@@ -252,7 +252,7 @@ class DiaryContextServiceTest {
                 new DiaryContextCreateRequest(null, null), List.of());
 
         verify(persistenceService).saveSuccess(1L, 10L, DiaryContextType.SPOTIFY, freshData);
-        verify(snapshotRepository).deleteAllByUserIdAndContextDateAndContextType(
+        verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
     }
 
@@ -270,12 +270,9 @@ class DiaryContextServiceTest {
                   {"played_at":"2026-07-30T09:00:00.000Z","track":{"name":"Morning Song"}}
                 ]}
                 """);
-        DailyContextSnapshot snapshot = DailyContextSnapshot.start(
-                diary.getUser(), diary.getDiaryDate(), DiaryContextType.SPOTIFY);
-        snapshot.succeed(preloadData);
-        given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
-                1L, diary.getDiaryDate(), DailyContextCollectionStatus.SUCCEEDED))
-                .willReturn(List.of(snapshot));
+        given(snapshotPersistenceService.findSuccessfulContextData(
+                1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY))
+                .willReturn(Optional.of(preloadData));
 
         JsonNode freshData = objectMapper.readTree("""
                 {"items":[
@@ -297,7 +294,7 @@ class DiaryContextServiceTest {
                 .isEqualTo("Evening Song");
         assertThat(saved.path("items").get(1).path("track").path("name").asText())
                 .isEqualTo("Morning Song");
-        verify(snapshotRepository).deleteAllByUserIdAndContextDateAndContextType(
+        verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
     }
 
@@ -315,12 +312,9 @@ class DiaryContextServiceTest {
                   {"played_at":"2026-07-30T09:00:00.000Z","track":{"name":"Morning Song"}}
                 ]}
                 """);
-        DailyContextSnapshot snapshot = DailyContextSnapshot.start(
-                diary.getUser(), diary.getDiaryDate(), DiaryContextType.SPOTIFY);
-        snapshot.succeed(preloadData);
-        given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
-                1L, diary.getDiaryDate(), DailyContextCollectionStatus.SUCCEEDED))
-                .willReturn(List.of(snapshot));
+        given(snapshotPersistenceService.findSuccessfulContextData(
+                1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY))
+                .willReturn(Optional.of(preloadData));
 
         JsonNode freshData = objectMapper.readTree("""
                 {"cursors":{"after":"123456"},"limit":50,"items":[
@@ -360,7 +354,7 @@ class DiaryContextServiceTest {
         assertThat(response.contexts()).singleElement()
                 .matches(result -> !result.success());
         verify(persistenceService).saveFailure(1L, 10L, DiaryContextType.SPOTIFY);
-        verify(snapshotRepository, never()).deleteAllByUserIdAndContextDateAndContextType(
+        verify(snapshotPersistenceService, never()).cleanupCollected(
                 any(), any(), eq(DiaryContextType.SPOTIFY));
     }
 
@@ -377,12 +371,9 @@ class DiaryContextServiceTest {
                   {"played_at":"2026-07-30T09:00:00.000Z","track":{"name":"Morning Song"}}
                 ]}
                 """);
-        DailyContextSnapshot snapshot = DailyContextSnapshot.start(
-                diary.getUser(), diary.getDiaryDate(), DiaryContextType.SPOTIFY);
-        snapshot.succeed(preloadData);
-        given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
-                1L, diary.getDiaryDate(), DailyContextCollectionStatus.SUCCEEDED))
-                .willReturn(List.of(snapshot));
+        given(snapshotPersistenceService.findSuccessfulContextData(
+                1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY))
+                .willReturn(Optional.of(preloadData));
         given(dataClient.fetchSpotify("token", diary.getDiaryDate()))
                 .willThrow(new RuntimeException("token expired"));
 

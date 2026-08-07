@@ -73,6 +73,26 @@ public class DailyContextSnapshotPersistenceService {
         finishIfOwned(snapshotId, leaseVersion, DailyContextCollectionStatus.FAILED);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<JsonNode> findSuccessfulContextData(
+            Long userId,
+            LocalDate date,
+            DiaryContextType type
+    ) {
+        return snapshotRepository
+                .findAllByUserIdAndContextDateAndCollectionStatus(
+                        userId, date, DailyContextCollectionStatus.SUCCEEDED)
+                .stream()
+                .filter(snapshot -> snapshot.getContextType() == type)
+                .findFirst()
+                .map(DailyContextSnapshot::getContextData);
+    }
+
+    @Transactional
+    public void cleanupCollected(Long userId, LocalDate date, DiaryContextType type) {
+        snapshotRepository.deleteAllByUserIdAndContextDateAndContextType(userId, date, type);
+    }
+
     private boolean finishIfOwned(
             Long snapshotId,
             long leaseVersion,

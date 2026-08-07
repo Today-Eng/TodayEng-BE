@@ -9,9 +9,7 @@ import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
-import com.example.todayEng.domain.home.entity.DailyContextSnapshot;
-import com.example.todayEng.domain.home.entity.enums.DailyContextCollectionStatus;
-import com.example.todayEng.domain.home.repository.DailyContextSnapshotRepository;
+import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceService;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
@@ -50,7 +48,7 @@ public class DiaryContextService {
     private final DiaryImageAnalysisClient imageAnalysisClient;
     private final ImageUploadValidator imageUploadValidator;
     private final DiaryMemoryService diaryMemoryService;
-    private final DailyContextSnapshotRepository snapshotRepository;
+    private final DailyContextSnapshotPersistenceService snapshotPersistenceService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -85,11 +83,11 @@ public class DiaryContextService {
 
     private boolean claimContextCollection(Long diaryId, Long userId) {
         LocalDateTime now = LocalDateTime.now(clock);
-        if (diaryRepository.claimContextCollection(diaryId, userId, now) == 1) {
+        if (persistenceService.claimContextCollection(diaryId, userId, now)) {
             return true;
         }
-        return diaryRepository.reclaimStaleContextCollection(
-                diaryId, userId, now, now.minus(CLAIM_STALE_AFTER)) == 1;
+        return persistenceService.reclaimStaleContextCollection(
+                diaryId, userId, now, now.minus(CLAIM_STALE_AFTER));
     }
 
     private ErrorCode resolveClaimFailureReason(Long userId, Long diaryId) {
@@ -177,13 +175,8 @@ public class DiaryContextService {
     }
 
     private JsonNode findSpotifyPreload(Long userId, LocalDate date) {
-        return snapshotRepository
-                .findAllByUserIdAndContextDateAndCollectionStatus(
-                        userId, date, DailyContextCollectionStatus.SUCCEEDED)
-                .stream()
-                .filter(snapshot -> snapshot.getContextType() == DiaryContextType.SPOTIFY)
-                .findFirst()
-                .map(DailyContextSnapshot::getContextData)
+        return snapshotPersistenceService
+                .findSuccessfulContextData(userId, date, DiaryContextType.SPOTIFY)
                 .orElse(null);
     }
 
@@ -237,11 +230,10 @@ public class DiaryContextService {
 
     private void cleanupSnapshot(Long userId, LocalDate diaryDate, DiaryContextType type) {
         try {
-            snapshotRepository.deleteAllByUserIdAndContextDateAndContextType(
-                    userId, diaryDate, type);
+            snapshotPersistenceService.cleanupCollected(userId, diaryDate, type);
         } catch (RuntimeException exception) {
-            log.warn("Daily context snapshot cleanup failed: type={}, exception={}",
-                    type, exception.getClass().getSimpleName());
+            log.warn("Daily context snapshot cleanup failed: userId={}, diaryDate={}, type={}",
+                    userId, diaryDate, type, exception);
         }
     }
 

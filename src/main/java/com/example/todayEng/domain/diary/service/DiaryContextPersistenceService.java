@@ -9,6 +9,7 @@ import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,22 @@ public class DiaryContextPersistenceService {
                 .orElseGet(() -> DiaryContext.failure(diary, type));
         context.markFailed();
         return contextRepository.save(context);
+    }
+
+    @Transactional
+    public boolean claimContextCollection(Long diaryId, Long userId, LocalDateTime now) {
+        return diaryRepository.claimContextCollection(diaryId, userId, now) == 1;
+    }
+
+    @Transactional
+    public boolean reclaimStaleContextCollection(
+            Long diaryId,
+            Long userId,
+            LocalDateTime now,
+            LocalDateTime staleBefore
+    ) {
+        return diaryRepository.reclaimStaleContextCollection(
+                diaryId, userId, now, staleBefore) == 1;
     }
 
     @Transactional
