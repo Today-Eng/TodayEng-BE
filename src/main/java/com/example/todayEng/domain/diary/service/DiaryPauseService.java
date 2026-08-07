@@ -6,8 +6,6 @@ import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,9 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class DiaryPauseService {
-
-    private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
-    private static final long RESUME_WINDOW_HOURS = 24;
 
     private final DiaryRepository diaryRepository;
 
@@ -30,15 +25,16 @@ public class DiaryPauseService {
         if (!diary.getUser().getId().equals(userId)) {
             throw new BaseException(ErrorCode.ACCESS_DENIED);
         }
-        if (diary.getStatus() == DiaryStatus.PAUSED) {
-            throw new BaseException(ErrorCode.DIARY_ALREADY_PAUSED);
+        if (diary.getStatus() == DiaryStatus.COMPLETED) {
+            return DiaryPauseResponse.from(diary);
         }
         if (diary.getStatus() != DiaryStatus.IN_PROGRESS) {
             throw new BaseException(ErrorCode.DIARY_NOT_IN_PROGRESS);
         }
 
-        LocalDateTime pausedAt = LocalDateTime.now(SERVICE_ZONE_ID);
-        diary.pause(pausedAt, pausedAt.plusHours(RESUME_WINDOW_HOURS));
+        // 명시적인 중간 종료만 답변 개수와 무관하게 완료한다.
+        // 화면 이탈 시에는 이 API가 호출되지 않으므로 IN_PROGRESS가 유지된다.
+        diary.complete();
         return DiaryPauseResponse.from(diary);
     }
 }

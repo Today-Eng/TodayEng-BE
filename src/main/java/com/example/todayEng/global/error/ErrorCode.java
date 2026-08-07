@@ -23,6 +23,7 @@ public enum ErrorCode {
     MULTIPART_FILE_ERROR(HttpStatus.BAD_REQUEST, "C009", "파일 업로드 처리 중 오류가 발생했습니다."),
     DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "C010", "이미 존재하는 리소스입니다."),
     INVALID_CALENDAR_DATE(HttpStatus.BAD_REQUEST, "C011", "조회할 연도와 월을 확인해주세요."),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "C012", "지원하지 않는 Content-Type입니다."),
 
 
     // Auth (A)
@@ -95,13 +96,15 @@ public enum ErrorCode {
     INVALID_REFLECTION_QUESTION_COMPOSITION(HttpStatus.CONFLICT, "D030", "회고 질문 구성이 완료 조건을 충족하지 않습니다."),
     INCOMPLETE_REFLECTION_ANSWERS(HttpStatus.CONFLICT, "D031", "모든 회고 답변이 완료되지 않았습니다."),
     REFLECTION_CORRECTION_NOT_FINISHED(HttpStatus.CONFLICT, "D032", "답변 교정 처리가 완료되지 않았습니다."),
-    DIARY_ALREADY_PAUSED(HttpStatus.CONFLICT, "D033", "이미 중단된 회고입니다."),
     INVALID_DIARY_YEAR_MONTH(HttpStatus.BAD_REQUEST, "D034", "조회할 연도 또는 월이 올바르지 않습니다."),
     DIARY_NOT_COMPLETED(HttpStatus.CONFLICT, "D035", "완료된 회고만 메모를 수정할 수 있습니다."),
     DIARY_CONTEXT_ALREADY_GENERATED(HttpStatus.CONFLICT, "D036", "회고 컨텍스트가 이미 생성되었거나 생성 중입니다."),
     DIARY_ALREADY_DELETED(HttpStatus.CONFLICT, "D037", "이미 삭제된 회고입니다."),
     DIARY_DELETE_NOT_ALLOWED(HttpStatus.CONFLICT, "D038", "완료된 회고만 삭제할 수 있습니다."),
     REFLECTION_QUESTION_CLAIM_LOST(HttpStatus.CONFLICT, "D039", "질문 생성 작업이 다른 요청으로 회수되었습니다."),
+    TOO_MANY_DIARY_IMAGES(HttpStatus.BAD_REQUEST, "D040", "사진은 최대 2장까지 첨부할 수 있습니다."),
+    DIARY_MEMO_TOO_LONG(HttpStatus.BAD_REQUEST, "D041", "메모는 최대 200자까지 입력할 수 있습니다."),
+    INVALID_DIARY_LOCATION(HttpStatus.BAD_REQUEST, "D042", "위도 또는 경도 값이 올바르지 않습니다."),
 
 
     // Notification (N)

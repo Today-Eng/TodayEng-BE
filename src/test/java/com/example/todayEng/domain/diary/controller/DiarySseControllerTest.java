@@ -2,6 +2,7 @@ package com.example.todayEng.domain.diary.controller;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -21,6 +22,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @WebMvcTest(DiarySseController.class)
@@ -59,16 +61,20 @@ class DiarySseControllerTest {
         given(subscriptionService.subscribe(1L, 10L))
                 .willReturn(emitter);
 
-        mockMvc.perform(get("/api/diaries/10/subscribe")
+        MvcResult result = mockMvc.perform(get("/api/diaries/10/subscribe")
                         .header(
                                 "Authorization",
                                 "Bearer valid-token"
                         ))
                 .andExpect(status().isOk())
-                .andExpect(request().asyncStarted());
+                .andExpect(request().asyncStarted())
+                .andReturn();
 
         verify(subscriptionService).subscribe(1L, 10L);
         emitter.complete();
+
+        mockMvc.perform(asyncDispatch(result))
+                .andExpect(status().isOk());
     }
 
     @Test

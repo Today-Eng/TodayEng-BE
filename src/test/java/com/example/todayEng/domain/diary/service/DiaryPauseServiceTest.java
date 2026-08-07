@@ -10,8 +10,8 @@ import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
-import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,7 +27,7 @@ class DiaryPauseServiceTest {
     @InjectMocks private DiaryPauseService diaryPauseService;
 
     @Test
-    void ownerCanPauseInProgressDiaryFor24Hours() {
+    void ownerCanEndInProgressDiaryRegardlessOfAnswerCount() {
         User user = user(1L);
         Diary diary = Diary.create(user, LocalDate.now());
         ReflectionTestUtils.setField(diary, "id", 10L);
@@ -36,10 +36,8 @@ class DiaryPauseServiceTest {
         var response = diaryPauseService.pause(1L, 10L);
 
         assertThat(response.diaryId()).isEqualTo(10L);
-        assertThat(response.status()).isEqualTo(DiaryStatus.PAUSED);
-        assertThat(response.pausedAt()).isNotNull();
-        assertThat(Duration.between(response.pausedAt(), response.expiresAt()))
-                .isEqualTo(Duration.ofHours(24));
+        assertThat(response.status()).isEqualTo(DiaryStatus.COMPLETED);
+        assertThat(response.completedAt()).isNotNull();
     }
 
     @Test
@@ -51,22 +49,17 @@ class DiaryPauseServiceTest {
     }
 
     @Test
-    void pausedDiaryCannotBePausedAgain() {
-        Diary diary = Diary.create(user(1L), LocalDate.now());
-        var now = java.time.LocalDateTime.now();
-        diary.pause(now, now.plusHours(24));
-        given(diaryRepository.findByIdForUpdate(10L)).willReturn(Optional.of(diary));
-
-        assertError(() -> diaryPauseService.pause(1L, 10L), ErrorCode.DIARY_ALREADY_PAUSED);
-    }
-
-    @Test
-    void completedDiaryCannotBePaused() {
+    void completedDiaryCanBeEndedAgainIdempotently() {
         Diary diary = Diary.create(user(1L), LocalDate.now());
         diary.complete();
+        LocalDateTime originalCompletedAt = diary.getCompletedAt();
         given(diaryRepository.findByIdForUpdate(10L)).willReturn(Optional.of(diary));
 
-        assertError(() -> diaryPauseService.pause(1L, 10L), ErrorCode.DIARY_NOT_IN_PROGRESS);
+        var response = diaryPauseService.pause(1L, 10L);
+
+        assertThat(response.status()).isEqualTo(DiaryStatus.COMPLETED);
+        assertThat(response.completedAt()).isEqualTo(originalCompletedAt);
+        assertThat(diary.getCompletedAt()).isEqualTo(originalCompletedAt);
     }
 
     private User user(Long id) {
