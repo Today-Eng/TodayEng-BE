@@ -44,6 +44,13 @@ dependencies {
 	implementation 'com.google.cloud:google-cloud-texttospeech'
 	implementation 'com.google.cloud:google-cloud-speech'
 
+	// AWS S3 audio storage
+	implementation platform('software.amazon.awssdk:bom:2.46.8')
+	implementation('software.amazon.awssdk:s3') {
+		exclude group: 'software.amazon.awssdk', module: 'apache5-client'
+	}
+	implementation 'software.amazon.awssdk:url-connection-client'
+
 	// Lombok
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'

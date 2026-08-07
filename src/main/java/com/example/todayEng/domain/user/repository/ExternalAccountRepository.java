@@ -14,7 +14,10 @@ public interface ExternalAccountRepository extends JpaRepository<ExternalAccount
 
     void deleteAllByUserId(Long userId);
 
-    Optional<ExternalAccount> findByIdAndUser_Id(Long id, Long userId);
+    Optional<ExternalAccount> findByUser_IdAndProvider(
+            Long userId,
+            ExternalServiceProvider provider
+    );
 
     Optional<ExternalAccount> findByUserAndProvider(
             User user,

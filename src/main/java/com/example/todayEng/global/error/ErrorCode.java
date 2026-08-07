@@ -42,7 +42,7 @@ public enum ErrorCode {
     TERMS_NOT_FOUND(HttpStatus.NOT_FOUND, "U007", "존재하지 않는 약관입니다."),
     REQUIRED_TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "U005", "필수 약관에 동의해야 합니다."),
     INTEREST_TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "U006", "존재하지 않는 관심사 태그입니다."),
-    EXTERNAL_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "U004", "연동된 외부 계정을 찾을 수 없습니다."),
+    EXTERNAL_ACCOUNT_NOT_CONNECTED(HttpStatus.NOT_FOUND, "U004", "연동되지 않은 외부 서비스입니다."),
 
 
     // External Service / S3 / API (E)
@@ -98,6 +98,10 @@ public enum ErrorCode {
     DIARY_ALREADY_PAUSED(HttpStatus.CONFLICT, "D033", "이미 중단된 회고입니다."),
     INVALID_DIARY_YEAR_MONTH(HttpStatus.BAD_REQUEST, "D034", "조회할 연도 또는 월이 올바르지 않습니다."),
     DIARY_NOT_COMPLETED(HttpStatus.CONFLICT, "D035", "완료된 회고만 메모를 수정할 수 있습니다."),
+    DIARY_CONTEXT_ALREADY_GENERATED(HttpStatus.CONFLICT, "D036", "회고 컨텍스트가 이미 생성되었거나 생성 중입니다."),
+    DIARY_ALREADY_DELETED(HttpStatus.CONFLICT, "D037", "이미 삭제된 회고입니다."),
+    DIARY_DELETE_NOT_ALLOWED(HttpStatus.CONFLICT, "D038", "완료된 회고만 삭제할 수 있습니다."),
+
 
     // Notification (N)
     PUSH_SUBSCRIPTION_REQUIRED(HttpStatus.BAD_REQUEST, "N001", "푸시 구독 정보가 없어 알림을 활성화할 수 없습니다."),

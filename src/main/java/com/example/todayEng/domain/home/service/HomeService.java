@@ -1,17 +1,25 @@
 package com.example.todayEng.domain.home.service;
 
 import com.example.todayEng.domain.diary.entity.Diary;
-import com.example.todayEng.domain.diary.entity.DiaryContext;
+import com.example.todayEng.domain.diary.entity.DiaryAnswer;
+import com.example.todayEng.domain.diary.entity.DiaryQuestion;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
+import com.example.todayEng.domain.diary.entity.enums.QuestionType;
+import com.example.todayEng.domain.diary.repository.DiaryAnswerRepository;
 import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
+import com.example.todayEng.domain.diary.repository.DiaryQuestionRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
+import com.example.todayEng.domain.home.dto.HomeDiaryDateResponse;
 import com.example.todayEng.domain.home.dto.HomeResponse;
 import com.example.todayEng.domain.home.dto.HomeResponse.CalendarMaterial;
 import com.example.todayEng.domain.home.dto.HomeResponse.RepresentativeEvent;
 import com.example.todayEng.domain.home.dto.HomeResponse.SpotifyMaterial;
 import com.example.todayEng.domain.home.dto.HomeResponse.TimeMaterial;
 import com.example.todayEng.domain.home.dto.HomeResponse.WeatherMaterial;
+import com.example.todayEng.domain.home.entity.DailyContextSnapshot;
+import com.example.todayEng.domain.home.entity.enums.DailyContextCollectionStatus;
+import com.example.todayEng.domain.home.repository.DailyContextSnapshotRepository;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
@@ -29,6 +37,7 @@ import java.time.YearMonth;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -42,7 +51,10 @@ public class HomeService {
 
     private final UserRepository userRepository;
     private final DiaryRepository diaryRepository;
+    private final DiaryQuestionRepository diaryQuestionRepository;
+    private final DiaryAnswerRepository diaryAnswerRepository;
     private final DiaryContextRepository diaryContextRepository;
+    private final DailyContextSnapshotRepository snapshotRepository;
     private final ExternalAccountRepository externalAccountRepository;
     private final Clock clock;
 
@@ -56,10 +68,12 @@ public class HomeService {
                 .findAllByUserIdAndDiaryDateBetweenOrderByDiaryDate(
                         userId, targetMonth.atDay(1), targetMonth.atEndOfMonth())
                 .stream()
+                .filter(d -> d.getStatus() != DiaryStatus.DELETED)
                 .map(Diary::getDiaryDate)
                 .toList();
         Optional<Diary> todayDiary = diaryRepository.findByUserIdAndDiaryDate(userId, today);
-        Map<DiaryContextType, DiaryContext> contexts = loadSuccessfulContexts(todayDiary);
+        Map<DiaryContextType, JsonNode> contexts =
+                loadSuccessfulContexts(userId, today, todayDiary);
         Map<ExternalServiceProvider, ExternalAccount> accounts = externalAccountRepository
                 .findAllByUser_Id(userId)
                 .stream()
@@ -97,6 +111,89 @@ public class HomeService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public HomeDiaryDateResponse getDiaryByDate(Long userId, LocalDate date) {
+        Optional<Diary> found = diaryRepository.findByUserIdAndDiaryDate(userId, date);
+
+        if (found.isEmpty()) {
+            return new HomeDiaryDateResponse(
+                    null,
+                    date,
+                    date.getDayOfWeek().name(),
+                    "NOT_STARTED",
+                    List.of(),
+                    null,
+                    null
+            );
+        }
+
+        Diary diary = found.get();
+
+        if (diary.getStatus() == DiaryStatus.DELETED) {
+            return new HomeDiaryDateResponse(
+                    diary.getId(),
+                    diary.getDiaryDate(),
+                    diary.getDiaryDate().getDayOfWeek().name(),
+                    "UNAVAILABLE",
+                    List.of(),
+                    null,
+                    null
+            );
+        }
+
+        String diaryStatus = diary.getStatus() == DiaryStatus.COMPLETED
+                ? "COMPLETED"
+                : "IN_PROGRESS";
+
+        if (diary.getStatus() != DiaryStatus.COMPLETED) {
+            return new HomeDiaryDateResponse(
+                    diary.getId(),
+                    diary.getDiaryDate(),
+                    diary.getDiaryDate().getDayOfWeek().name(),
+                    diaryStatus,
+                    List.of(),
+                    null,
+                    null
+            );
+        }
+
+        List<DiaryQuestion> mainQuestions = diaryQuestionRepository
+                .findAllByDiaryIdInAndQuestionTypeOrderByDiaryIdAscQuestionOrderAsc(
+                        List.of(diary.getId()),
+                        QuestionType.MAIN
+                );
+
+        List<String> keywords = mainQuestions.stream()
+                .map(DiaryQuestion::getKeyword)
+                .filter(Objects::nonNull)
+                .filter(keyword -> !keyword.isBlank())
+                .toList();
+
+        DiaryQuestion firstQuestion = mainQuestions.isEmpty() ? null : mainQuestions.get(0);
+        String questionText = firstQuestion == null ? null : firstQuestion.getQuestionText();
+
+        String correctedText = null;
+        if (firstQuestion != null) {
+            List<DiaryAnswer> answers = diaryAnswerRepository
+                    .findAllByQuestionIdIn(List.of(firstQuestion.getId()));
+            if (!answers.isEmpty()) {
+                DiaryAnswer answer = answers.get(0);
+                String ct = answer.getCorrectedText();
+                correctedText = (ct != null && !ct.isBlank()) ? ct : answer.getOriginalText();
+            }
+        }
+
+        return new HomeDiaryDateResponse(
+                diary.getId(),
+                diary.getDiaryDate(),
+                diary.getDiaryDate().getDayOfWeek().name(),
+                diaryStatus,
+                keywords,
+                questionText,
+                correctedText
+        );
+    }
+
     private YearMonth resolveTargetMonth(Integer year, Integer month, LocalDate today) {
         int resolvedYear = year == null ? today.getYear() : year;
         int resolvedMonth = month == null ? today.getMonthValue() : month;
@@ -111,19 +208,31 @@ public class HomeService {
         }
     }
 
-    private Map<DiaryContextType, DiaryContext> loadSuccessfulContexts(Optional<Diary> diary) {
-        if (diary.isEmpty()) {
-            return Map.of();
-        }
-        return diaryContextRepository
-                .findAllByDiaryIdAndSuccessTrueOrderById(diary.get().getId())
+    private Map<DiaryContextType, JsonNode> loadSuccessfulContexts(
+            Long userId,
+            LocalDate today,
+            Optional<Diary> diary
+    ) {
+        Map<DiaryContextType, JsonNode> contexts = snapshotRepository
+                .findAllByUserIdAndContextDateAndCollectionStatus(
+                        userId,
+                        today,
+                        DailyContextCollectionStatus.SUCCEEDED
+                )
                 .stream()
                 .collect(Collectors.toMap(
-                        DiaryContext::getContextType,
-                        Function.identity(),
+                        DailyContextSnapshot::getContextType,
+                        DailyContextSnapshot::getContextData,
                         (first, ignored) -> first,
                         () -> new EnumMap<>(DiaryContextType.class)
                 ));
+        diary.ifPresent(value -> diaryContextRepository
+                .findAllByDiaryIdAndSuccessTrueOrderById(value.getId())
+                .forEach(context -> contexts.put(
+                        context.getContextType(),
+                        context.getContextData()
+                )));
+        return contexts;
     }
 
     private HomeResponse.TodaySummary createToday(
@@ -132,7 +241,15 @@ public class HomeService {
     ) {
         String status = diary
                 .map(Diary::getStatus)
-                .map(value -> value == DiaryStatus.COMPLETED ? "COMPLETED" : "IN_PROGRESS")
+                .map(value -> {
+                    if (value == DiaryStatus.COMPLETED) {
+                        return "COMPLETED";
+                    }
+                    if (value == DiaryStatus.DELETED) {
+                        return "UNAVAILABLE";
+                    }
+                    return "IN_PROGRESS";
+                })
                 .orElse("NOT_STARTED");
         return new HomeResponse.TodaySummary(
                 today,
@@ -156,11 +273,11 @@ public class HomeService {
         return new TimeMaterial("NIGHT", "밤입니다");
     }
 
-    private WeatherMaterial createWeather(DiaryContext context) {
-        if (!hasData(context)) {
+    private WeatherMaterial createWeather(JsonNode contextData) {
+        if (contextData == null) {
             return new WeatherMaterial(false, null, null);
         }
-        JsonNode daily = context.getContextData().path("daily");
+        JsonNode daily = contextData.path("daily");
         Integer weatherCode = firstInt(daily.path("weather_code"));
         Double maximum = firstDouble(daily.path("temperature_2m_max"));
         Double minimum = firstDouble(daily.path("temperature_2m_min"));
@@ -179,14 +296,14 @@ public class HomeService {
 
     private CalendarMaterial createCalendar(
             ExternalAccount account,
-            DiaryContext context
+            JsonNode contextData
     ) {
         boolean connected = account != null;
         boolean enabled = connected && account.isUseEnabled();
-        if (!enabled || !hasData(context)) {
+        if (!enabled || contextData == null) {
             return new CalendarMaterial(connected, enabled, 0, null);
         }
-        JsonNode items = context.getContextData().path("items");
+        JsonNode items = contextData.path("items");
         if (!items.isArray()) {
             return new CalendarMaterial(connected, enabled, 0, null);
         }
@@ -196,14 +313,14 @@ public class HomeService {
 
     private SpotifyMaterial createSpotify(
             ExternalAccount account,
-            DiaryContext context
+            JsonNode contextData
     ) {
         boolean connected = account != null;
         boolean enabled = connected && account.isUseEnabled();
-        if (!enabled || !hasData(context)) {
+        if (!enabled || contextData == null) {
             return new SpotifyMaterial(connected, enabled, false, null, null);
         }
-        JsonNode items = context.getContextData().path("items");
+        JsonNode items = contextData.path("items");
         if (!items.isArray() || items.isEmpty()) {
             return new SpotifyMaterial(connected, enabled, false, null, null);
         }
@@ -249,12 +366,6 @@ public class HomeService {
                 return new RepresentativeEvent(title, null);
             }
         }
-    }
-
-    private boolean hasData(DiaryContext context) {
-        return context != null
-                && context.isSuccess()
-                && context.getContextData() != null;
     }
 
     private Integer firstInt(JsonNode node) {

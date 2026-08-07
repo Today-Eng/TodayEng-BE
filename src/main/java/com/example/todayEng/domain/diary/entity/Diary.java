@@ -1,5 +1,6 @@
 package com.example.todayEng.domain.diary.entity;
 
+import com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
 import com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus;
 import com.example.todayEng.domain.user.entity.User;
@@ -53,6 +54,18 @@ public class Diary extends BaseTimeEntity {
     @ColumnDefault("'NOT_STARTED'")
     private ReflectionQuestionGenerationStatus questionGenerationStatus;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "context_collection_status", nullable = false, length = 20)
+    @ColumnDefault("'NOT_STARTED'")
+    private DiaryContextCollectionStatus contextCollectionStatus;
+
+    @Column(name = "context_collection_claimed_at")
+    private LocalDateTime contextCollectionClaimedAt;
+
+    @Column(name = "context_collection_lease_version", nullable = false)
+    @ColumnDefault("0")
+    private long contextCollectionLeaseVersion;
+
     @Column(name = "memo", length = 2000)
     private String memo;
 
@@ -74,6 +87,8 @@ public class Diary extends BaseTimeEntity {
         this.diaryDate = diaryDate;
         this.status = DiaryStatus.IN_PROGRESS;
         this.questionGenerationStatus = ReflectionQuestionGenerationStatus.NOT_STARTED;
+        this.contextCollectionStatus = DiaryContextCollectionStatus.NOT_STARTED;
+        this.contextCollectionLeaseVersion = 0L;
     }
 
     public static Diary create(
@@ -115,6 +130,17 @@ public class Diary extends BaseTimeEntity {
         this.status = DiaryStatus.PAUSED;
         this.pausedAt = pausedAt;
         this.pauseExpiresAt = pauseExpiresAt;
+    }
+
+    public void delete() {
+        if (this.status != DiaryStatus.COMPLETED) {
+            throw new IllegalStateException(
+                    "Only a completed diary can be deleted."
+            );
+        }
+
+        this.status = DiaryStatus.DELETED;
+        this.memo = null;
     }
 
     public void completeQuestionGeneration() {

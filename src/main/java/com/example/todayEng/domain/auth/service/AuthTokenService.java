@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class AuthTokenService {
@@ -18,8 +20,10 @@ public class AuthTokenService {
     @Transactional
     public LoginResponse issueTokens(User user, boolean isNewUser) {
         JwtTokenProvider.IssuedToken access = jwtTokenProvider.issueAccessToken(user.getId());
-        JwtTokenProvider.IssuedToken refresh = jwtTokenProvider.issueRefreshToken(user.getId());
-        refreshTokenRepository.save(RefreshToken.create(user, refresh.jti(), refresh.expiresAt()));
+        String sessionId = UUID.randomUUID().toString();
+        JwtTokenProvider.IssuedToken refresh = jwtTokenProvider.issueRefreshToken(user.getId(), sessionId);
+        refreshTokenRepository.save(RefreshToken.create(
+                user, sessionId, refresh.jti(), refresh.expiresAt()));
         return new LoginResponse(access.value(), refresh.value(), isNewUser);
     }
 }
