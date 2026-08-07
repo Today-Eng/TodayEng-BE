@@ -1,5 +1,7 @@
 package com.example.todayEng.domain.home.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
@@ -12,6 +14,10 @@ import com.example.todayEng.domain.diary.dto.request.DiaryContextCreateRequest.L
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
+import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse;
+import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse.ContextResult;
+import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse.ResultStatus;
+import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse.SkipReason;
 import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceService.SnapshotClaim;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
@@ -78,12 +84,30 @@ class DailyContextPreloadServiceTest {
         given(dataClient.fetchCalendar("token", TODAY))
                 .willReturn(new ObjectMapper().createObjectNode());
 
-        service.preload(USER_ID, location);
+        DailyContextPreloadResponse response = service.preload(USER_ID, location);
 
         verify(persistenceService).succeed(10L, 0L,
                 new ObjectMapper().createObjectNode());
         verify(persistenceService).succeed(11L, 0L,
                 new ObjectMapper().createObjectNode());
+        assertThat(response.contextDate()).isEqualTo(TODAY);
+        assertThat(response.skipReason()).isNull();
+        assertThat(response.contexts())
+                .extracting(ContextResult::type, ContextResult::status)
+                .containsExactly(
+                        tuple(DiaryContextType.WEATHER, ResultStatus.SUCCEEDED),
+                        tuple(DiaryContextType.CALENDAR, ResultStatus.SUCCEEDED)
+                );
+    }
+
+    @Test
+    void reportsNoLocationWhenCoordinatesAreAbsent() {
+        DailyContextPreloadResponse response = service.preload(USER_ID, null);
+
+        verify(persistenceService, never()).start(any(), any(), any());
+        assertThat(response.contexts())
+                .extracting(ContextResult::type, ContextResult::status)
+                .containsExactly(tuple(DiaryContextType.WEATHER, ResultStatus.NO_LOCATION));
     }
 
     @Test
@@ -93,11 +117,15 @@ class DailyContextPreloadServiceTest {
         given(persistenceService.reclaimStale(USER_ID, TODAY, DiaryContextType.WEATHER))
                 .willReturn(Optional.empty());
 
-        service.preload(USER_ID, new Location(37.5, 127.0));
+        DailyContextPreloadResponse response = service.preload(USER_ID, new Location(37.5, 127.0));
 
         verify(dataClient, never()).fetchWeather(any(), any());
         verify(persistenceService, never()).succeed(any(), anyLong(), any());
         verify(persistenceService, never()).fail(any(), anyLong());
+        assertThat(response.contexts())
+                .extracting(ContextResult::type, ContextResult::status)
+                .containsExactly(
+                        tuple(DiaryContextType.WEATHER, ResultStatus.ALREADY_IN_PROGRESS));
     }
 
     @Test
@@ -121,9 +149,12 @@ class DailyContextPreloadServiceTest {
         given(dataClient.fetchWeather(any(), any()))
                 .willThrow(new RuntimeException("timeout"));
 
-        service.preload(USER_ID, new Location(37.5, 127.0));
+        DailyContextPreloadResponse response = service.preload(USER_ID, new Location(37.5, 127.0));
 
         verify(persistenceService).fail(10L, 0L);
+        assertThat(response.contexts())
+                .extracting(ContextResult::type, ContextResult::status)
+                .containsExactly(tuple(DiaryContextType.WEATHER, ResultStatus.FAILED));
     }
 
     @Test
@@ -153,9 +184,11 @@ class DailyContextPreloadServiceTest {
         given(diaryRepository.findByUserIdAndDiaryDate(USER_ID, TODAY))
                 .willReturn(Optional.of(org.mockito.Mockito.mock(Diary.class)));
 
-        service.preload(USER_ID, new Location(37.5, 127.0));
+        DailyContextPreloadResponse response = service.preload(USER_ID, new Location(37.5, 127.0));
 
         verify(persistenceService, never()).start(any(), any(), any());
         verify(dataClient, never()).fetchWeather(any(), any());
+        assertThat(response.skipReason()).isEqualTo(SkipReason.DIARY_ALREADY_STARTED);
+        assertThat(response.contexts()).isEmpty();
     }
 }
