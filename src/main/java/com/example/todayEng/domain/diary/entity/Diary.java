@@ -62,6 +62,9 @@ public class Diary extends BaseTimeEntity {
     @Column(name = "context_collection_claimed_at")
     private LocalDateTime contextCollectionClaimedAt;
 
+    @Column(name = "context_collection_lease_version", nullable = false)
+    private long contextCollectionLeaseVersion;
+
     @Column(name = "memo", length = 2000)
     private String memo;
 
@@ -84,6 +87,7 @@ public class Diary extends BaseTimeEntity {
         this.status = DiaryStatus.IN_PROGRESS;
         this.questionGenerationStatus = ReflectionQuestionGenerationStatus.NOT_STARTED;
         this.contextCollectionStatus = DiaryContextCollectionStatus.NOT_STARTED;
+        this.contextCollectionLeaseVersion = 0L;
     }
 
     public static Diary create(
@@ -133,14 +137,6 @@ public class Diary extends BaseTimeEntity {
 
     public void failQuestionGeneration() {
         this.questionGenerationStatus = ReflectionQuestionGenerationStatus.FAILED;
-    }
-
-    public void completeContextCollection() {
-        this.contextCollectionStatus = DiaryContextCollectionStatus.COMPLETED;
-    }
-
-    public void failContextCollection() {
-        this.contextCollectionStatus = DiaryContextCollectionStatus.FAILED;
     }
 
     private String normalizeMemo(String memo) {

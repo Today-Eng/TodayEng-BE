@@ -3,6 +3,7 @@ package com.example.todayEng.domain.diary.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -17,6 +18,7 @@ import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
+import com.example.todayEng.domain.diary.service.DiaryContextPersistenceService.ContextCollectionClaim;
 import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceService;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.User;
@@ -51,6 +53,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class DiaryContextServiceTest {
 
+    private static final long LEASE_VERSION = 1L;
+
     @Mock DiaryRepository diaryRepository;
     @Mock DiaryContextPersistenceService persistenceService;
     @Mock ExternalAccountRepository accountRepository;
@@ -78,18 +82,18 @@ class DiaryContextServiceTest {
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary));
         given(persistenceService.claimContextCollection(eq(10L), eq(1L), any()))
-                .willReturn(true);
+                .willReturn(Optional.of(new ContextCollectionClaim(LEASE_VERSION)));
         given(diaryMemoryService.create(1L, 10L))
                 .willReturn(Optional.empty());
         given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of());
         given(snapshotPersistenceService.findSuccessfulContextData(any(), any(), any()))
                 .willReturn(Optional.empty());
-        given(persistenceService.saveSuccess(any(), any(), any(), any()))
-                .willAnswer(call -> DiaryContext.success(
-                        diary, call.getArgument(2), call.getArgument(3)));
-        given(persistenceService.saveFailure(any(), any(), any()))
-                .willAnswer(call -> DiaryContext.failure(
-                        diary, call.getArgument(2)));
+        given(persistenceService.saveSuccess(any(), any(), anyLong(), any(), any()))
+                .willAnswer(call -> Optional.of(DiaryContext.success(
+                        diary, call.getArgument(3), call.getArgument(4))));
+        given(persistenceService.saveFailure(any(), any(), anyLong(), any()))
+                .willAnswer(call -> Optional.of(DiaryContext.failure(
+                        diary, call.getArgument(3))));
     }
 
     @Test
@@ -108,8 +112,8 @@ class DiaryContextServiceTest {
             assertThat(result.type()).isEqualTo(DiaryContextType.PHOTO);
             assertThat(result.success()).isTrue();
         });
-        verify(persistenceService).completeContextCollection(1L, 10L);
-        verify(persistenceService, never()).failContextCollection(any(), any());
+        verify(persistenceService).completeContextCollection(1L, 10L, LEASE_VERSION);
+        verify(persistenceService, never()).failContextCollection(any(), any(), anyLong());
         verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.PHOTO);
     }
@@ -127,7 +131,7 @@ class DiaryContextServiceTest {
 
         assertThat(response.contexts()).singleElement()
                 .matches(result -> !result.success());
-        verify(persistenceService).completeContextCollection(1L, 10L);
+        verify(persistenceService).completeContextCollection(1L, 10L, LEASE_VERSION);
         verify(snapshotPersistenceService, never()).cleanupCollected(
                 any(), any(), eq(DiaryContextType.PHOTO));
     }
@@ -143,16 +147,16 @@ class DiaryContextServiceTest {
                 .extracting(exception -> ((BaseException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_FILE_EXTENSION);
 
-        verify(persistenceService).failContextCollection(1L, 10L);
-        verify(persistenceService, never()).completeContextCollection(any(), any());
+        verify(persistenceService).failContextCollection(1L, 10L, LEASE_VERSION);
+        verify(persistenceService, never()).completeContextCollection(any(), any(), anyLong());
     }
 
     @Test
     void rejectsDuplicateContextGenerationBeforeCollecting() {
         given(persistenceService.claimContextCollection(eq(10L), eq(1L), any()))
-                .willReturn(false);
+                .willReturn(Optional.empty());
         given(persistenceService.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
-                .willReturn(false);
+                .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of()))
@@ -160,8 +164,8 @@ class DiaryContextServiceTest {
                 .extracting(exception -> ((BaseException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.DIARY_CONTEXT_ALREADY_GENERATED);
 
-        verify(persistenceService, never()).failContextCollection(any(), any());
-        verify(persistenceService, never()).completeContextCollection(any(), any());
+        verify(persistenceService, never()).failContextCollection(any(), any(), anyLong());
+        verify(persistenceService, never()).completeContextCollection(any(), any(), anyLong());
         verify(diaryMemoryService, never()).create(any(), any());
     }
 
@@ -174,9 +178,9 @@ class DiaryContextServiceTest {
                 .willReturn(Optional.of(diary))
                 .willReturn(Optional.of(completedDiary));
         given(persistenceService.claimContextCollection(eq(10L), eq(1L), any()))
-                .willReturn(false);
+                .willReturn(Optional.empty());
         given(persistenceService.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
-                .willReturn(false);
+                .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of()))
@@ -188,9 +192,9 @@ class DiaryContextServiceTest {
     @Test
     void reclaimsStaleCollectingClaimAfterCrashAndProceeds() throws Exception {
         given(persistenceService.claimContextCollection(eq(10L), eq(1L), any()))
-                .willReturn(false);
+                .willReturn(Optional.empty());
         given(persistenceService.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
-                .willReturn(true);
+                .willReturn(Optional.of(new ContextCollectionClaim(2L)));
         var image = new MockMultipartFile(
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
@@ -202,7 +206,9 @@ class DiaryContextServiceTest {
 
         assertThat(response.contexts()).singleElement()
                 .matches(result -> result.success());
-        verify(persistenceService).completeContextCollection(1L, 10L);
+        verify(persistenceService).completeContextCollection(1L, 10L, 2L);
+        verify(persistenceService).saveSuccess(eq(1L), eq(10L), eq(2L),
+                eq(DiaryContextType.PHOTO), any());
     }
 
     @Test
@@ -214,8 +220,26 @@ class DiaryContextServiceTest {
                 new DiaryContextCreateRequest(null, null), List.of()))
                 .isInstanceOf(OutOfMemoryError.class);
 
-        verify(persistenceService).failContextCollection(1L, 10L);
-        verify(persistenceService, never()).completeContextCollection(any(), any());
+        verify(persistenceService).failContextCollection(1L, 10L, LEASE_VERSION);
+        verify(persistenceService, never()).completeContextCollection(any(), any(), anyLong());
+    }
+
+    @Test
+    void discardsResultWhenLeaseIsLostMidCollection() throws Exception {
+        given(persistenceService.saveSuccess(any(), any(), anyLong(), any(), any()))
+                .willReturn(Optional.empty());
+        var image = new MockMultipartFile(
+                "images", "day.jpg", "image/jpeg",
+                imageBytes(true));
+        var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
+        given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
+
+        var response = service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null, null), List.of(image));
+
+        assertThat(response.contexts()).isEmpty();
+        verify(snapshotPersistenceService, never()).cleanupCollected(any(), any(), any());
+        verify(persistenceService).completeContextCollection(1L, 10L, LEASE_VERSION);
     }
 
     @Test
@@ -234,8 +258,8 @@ class DiaryContextServiceTest {
 
         assertThat(response.contexts()).singleElement()
                 .matches(result -> result.success());
-        verify(persistenceService, never()).saveFailure(any(), any(), any());
-        verify(persistenceService).completeContextCollection(1L, 10L);
+        verify(persistenceService, never()).saveFailure(any(), any(), anyLong(), any());
+        verify(persistenceService).completeContextCollection(1L, 10L, LEASE_VERSION);
     }
 
     @Test
@@ -251,7 +275,8 @@ class DiaryContextServiceTest {
         service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of());
 
-        verify(persistenceService).saveSuccess(1L, 10L, DiaryContextType.SPOTIFY, freshData);
+        verify(persistenceService).saveSuccess(
+                1L, 10L, LEASE_VERSION, DiaryContextType.SPOTIFY, freshData);
         verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
     }
@@ -287,7 +312,8 @@ class DiaryContextServiceTest {
 
         ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
         verify(persistenceService).saveSuccess(
-                eq(1L), eq(10L), eq(DiaryContextType.SPOTIFY), captor.capture());
+                eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY),
+                captor.capture());
         JsonNode saved = captor.getValue();
         assertThat(saved.path("items").size()).isEqualTo(2);
         assertThat(saved.path("items").get(0).path("track").path("name").asText())
@@ -334,7 +360,8 @@ class DiaryContextServiceTest {
 
         ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
         verify(persistenceService).saveSuccess(
-                eq(1L), eq(10L), eq(DiaryContextType.SPOTIFY), captor.capture());
+                eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY),
+                captor.capture());
         JsonNode saved = captor.getValue();
         assertThat(saved.path("items").size()).isEqualTo(1);
         assertThat(saved.path("items").get(0).path("track").path("name").asText())
@@ -362,7 +389,8 @@ class DiaryContextServiceTest {
 
         assertThat(response.contexts()).singleElement()
                 .matches(result -> !result.success());
-        verify(persistenceService).saveFailure(1L, 10L, DiaryContextType.SPOTIFY);
+        verify(persistenceService).saveFailure(
+                1L, 10L, LEASE_VERSION, DiaryContextType.SPOTIFY);
         verify(snapshotPersistenceService, never()).cleanupCollected(
                 any(), any(), eq(DiaryContextType.SPOTIFY));
     }
@@ -389,9 +417,10 @@ class DiaryContextServiceTest {
         service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of());
 
-        verify(persistenceService).saveSuccess(1L, 10L, DiaryContextType.SPOTIFY, preloadData);
+        verify(persistenceService).saveSuccess(
+                1L, 10L, LEASE_VERSION, DiaryContextType.SPOTIFY, preloadData);
         verify(persistenceService, never())
-                .saveFailure(any(), any(), eq(DiaryContextType.SPOTIFY));
+                .saveFailure(any(), any(), anyLong(), eq(DiaryContextType.SPOTIFY));
     }
 
     private byte[] imageBytes(boolean jpeg) {

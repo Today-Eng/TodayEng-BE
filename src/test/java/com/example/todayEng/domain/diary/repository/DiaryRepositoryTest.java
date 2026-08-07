@@ -33,6 +33,7 @@ class DiaryRepositoryTest {
         assertThat(reloaded.getContextCollectionStatus())
                 .isEqualTo(DiaryContextCollectionStatus.COLLECTING);
         assertThat(reloaded.getContextCollectionClaimedAt()).isEqualTo(now);
+        assertThat(reloaded.getContextCollectionLeaseVersion()).isEqualTo(1L);
     }
 
     @Test
@@ -66,6 +67,7 @@ class DiaryRepositoryTest {
         assertThat(reloaded.getContextCollectionStatus())
                 .isEqualTo(DiaryContextCollectionStatus.COLLECTING);
         assertThat(reloaded.getContextCollectionClaimedAt()).isEqualTo(now);
+        assertThat(reloaded.getContextCollectionLeaseVersion()).isEqualTo(2L);
     }
 
     @Test
@@ -81,5 +83,98 @@ class DiaryRepositoryTest {
                 diary.getId(), user.getId(), now, now.minusMinutes(10));
 
         assertThat(reclaimed).isEqualTo(0);
+    }
+
+    @Test
+    void finishContextCollectionIfOwnedTransitionsMatchingLease() {
+        User user = userRepository.save(User.create());
+        Diary diary = diaryRepository.saveAndFlush(
+                Diary.create(user, LocalDate.of(2026, 8, 7)));
+        diaryRepository.claimContextCollection(diary.getId(), user.getId(), LocalDateTime.now());
+
+        int finished = diaryRepository.finishContextCollectionIfOwned(
+                diary.getId(), user.getId(), DiaryContextCollectionStatus.COMPLETED, 1L);
+
+        assertThat(finished).isEqualTo(1);
+        assertThat(diaryRepository.findById(diary.getId()).orElseThrow()
+                .getContextCollectionStatus()).isEqualTo(DiaryContextCollectionStatus.COMPLETED);
+    }
+
+    @Test
+    void finishContextCollectionIfOwnedRejectsMismatchedLease() {
+        User user = userRepository.save(User.create());
+        Diary diary = diaryRepository.saveAndFlush(
+                Diary.create(user, LocalDate.of(2026, 8, 7)));
+        diaryRepository.claimContextCollection(diary.getId(), user.getId(), LocalDateTime.now());
+
+        int finished = diaryRepository.finishContextCollectionIfOwned(
+                diary.getId(), user.getId(), DiaryContextCollectionStatus.COMPLETED, 99L);
+
+        assertThat(finished).isEqualTo(0);
+        assertThat(diaryRepository.findById(diary.getId()).orElseThrow()
+                .getContextCollectionStatus()).isEqualTo(DiaryContextCollectionStatus.COLLECTING);
+    }
+
+    @Test
+    void verifyContextCollectionLeaseRejectsStaleLeaseAfterReclaim() {
+        User user = userRepository.save(User.create());
+        Diary diary = diaryRepository.saveAndFlush(
+                Diary.create(user, LocalDate.of(2026, 8, 7)));
+        diaryRepository.claimContextCollection(
+                diary.getId(), user.getId(), LocalDateTime.now().minusMinutes(20));
+        long originalLeaseVersion = diaryRepository.findById(diary.getId())
+                .orElseThrow().getContextCollectionLeaseVersion();
+
+        LocalDateTime now = LocalDateTime.now();
+        int reclaimed = diaryRepository.reclaimStaleContextCollection(
+                diary.getId(), user.getId(), now, now.minusMinutes(10));
+        assertThat(reclaimed).isEqualTo(1);
+
+        int staleVerify = diaryRepository.verifyContextCollectionLease(
+                diary.getId(), user.getId(), LocalDateTime.now(), originalLeaseVersion);
+        assertThat(staleVerify).isEqualTo(0);
+
+        long reclaimerLeaseVersion = diaryRepository.findById(diary.getId())
+                .orElseThrow().getContextCollectionLeaseVersion();
+        int freshVerify = diaryRepository.verifyContextCollectionLease(
+                diary.getId(), user.getId(), LocalDateTime.now(), reclaimerLeaseVersion);
+        assertThat(freshVerify).isEqualTo(1);
+    }
+
+    @Test
+    void overlappingClaimantsOnlyReclaimerWinsFinalCompletion() {
+        User user = userRepository.save(User.create());
+        Diary diary = diaryRepository.saveAndFlush(
+                Diary.create(user, LocalDate.of(2026, 8, 7)));
+
+        // Original claimant claims, then stalls past the timeout.
+        diaryRepository.claimContextCollection(
+                diary.getId(), user.getId(), LocalDateTime.now().minusMinutes(20));
+        long originalLeaseVersion = diaryRepository.findById(diary.getId())
+                .orElseThrow().getContextCollectionLeaseVersion();
+
+        // A second request reclaims the same diary.
+        LocalDateTime now = LocalDateTime.now();
+        int reclaimed = diaryRepository.reclaimStaleContextCollection(
+                diary.getId(), user.getId(), now, now.minusMinutes(10));
+        assertThat(reclaimed).isEqualTo(1);
+        long reclaimerLeaseVersion = diaryRepository.findById(diary.getId())
+                .orElseThrow().getContextCollectionLeaseVersion();
+
+        // The original (now-stale) claimant finally finishes using its old lease.
+        int staleCompletion = diaryRepository.finishContextCollectionIfOwned(
+                diary.getId(), user.getId(),
+                DiaryContextCollectionStatus.COMPLETED, originalLeaseVersion);
+        assertThat(staleCompletion).isEqualTo(0);
+        assertThat(diaryRepository.findById(diary.getId()).orElseThrow()
+                .getContextCollectionStatus()).isEqualTo(DiaryContextCollectionStatus.COLLECTING);
+
+        // The reclaimer finishes using its own lease.
+        int winningCompletion = diaryRepository.finishContextCollectionIfOwned(
+                diary.getId(), user.getId(),
+                DiaryContextCollectionStatus.COMPLETED, reclaimerLeaseVersion);
+        assertThat(winningCompletion).isEqualTo(1);
+        assertThat(diaryRepository.findById(diary.getId()).orElseThrow()
+                .getContextCollectionStatus()).isEqualTo(DiaryContextCollectionStatus.COMPLETED);
     }
 }

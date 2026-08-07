@@ -9,6 +9,7 @@ import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
+import com.example.todayEng.domain.diary.service.DiaryContextPersistenceService.ContextCollectionClaim;
 import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceService;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
@@ -28,6 +29,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,31 +65,32 @@ public class DiaryContextService {
         if (diary.getStatus() != DiaryStatus.IN_PROGRESS) {
             throw new BaseException(ErrorCode.DIARY_ALREADY_COMPLETED);
         }
-        if (!claimContextCollection(diaryId, userId)) {
-            throw new BaseException(resolveClaimFailureReason(userId, diaryId));
-        }
+        long leaseVersion = claimContextCollection(diaryId, userId)
+                .orElseThrow(() -> new BaseException(resolveClaimFailureReason(userId, diaryId)));
 
         boolean completed = false;
         try {
             DiaryContextCreateResponse response = collectContexts(
-                    userId, diaryId, diary, request, images);
-            persistenceService.completeContextCollection(userId, diaryId);
+                    userId, diaryId, leaseVersion, diary, request, images);
+            persistenceService.completeContextCollection(userId, diaryId, leaseVersion);
             completed = true;
             return response;
         } finally {
             if (!completed) {
-                persistenceService.failContextCollection(userId, diaryId);
+                persistenceService.failContextCollection(userId, diaryId, leaseVersion);
             }
         }
     }
 
-    private boolean claimContextCollection(Long diaryId, Long userId) {
+    private Optional<Long> claimContextCollection(Long diaryId, Long userId) {
         LocalDateTime now = LocalDateTime.now(clock);
-        if (persistenceService.claimContextCollection(diaryId, userId, now)) {
-            return true;
+        Optional<ContextCollectionClaim> claim =
+                persistenceService.claimContextCollection(diaryId, userId, now);
+        if (claim.isEmpty()) {
+            claim = persistenceService.reclaimStaleContextCollection(
+                    diaryId, userId, now, now.minus(CLAIM_STALE_AFTER));
         }
-        return persistenceService.reclaimStaleContextCollection(
-                diaryId, userId, now, now.minus(CLAIM_STALE_AFTER));
+        return claim.map(ContextCollectionClaim::leaseVersion);
     }
 
     private ErrorCode resolveClaimFailureReason(Long userId, Long diaryId) {
@@ -102,6 +105,7 @@ public class DiaryContextService {
     private DiaryContextCreateResponse collectContexts(
             Long userId,
             Long diaryId,
+            long leaseVersion,
             Diary diary,
             DiaryContextCreateRequest request,
             List<MultipartFile> images
@@ -111,24 +115,27 @@ public class DiaryContextService {
         List<DiaryContext> contexts = new ArrayList<>();
 
         if (request.memo() != null) {
-            contexts.add(persistenceService.saveMemo(userId, diaryId, request.memo(),
-                    objectMapper.valueToTree(new MemoData(request.memo()))));
+            persistenceService.saveMemo(userId, diaryId, leaseVersion, request.memo(),
+                            objectMapper.valueToTree(new MemoData(request.memo())))
+                    .ifPresent(contexts::add);
         }
         if (!validatedImages.isEmpty()) {
-            contexts.add(collect(userId, diaryId, diary.getDiaryDate(), DiaryContextType.PHOTO,
-                    () -> imageAnalysisClient.analyze(validatedImages)));
+            collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.PHOTO,
+                    () -> imageAnalysisClient.analyze(validatedImages))
+                    .ifPresent(contexts::add);
         }
         if (request.location() != null) {
-            contexts.add(collect(userId, diaryId, diary.getDiaryDate(), DiaryContextType.WEATHER,
+            collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.WEATHER,
                     () -> contextDataClient.fetchWeather(
-                            request.location(), diary.getDiaryDate())));
+                            request.location(), diary.getDiaryDate()))
+                    .ifPresent(contexts::add);
         }
         diaryMemoryService.create(userId, diaryId).ifPresent(contexts::add);
 
         externalAccountRepository.findAllByUser_Id(userId).stream()
                 .filter(ExternalAccount::isUseEnabled)
                 .forEach(account -> collectExternal(
-                        userId, diaryId, diary, account, contexts));
+                        userId, diaryId, leaseVersion, diary, account, contexts));
 
         return new DiaryContextCreateResponse(diary.getId(), contexts.stream()
                 .map(DiaryContextCreateResponse.ContextResult::from).toList());
@@ -137,17 +144,20 @@ public class DiaryContextService {
     private void collectExternal(
             Long userId,
             Long diaryId,
+            long leaseVersion,
             Diary diary,
             ExternalAccount account,
             List<DiaryContext> contexts
     ) {
         if (account.getProvider() == ExternalServiceProvider.GOOGLE_CALENDAR) {
-            contexts.add(collect(userId, diaryId, diary.getDiaryDate(), DiaryContextType.CALENDAR,
+            collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.CALENDAR,
                     () -> contextDataClient.fetchCalendar(
-                            account.getAccessToken(), diary.getDiaryDate())));
+                            account.getAccessToken(), diary.getDiaryDate()))
+                    .ifPresent(contexts::add);
         } else if (account.getProvider() == ExternalServiceProvider.SPOTIFY) {
-            contexts.add(collect(userId, diaryId, diary.getDiaryDate(), DiaryContextType.SPOTIFY,
-                    () -> collectSpotify(userId, diary, account)));
+            collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.SPOTIFY,
+                    () -> collectSpotify(userId, diary, account))
+                    .ifPresent(contexts::add);
         }
     }
 
@@ -205,9 +215,10 @@ public class DiaryContextService {
         return result;
     }
 
-    private DiaryContext collect(
+    private Optional<DiaryContext> collect(
             Long userId,
             Long diaryId,
+            long leaseVersion,
             LocalDate diaryDate,
             DiaryContextType type,
             Supplier<JsonNode> collector
@@ -217,13 +228,14 @@ public class DiaryContextService {
             if (data == null) {
                 throw new IllegalStateException("Context collector returned no data");
             }
-            DiaryContext context = persistenceService.saveSuccess(userId, diaryId, type, data);
-            cleanupSnapshot(userId, diaryDate, type);
+            Optional<DiaryContext> context = persistenceService.saveSuccess(
+                    userId, diaryId, leaseVersion, type, data);
+            context.ifPresent(ignored -> cleanupSnapshot(userId, diaryDate, type));
             return context;
         } catch (RuntimeException exception) {
             log.warn("Diary context collection failed: diaryId={}, type={}, exception={}",
                     diaryId, type, exception.getClass().getSimpleName());
-            return persistenceService.saveFailure(userId, diaryId, type);
+            return persistenceService.saveFailure(userId, diaryId, leaseVersion, type);
         }
     }
 
