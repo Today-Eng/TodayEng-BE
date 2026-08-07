@@ -81,13 +81,12 @@ public class DiaryContextController {
         );
     }
 
-    // part별 Content-Type 지정 없이도 받을 수 있도록 문자열로 받아 직접 역직렬화한다
+    // part별 Content-Type 없이 오는 요청도 받기 위해 객체 바인딩을 쓰지 않는다
     private DiaryContextCreateRequest parseRequest(String request) {
         if (request == null || request.isBlank()) {
             return emptyRequest();
         }
         try {
-            // JSON 리터럴 null은 readValue가 null을 돌려주므로 빈 요청으로 정규화한다
             DiaryContextCreateRequest parsed =
                     objectMapper.readValue(request, DiaryContextCreateRequest.class);
             return parsed == null ? emptyRequest() : parsed;
