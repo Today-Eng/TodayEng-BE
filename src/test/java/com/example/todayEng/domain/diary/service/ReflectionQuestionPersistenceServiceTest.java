@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionLlmResponse;
 import com.example.todayEng.domain.diary.entity.Diary;
@@ -78,6 +80,7 @@ class ReflectionQuestionPersistenceServiceTest {
     void preparesSnapshotAfterAtomicClaim() {
         InterestTag tag = InterestTag.create(InterestTagName.MUSIC);
         UserInterest interest = UserInterest.create(user, tag);
+        ReflectionTestUtils.setField(diary, "questionGenerationLeaseVersion", 7L);
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary));
         given(diaryRepository.claimQuestionGeneration(eq(10L), eq(1L), any(LocalDateTime.class)))
@@ -89,6 +92,7 @@ class ReflectionQuestionPersistenceServiceTest {
 
         var result = service.prepare(1L, 10L);
 
+        assertThat(result.leaseVersion()).isEqualTo(7L);
         assertThat(result.englishLevel()).isEqualTo(EnglishLevel.INTERMEDIATE);
         assertThat(result.interests()).containsExactly("MUSIC");
         assertThat(result.contexts()).hasSize(1);
@@ -142,6 +146,7 @@ class ReflectionQuestionPersistenceServiceTest {
         var command = new com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand(
                 1L,
                 10L,
+                1L,
                 EnglishLevel.INTERMEDIATE,
                 List.of("MUSIC"),
                 List.of(new com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand.ContextInput(
@@ -155,6 +160,9 @@ class ReflectionQuestionPersistenceServiceTest {
                 question(1, 100L),
                 question(2, 100L)
         ));
+        given(diaryRepository.finishQuestionGenerationIfOwned(
+                10L, 1L, ReflectionQuestionGenerationStatus.COMPLETED, 1L))
+                .willReturn(1);
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary));
         given(contextRepository.findAllByDiaryIdAndIdIn(10L, List.of(100L)))
@@ -180,8 +188,39 @@ class ReflectionQuestionPersistenceServiceTest {
         assertThat(result.questions()).extracting(
                 com.example.todayEng.domain.diary.dto.response.ReflectionSessionResponse.Question::contextId
         ).containsOnly(100L);
-        assertThat(diary.getQuestionGenerationStatus())
-                .isEqualTo(ReflectionQuestionGenerationStatus.COMPLETED);
+        verify(diaryRepository).finishQuestionGenerationIfOwned(
+                10L, 1L, ReflectionQuestionGenerationStatus.COMPLETED, 1L);
+    }
+
+    @Test
+    void rejectsSaveWhenClaimWasReclaimedByAnotherRequest() {
+        var command = new com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand(
+                1L,
+                10L,
+                1L,
+                EnglishLevel.INTERMEDIATE,
+                List.of("MUSIC"),
+                List.of(new com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand.ContextInput(
+                        100L,
+                        DiaryContextType.MEMO,
+                        context.getContextData()
+                ))
+        );
+        var response = new ReflectionQuestionLlmResponse(List.of(
+                question(1, 100L),
+                question(2, 100L),
+                question(3, 100L)
+        ));
+        given(diaryRepository.finishQuestionGenerationIfOwned(
+                10L, 1L, ReflectionQuestionGenerationStatus.COMPLETED, 1L))
+                .willReturn(0);
+
+        assertThatThrownBy(() -> service.saveQuestions(command, response))
+                .isInstanceOf(BaseException.class)
+                .extracting(exception -> ((BaseException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.REFLECTION_QUESTION_CLAIM_LOST);
+
+        verify(questionRepository, never()).saveAllAndFlush(anyList());
     }
 
     @Test
@@ -189,6 +228,7 @@ class ReflectionQuestionPersistenceServiceTest {
         var command = new com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand(
                 1L,
                 10L,
+                1L,
                 EnglishLevel.BEGINNER,
                 List.of(),
                 List.of(new com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand.ContextInput(

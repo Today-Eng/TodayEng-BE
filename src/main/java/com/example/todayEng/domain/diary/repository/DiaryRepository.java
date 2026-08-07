@@ -3,6 +3,7 @@ package com.example.todayEng.domain.diary.repository;
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
+import com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus;
 import com.example.todayEng.domain.user.entity.User;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
@@ -29,7 +30,8 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
     @Query("""
             update Diary d
                set d.questionGenerationStatus = com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus.GENERATING,
-                   d.questionGenerationClaimedAt = :now
+                   d.questionGenerationClaimedAt = :now,
+                   d.questionGenerationLeaseVersion = d.questionGenerationLeaseVersion + 1
              where d.id = :diaryId
                and d.user.id = :userId
                and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.IN_PROGRESS
@@ -47,18 +49,35 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Diary d
-               set d.questionGenerationClaimedAt = :now
+               set d.questionGenerationClaimedAt = :now,
+                   d.questionGenerationLeaseVersion = d.questionGenerationLeaseVersion + 1
              where d.id = :diaryId
                and d.user.id = :userId
                and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.IN_PROGRESS
                and d.questionGenerationStatus = com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus.GENERATING
-               and d.questionGenerationClaimedAt < :staleBefore
+               and (d.questionGenerationClaimedAt is null or d.questionGenerationClaimedAt < :staleBefore)
             """)
     int reclaimStaleQuestionGeneration(
             @Param("diaryId") Long diaryId,
             @Param("userId") Long userId,
             @Param("now") LocalDateTime now,
             @Param("staleBefore") LocalDateTime staleBefore
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Diary d
+               set d.questionGenerationStatus = :targetStatus
+             where d.id = :diaryId
+               and d.user.id = :userId
+               and d.questionGenerationStatus = com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus.GENERATING
+               and d.questionGenerationLeaseVersion = :expectedLeaseVersion
+            """)
+    int finishQuestionGenerationIfOwned(
+            @Param("diaryId") Long diaryId,
+            @Param("userId") Long userId,
+            @Param("targetStatus") ReflectionQuestionGenerationStatus targetStatus,
+            @Param("expectedLeaseVersion") long expectedLeaseVersion
     );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

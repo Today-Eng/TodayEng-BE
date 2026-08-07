@@ -37,7 +37,7 @@ class ReflectionSessionServiceTest {
     @Test
     void callsLlmOnceAndPublishesQuestionsReady() {
         var command = new ReflectionQuestionGenerationCommand(
-                1L, 10L, EnglishLevel.BEGINNER, List.of(), List.of()
+                1L, 10L, 1L, EnglishLevel.BEGINNER, List.of(), List.of()
         );
         var llmResponse = new ReflectionQuestionLlmResponse(List.of());
         var response = new ReflectionSessionResponse(10L, List.of());
@@ -61,7 +61,7 @@ class ReflectionSessionServiceTest {
     @Test
     void marksGenerationFailedWhenLlmFails() {
         var command = new ReflectionQuestionGenerationCommand(
-                1L, 10L, EnglishLevel.BEGINNER, List.of(), List.of()
+                1L, 10L, 1L, EnglishLevel.BEGINNER, List.of(), List.of()
         );
         RuntimeException failure = new RuntimeException("llm failed");
         given(persistenceService.prepare(1L, 10L)).willReturn(command);
@@ -69,13 +69,13 @@ class ReflectionSessionServiceTest {
 
         assertThatThrownBy(() -> service.create(1L, 10L))
                 .isSameAs(failure);
-        verify(persistenceService).markFailed(1L, 10L);
+        verify(persistenceService).markFailed(command);
     }
 
     @Test
     void notificationFailureDoesNotMarkSavedQuestionsFailed() {
         var command = new ReflectionQuestionGenerationCommand(
-                1L, 10L, EnglishLevel.BEGINNER, List.of(), List.of());
+                1L, 10L, 1L, EnglishLevel.BEGINNER, List.of(), List.of());
         var llmResponse = new ReflectionQuestionLlmResponse(List.of());
         var response = new ReflectionSessionResponse(10L, List.of());
         given(persistenceService.prepare(1L, 10L)).willReturn(command);
@@ -86,7 +86,7 @@ class ReflectionSessionServiceTest {
 
         assertThat(service.create(1L, 10L)).isSameAs(response);
 
-        verify(persistenceService, never()).markFailed(1L, 10L);
+        verify(persistenceService, never()).markFailed(command);
         verify(questionTtsService).generateFirstQuestion(1L, response);
     }
 }
