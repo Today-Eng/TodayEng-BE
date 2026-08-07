@@ -302,6 +302,69 @@ class DiaryContextServiceTest {
     }
 
     @Test
+    void mergeSkipsItemsMissingPlayedAtAndPreservesOtherFields() throws Exception {
+        ExternalAccount spotify = mock(ExternalAccount.class);
+        given(spotify.getProvider()).willReturn(ExternalServiceProvider.SPOTIFY);
+        given(spotify.isUseEnabled()).willReturn(true);
+        given(spotify.getAccessToken()).willReturn("token");
+        given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of(spotify));
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode preloadData = objectMapper.readTree("""
+                {"items":[
+                  {"played_at":"2026-07-30T09:00:00.000Z","track":{"name":"Morning Song"}}
+                ]}
+                """);
+        DailyContextSnapshot snapshot = DailyContextSnapshot.start(
+                diary.getUser(), diary.getDiaryDate(), DiaryContextType.SPOTIFY);
+        snapshot.succeed(preloadData);
+        given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
+                1L, diary.getDiaryDate(), DailyContextCollectionStatus.SUCCEEDED))
+                .willReturn(List.of(snapshot));
+
+        JsonNode freshData = objectMapper.readTree("""
+                {"cursors":{"after":"123456"},"limit":50,"items":[
+                  {"played_at":"2026-07-30T09:00:00.000Z","track":{"name":"Morning Song"}},
+                  {"track":{"name":"Untimed Song"}}
+                ]}
+                """);
+        given(dataClient.fetchSpotify("token", diary.getDiaryDate())).willReturn(freshData);
+
+        service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null, null), List.of());
+
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
+        verify(persistenceService).saveSuccess(
+                eq(1L), eq(10L), eq(DiaryContextType.SPOTIFY), captor.capture());
+        JsonNode saved = captor.getValue();
+        assertThat(saved.path("items").size()).isEqualTo(1);
+        assertThat(saved.path("items").get(0).path("track").path("name").asText())
+                .isEqualTo("Morning Song");
+        assertThat(saved.path("cursors").path("after").asText()).isEqualTo("123456");
+        assertThat(saved.path("limit").asInt()).isEqualTo(50);
+    }
+
+    @Test
+    void savesSpotifyFailureWhenFreshFetchFailsWithoutPreload() {
+        ExternalAccount spotify = mock(ExternalAccount.class);
+        given(spotify.getProvider()).willReturn(ExternalServiceProvider.SPOTIFY);
+        given(spotify.isUseEnabled()).willReturn(true);
+        given(spotify.getAccessToken()).willReturn("token");
+        given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of(spotify));
+        given(dataClient.fetchSpotify("token", diary.getDiaryDate()))
+                .willThrow(new RuntimeException("token expired"));
+
+        var response = service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null, null), List.of());
+
+        assertThat(response.contexts()).singleElement()
+                .matches(result -> !result.success());
+        verify(persistenceService).saveFailure(1L, 10L, DiaryContextType.SPOTIFY);
+        verify(snapshotRepository, never()).deleteAllByUserIdAndContextDateAndContextType(
+                any(), any(), eq(DiaryContextType.SPOTIFY));
+    }
+
+    @Test
     void fallsBackToPreloadedSpotifyDataWhenFreshFetchFails() throws Exception {
         ExternalAccount spotify = mock(ExternalAccount.class);
         given(spotify.getProvider()).willReturn(ExternalServiceProvider.SPOTIFY);

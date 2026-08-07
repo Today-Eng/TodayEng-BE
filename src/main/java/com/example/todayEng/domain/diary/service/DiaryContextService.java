@@ -206,6 +206,9 @@ public class DiaryContextService {
                         (JsonNode item) -> item.path("played_at").asText()).reversed())
                 .forEach(merged::add);
         ObjectNode result = objectMapper.createObjectNode();
+        if (fresh.isObject()) {
+            result.setAll((ObjectNode) fresh);
+        }
         result.set("items", merged);
         return result;
     }
