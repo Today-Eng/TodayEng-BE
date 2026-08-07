@@ -10,17 +10,25 @@ import org.junit.jupiter.api.Test;
 class ExternalServiceProviderTest {
 
     @Test
-    void fromSlug_returnsMatchingProvider() {
-        assertThat(ExternalServiceProvider.fromSlug("google-calendar"))
+    void from_slug_returnsMatchingProvider() {
+        assertThat(ExternalServiceProvider.from("google-calendar"))
                 .isEqualTo(ExternalServiceProvider.GOOGLE_CALENDAR);
-        assertThat(ExternalServiceProvider.fromSlug("spotify"))
+        assertThat(ExternalServiceProvider.from("spotify"))
                 .isEqualTo(ExternalServiceProvider.SPOTIFY);
     }
 
     @Test
-    void fromSlug_unsupportedProvider_throws() {
+    void from_enumName_returnsMatchingProvider() {
+        assertThat(ExternalServiceProvider.from("GOOGLE_CALENDAR"))
+                .isEqualTo(ExternalServiceProvider.GOOGLE_CALENDAR);
+        assertThat(ExternalServiceProvider.from("SPOTIFY"))
+                .isEqualTo(ExternalServiceProvider.SPOTIFY);
+    }
+
+    @Test
+    void from_unsupportedProvider_throws() {
         assertThatThrownBy(() ->
-                ExternalServiceProvider.fromSlug("unknown")
+                ExternalServiceProvider.from("unknown")
         )
                 .isInstanceOf(BaseException.class)
                 .extracting(exception ->
@@ -30,9 +38,9 @@ class ExternalServiceProviderTest {
     }
 
     @Test
-    void fromSlug_null_throws() {
+    void from_null_throws() {
         assertThatThrownBy(() ->
-                ExternalServiceProvider.fromSlug(null)
+                ExternalServiceProvider.from(null)
         )
                 .isInstanceOf(BaseException.class)
                 .extracting(exception ->

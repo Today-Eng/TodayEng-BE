@@ -15,9 +15,23 @@ public enum ExternalServiceProvider {
 
     private final String slug;
 
-    public static ExternalServiceProvider fromSlug(String slug) {
+    /*
+     * OAuth 경로에서 쓰는 slug(google-calendar)와
+     * 연동 관리 API에서 쓰는 enum 이름(GOOGLE_CALENDAR)을 모두 허용합니다.
+     */
+    public static ExternalServiceProvider from(String value) {
+        if (value == null || value.isBlank()) {
+            throw new BaseException(
+                    ErrorCode.UNSUPPORTED_OAUTH_PROVIDER
+            );
+        }
+
+        String normalized = value.trim()
+                .replace('_', '-')
+                .toLowerCase();
+
         return Arrays.stream(values())
-                .filter(provider -> provider.slug.equals(slug))
+                .filter(provider -> provider.slug.equals(normalized))
                 .findFirst()
                 .orElseThrow(() -> new BaseException(
                         ErrorCode.UNSUPPORTED_OAUTH_PROVIDER

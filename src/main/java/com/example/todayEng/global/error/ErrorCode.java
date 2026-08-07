@@ -42,7 +42,7 @@ public enum ErrorCode {
     TERMS_NOT_FOUND(HttpStatus.NOT_FOUND, "U007", "존재하지 않는 약관입니다."),
     REQUIRED_TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "U005", "필수 약관에 동의해야 합니다."),
     INTEREST_TAG_NOT_FOUND(HttpStatus.NOT_FOUND, "U006", "존재하지 않는 관심사 태그입니다."),
-    EXTERNAL_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "U004", "연동된 외부 계정을 찾을 수 없습니다."),
+    EXTERNAL_ACCOUNT_NOT_CONNECTED(HttpStatus.NOT_FOUND, "U004", "연동되지 않은 외부 서비스입니다."),
 
 
     // External Service / S3 / API (E)
