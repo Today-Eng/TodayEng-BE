@@ -21,6 +21,7 @@ public interface UserTermsRepository extends JpaRepository<UserTerms, Long> {
             from UserTerms ut
             where ut.user.id = :userId
               and ut.agree = true
+              and ut.terms.active = true
               and ut.terms.termsType in :requiredTypes
             """)
     long countAgreedRequiredTerms(

@@ -24,37 +24,34 @@ class TermsSeederTest {
     TermsRepository termsRepository;
 
     @Test
-    void synchronizesExistingTermsAndCreatesOnlyMissingTerms() {
-        Terms existing = Terms.create(TermsType.SERVICE_USE, "old content");
-        given(termsRepository.findAll()).willReturn(List.of(existing));
+    void createsNewImmutableVersionsAndDeactivatesPreviousVersions() {
+        Terms previous = Terms.create(TermsType.SERVICE_USE, "previous content", 1);
+        given(termsRepository.findAll()).willReturn(List.of(previous));
 
         new TermsSeeder(termsRepository).seed();
 
-        String expectedContent = TermsSeedCatalog.values().stream()
-                .filter(seed -> seed.type() == TermsType.SERVICE_USE)
-                .findFirst()
-                .orElseThrow()
-                .content();
-        assertThat(existing.getContent()).isEqualTo(expectedContent);
+        assertThat(previous.isActive()).isFalse();
+        assertThat(previous.getContent()).isEqualTo("previous content");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Terms>> captor = ArgumentCaptor.forClass(List.class);
         verify(termsRepository).saveAll(captor.capture());
         assertThat(captor.getValue())
-                .hasSize(TermsType.values().length - 1)
-                .extracting(Terms::getTermsType)
-                .doesNotContain(TermsType.SERVICE_USE);
+                .hasSize(TermsType.values().length)
+                .allMatch(Terms::isActive)
+                .allMatch(terms -> terms.getVersion() == 2);
     }
 
     @Test
-    void doesNotInsertWhenEveryTermsTypeAlreadyExists() {
-        List<Terms> existingTerms = TermsSeedCatalog.values().stream()
-                .map(seed -> Terms.create(seed.type(), seed.content()))
+    void doesNotInsertWhenEveryCurrentVersionAlreadyExists() {
+        List<Terms> currentTerms = TermsSeedCatalog.values().stream()
+                .map(seed -> Terms.create(seed.type(), seed.content(), seed.version()))
                 .toList();
-        given(termsRepository.findAll()).willReturn(existingTerms);
+        given(termsRepository.findAll()).willReturn(currentTerms);
 
         new TermsSeeder(termsRepository).seed();
 
         verify(termsRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
+        assertThat(currentTerms).allMatch(Terms::isActive);
     }
 }

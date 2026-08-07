@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,19 +20,29 @@ public class TermsSeeder {
 
     @Transactional
     public void seed() {
-        Map<TermsType, Terms> savedTerms = new EnumMap<>(TermsType.class);
-        termsRepository.findAll().forEach(terms -> savedTerms.put(terms.getTermsType(), terms));
+        List<Terms> savedTerms = termsRepository.findAll();
+        Map<TermsKey, Terms> byKey = new HashMap<>();
+        savedTerms.forEach(terms -> byKey.put(new TermsKey(terms.getTermsType(), terms.getVersion()), terms));
+
+        TermsSeedCatalog.values().forEach(seed -> savedTerms.stream()
+                .filter(terms -> terms.getTermsType() == seed.type())
+                .filter(terms -> terms.getVersion() != seed.version())
+                .forEach(Terms::deactivate));
 
         List<Terms> missingTerms = TermsSeedCatalog.values().stream()
-                .filter(seed -> !savedTerms.containsKey(seed.type()))
-                .map(seed -> Terms.create(seed.type(), seed.content()))
+                .filter(seed -> !byKey.containsKey(new TermsKey(seed.type(), seed.version())))
+                .map(seed -> Terms.create(seed.type(), seed.content(), seed.version()))
                 .toList();
         if (!missingTerms.isEmpty()) {
             termsRepository.saveAll(missingTerms);
         }
 
         TermsSeedCatalog.values().stream()
-                .filter(seed -> savedTerms.containsKey(seed.type()))
-                .forEach(seed -> savedTerms.get(seed.type()).synchronize(seed.content()));
+                .map(seed -> byKey.get(new TermsKey(seed.type(), seed.version())))
+                .filter(java.util.Objects::nonNull)
+                .forEach(Terms::activate);
+    }
+
+    private record TermsKey(TermsType type, int version) {
     }
 }

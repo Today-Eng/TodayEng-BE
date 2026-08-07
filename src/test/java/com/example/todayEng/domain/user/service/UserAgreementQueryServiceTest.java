@@ -70,12 +70,12 @@ class UserAgreementQueryServiceTest {
         UserTerms agreed = UserTerms.create(user, serviceUse, true);
         UserTerms disagreed = UserTerms.create(user, marketing, false);
 
-        given(termsRepository.findAll()).willReturn(List.of(marketing, calendar, serviceUse));
+        given(termsRepository.findAllByActiveTrue()).willReturn(List.of(marketing, calendar, serviceUse));
         given(userTermsRepository.findAllByUserId(USER_ID)).willReturn(List.of(agreed, disagreed));
 
         var response = userService.getAgreements(USER_ID);
 
-        assertThat(response.allRequiredAgreed()).isTrue();
+        assertThat(response.allRequiredAgreed()).isFalse();
         assertThat(response.agreements()).extracting("termId")
                 .containsExactly(10L, 20L, 30L);
         assertThat(response.agreements()).extracting("agreementStatus")
@@ -95,7 +95,7 @@ class UserAgreementQueryServiceTest {
         Terms privacy = term(20L, TermsType.PRIVACY_COLLECTION, "개인정보 약관 내용");
         UserTerms agreed = UserTerms.create(user, serviceUse, true);
 
-        given(termsRepository.findAll()).willReturn(List.of(serviceUse, privacy));
+        given(termsRepository.findAllByActiveTrue()).willReturn(List.of(serviceUse, privacy));
         given(userTermsRepository.findAllByUserId(USER_ID)).willReturn(List.of(agreed));
 
         var response = userService.getAgreements(USER_ID);

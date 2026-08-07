@@ -35,7 +35,7 @@ public class UserService {
         Set<Long> ids = new HashSet<>();
         for (AgreementItem item : request.agreements()) {
             if (!ids.add(item.termId())) throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
-            Terms terms = termsRepository.findById(item.termId())
+            Terms terms = termsRepository.findByIdAndActiveTrue(item.termId())
                     .orElseThrow(() -> new BaseException(ErrorCode.TERMS_NOT_FOUND));
             if (terms.isRequired() && !item.agree()) throw new BaseException(ErrorCode.REQUIRED_TERMS_NOT_AGREED);
             UserTerms agreement = userTermsRepository.findByUserIdAndTermsId(userId, item.termId())
@@ -55,14 +55,18 @@ public class UserService {
                         Function.identity()
                 ));
 
-        List<AgreementResponse> agreements = termsRepository.findAll()
+        List<AgreementResponse> agreements = termsRepository.findAllByActiveTrue()
                 .stream()
                 .sorted(Comparator.comparingInt(Terms::getDisplayOrder))
                 .map(terms -> agreementResponse(terms, agreementByTermId.get(terms.getId())))
                 .toList();
 
-        boolean allRequiredAgreed = agreements.stream()
+        List<AgreementResponse> requiredAgreements = agreements.stream()
                 .filter(AgreementResponse::required)
+                .toList();
+        long requiredTypeCount = Arrays.stream(TermsType.values()).filter(TermsType::isRequired).count();
+        boolean allRequiredAgreed = requiredAgreements.size() == requiredTypeCount
+                && requiredAgreements.stream()
                 .allMatch(agreement -> agreement.agreementStatus() == AgreementStatus.AGREED);
 
         return new AgreementsResponse(allRequiredAgreed, agreements);
