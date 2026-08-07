@@ -9,10 +9,12 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
 import javax.imageio.ImageIO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+@Slf4j
 @Component
 public class ImageUploadValidator {
 
@@ -25,7 +27,7 @@ public class ImageUploadValidator {
             return List.of();
         }
         if (images.size() > MAX_IMAGE_COUNT) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+            throw new BaseException(ErrorCode.TOO_MANY_DIARY_IMAGES);
         }
 
         long totalSize = 0;
@@ -58,6 +60,8 @@ public class ImageUploadValidator {
                 throw new BaseException(ErrorCode.INVALID_FILE_EXTENSION);
             }
         } catch (IOException exception) {
+            log.warn("Image part read failed: name={}, size={}", image.getName(), image.getSize(),
+                    exception);
             throw new BaseException(ErrorCode.MULTIPART_FILE_ERROR);
         }
     }
@@ -77,7 +81,8 @@ public class ImageUploadValidator {
 
     private boolean hasMatchingSignature(String mediaType, byte[] bytes) {
         return switch (mediaType) {
-            case "image/jpeg" -> isJpeg(bytes);
+            // 일부 클라이언트가 비표준 image/jpg를 보내므로 함께 허용한다
+            case "image/jpeg", "image/jpg" -> isJpeg(bytes);
             case "image/png" -> isPng(bytes);
             case "image/webp" -> isWebp(bytes);
             default -> false;

@@ -38,7 +38,7 @@ class ImageUploadValidatorTest {
 
         assertError(
                 () -> validator.validate(List.of(image, image, image)),
-                ErrorCode.INVALID_INPUT_VALUE
+                ErrorCode.TOO_MANY_DIARY_IMAGES
         );
     }
 
