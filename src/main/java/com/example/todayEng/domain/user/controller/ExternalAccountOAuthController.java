@@ -37,7 +37,7 @@ public class ExternalAccountOAuthController {
         return ApiResponse.success(
                 externalAccountOAuthService.createAuthorizationUrl(
                         userId,
-                        ExternalServiceProvider.fromSlug(provider)
+                        ExternalServiceProvider.from(provider)
                 )
         );
     }
@@ -58,7 +58,7 @@ public class ExternalAccountOAuthController {
             @RequestParam(required = false) String error
     ) {
         externalAccountOAuthService.connectExternalAccount(
-                ExternalServiceProvider.fromSlug(provider),
+                ExternalServiceProvider.from(provider),
                 code,
                 state,
                 error
