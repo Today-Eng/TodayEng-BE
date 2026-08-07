@@ -54,6 +54,9 @@ public class Diary extends BaseTimeEntity {
     @ColumnDefault("'NOT_STARTED'")
     private ReflectionQuestionGenerationStatus questionGenerationStatus;
 
+    @Column(name = "question_generation_claimed_at")
+    private LocalDateTime questionGenerationClaimedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "context_collection_status", nullable = false, length = 20)
     @ColumnDefault("'NOT_STARTED'")

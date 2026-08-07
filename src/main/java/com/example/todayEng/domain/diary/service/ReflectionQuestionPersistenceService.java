@@ -17,6 +17,9 @@ import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -31,11 +34,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReflectionQuestionPersistenceService {
 
+    private static final Duration CLAIM_STALE_AFTER = Duration.ofMinutes(10);
+
     private final DiaryRepository diaryRepository;
     private final DiaryContextRepository contextRepository;
     private final DiaryQuestionRepository questionRepository;
     private final UserInterestRepository userInterestRepository;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Transactional
     public ReflectionQuestionGenerationCommand prepare(
@@ -49,7 +55,7 @@ public class ReflectionQuestionPersistenceService {
             throw new BaseException(ErrorCode.DIARY_NOT_IN_PROGRESS);
         }
 
-        if (diaryRepository.claimQuestionGeneration(diaryId, userId) != 1) {
+        if (!claimQuestionGeneration(diaryId, userId)) {
             throw new BaseException(
                     ErrorCode.REFLECTION_QUESTIONS_ALREADY_GENERATED
             );
@@ -190,6 +196,16 @@ public class ReflectionQuestionPersistenceService {
                         ReflectionQuestionLlmResponse.GeneratedQuestion::order
                 ))
                 .toList();
+    }
+
+    private boolean claimQuestionGeneration(Long diaryId, Long userId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (diaryRepository.claimQuestionGeneration(diaryId, userId, now) == 1) {
+            return true;
+        }
+        // 이전 시도가 GENERATING에서 죽어 고착된 경우, 일정 시간이 지났으면 재시도로 복구
+        return diaryRepository.reclaimStaleQuestionGeneration(
+                diaryId, userId, now, now.minus(CLAIM_STALE_AFTER)) == 1;
     }
 
     private boolean isBlank(String value) {

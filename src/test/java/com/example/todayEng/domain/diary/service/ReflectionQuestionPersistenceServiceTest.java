@@ -2,7 +2,9 @@ package com.example.todayEng.domain.diary.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 
 import com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionLlmResponse;
@@ -23,7 +25,9 @@ import com.example.todayEng.domain.user.repository.UserInterestRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +58,8 @@ class ReflectionQuestionPersistenceServiceTest {
                 contextRepository,
                 questionRepository,
                 userInterestRepository,
-                objectMapper
+                objectMapper,
+                Clock.systemDefaultZone()
         );
         user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
@@ -75,7 +80,7 @@ class ReflectionQuestionPersistenceServiceTest {
         UserInterest interest = UserInterest.create(user, tag);
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary));
-        given(diaryRepository.claimQuestionGeneration(10L, 1L))
+        given(diaryRepository.claimQuestionGeneration(eq(10L), eq(1L), any(LocalDateTime.class)))
                 .willReturn(1);
         given(contextRepository.findAllByDiaryIdAndSuccessTrueOrderById(10L))
                 .willReturn(List.of(context));
@@ -95,7 +100,7 @@ class ReflectionQuestionPersistenceServiceTest {
         InterestTag tag = InterestTag.create(InterestTagName.MUSIC);
         UserInterest interest = UserInterest.create(user, tag);
         given(diaryRepository.findByIdAndUserId(10L, 1L)).willReturn(Optional.of(diary));
-        given(diaryRepository.claimQuestionGeneration(10L, 1L)).willReturn(1);
+        given(diaryRepository.claimQuestionGeneration(eq(10L), eq(1L), any(LocalDateTime.class))).willReturn(1);
         given(contextRepository.findAllByDiaryIdAndSuccessTrueOrderById(10L)).willReturn(List.of());
         given(userInterestRepository.findAllByUserIdOrderByInterestTagId(1L)).willReturn(List.of(interest));
 
@@ -108,7 +113,7 @@ class ReflectionQuestionPersistenceServiceTest {
     @Test
     void rejectsGenerationWhenBothContextAndInterestAreAbsent() {
         given(diaryRepository.findByIdAndUserId(10L, 1L)).willReturn(Optional.of(diary));
-        given(diaryRepository.claimQuestionGeneration(10L, 1L)).willReturn(1);
+        given(diaryRepository.claimQuestionGeneration(eq(10L), eq(1L), any(LocalDateTime.class))).willReturn(1);
         given(contextRepository.findAllByDiaryIdAndSuccessTrueOrderById(10L)).willReturn(List.of());
         given(userInterestRepository.findAllByUserIdOrderByInterestTagId(1L)).willReturn(List.of());
 
@@ -121,7 +126,7 @@ class ReflectionQuestionPersistenceServiceTest {
     void rejectsDuplicateGenerationBeforeLlmCall() {
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary));
-        given(diaryRepository.claimQuestionGeneration(10L, 1L))
+        given(diaryRepository.claimQuestionGeneration(eq(10L), eq(1L), any(LocalDateTime.class)))
                 .willReturn(0);
 
         assertThatThrownBy(() -> service.prepare(1L, 10L))

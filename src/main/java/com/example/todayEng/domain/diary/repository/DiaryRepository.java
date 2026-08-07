@@ -27,7 +27,8 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Diary d
-               set d.questionGenerationStatus = com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus.GENERATING
+               set d.questionGenerationStatus = com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus.GENERATING,
+                   d.questionGenerationClaimedAt = :now
              where d.id = :diaryId
                and d.user.id = :userId
                and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.IN_PROGRESS
@@ -38,7 +39,25 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
             """)
     int claimQuestionGeneration(
             @Param("diaryId") Long diaryId,
-            @Param("userId") Long userId
+            @Param("userId") Long userId,
+            @Param("now") LocalDateTime now
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Diary d
+               set d.questionGenerationClaimedAt = :now
+             where d.id = :diaryId
+               and d.user.id = :userId
+               and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.IN_PROGRESS
+               and d.questionGenerationStatus = com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus.GENERATING
+               and d.questionGenerationClaimedAt < :staleBefore
+            """)
+    int reclaimStaleQuestionGeneration(
+            @Param("diaryId") Long diaryId,
+            @Param("userId") Long userId,
+            @Param("now") LocalDateTime now,
+            @Param("staleBefore") LocalDateTime staleBefore
     );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
