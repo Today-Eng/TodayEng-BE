@@ -95,7 +95,6 @@ public enum ErrorCode {
     INVALID_REFLECTION_QUESTION_COMPOSITION(HttpStatus.CONFLICT, "D030", "회고 질문 구성이 완료 조건을 충족하지 않습니다."),
     INCOMPLETE_REFLECTION_ANSWERS(HttpStatus.CONFLICT, "D031", "모든 회고 답변이 완료되지 않았습니다."),
     REFLECTION_CORRECTION_NOT_FINISHED(HttpStatus.CONFLICT, "D032", "답변 교정 처리가 완료되지 않았습니다."),
-    DIARY_ALREADY_PAUSED(HttpStatus.CONFLICT, "D033", "이미 중단된 회고입니다."),
     INVALID_DIARY_YEAR_MONTH(HttpStatus.BAD_REQUEST, "D034", "조회할 연도 또는 월이 올바르지 않습니다."),
     DIARY_NOT_COMPLETED(HttpStatus.CONFLICT, "D035", "완료된 회고만 메모를 수정할 수 있습니다."),
     DIARY_CONTEXT_ALREADY_GENERATED(HttpStatus.CONFLICT, "D036", "회고 컨텍스트가 이미 생성되었거나 생성 중입니다."),

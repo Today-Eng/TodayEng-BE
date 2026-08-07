@@ -107,10 +107,9 @@ class HomeServiceTest {
     }
 
     @Test
-    void mapsStoredContextsAndPausedDiaryToHomeContract() throws Exception {
+    void mapsStoredContextsAndInProgressDiaryToHomeContract() throws Exception {
         Diary diary = Diary.create(user, TODAY);
         ReflectionTestUtils.setField(diary, "id", 10L);
-        diary.pause(TODAY.atTime(10, 0), TODAY.plusDays(1).atStartOfDay());
         given(diaryRepository.findByUserIdAndDiaryDate(USER_ID, TODAY))
                 .willReturn(Optional.of(diary));
 
