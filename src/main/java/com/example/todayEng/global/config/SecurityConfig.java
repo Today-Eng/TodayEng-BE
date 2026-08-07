@@ -4,6 +4,7 @@ import com.example.todayEng.global.common.ApiResponse;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.security.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -78,6 +79,11 @@ public class SecurityConfig {
                         })
                 )
                 .authorizeHttpRequests(authorize -> {
+                    authorize.dispatcherTypeMatchers(
+                            DispatcherType.ASYNC,
+                            DispatcherType.ERROR
+                    ).permitAll();
+
                     authorize.requestMatchers(
                             "/health",
                             "/files/audio/**",

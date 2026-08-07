@@ -100,11 +100,16 @@ public class DailyContextPreloadService {
             persistenceService.succeed(claim.id(), claim.leaseVersion(), data);
             return new ContextResult(type, ResultStatus.SUCCEEDED);
         } catch (RuntimeException exception) {
-            log.warn("Daily context preload failed: userId={}, date={}, type={}, cause={}",
-                    userId, date, type, ExternalCallLog.describe(exception));
-            persistenceService.fail(claim.id(), claim.leaseVersion());
-            return new ContextResult(type, ResultStatus.FAILED);
-        }
+          log.warn(
+                  "Daily context preload failed: userId={}, date={}, type={}, cause={}",
+                  userId,
+                  date,
+                  type,
+                  ExternalCallLog.describe(exception)
+          );
+          persistenceService.fail(claim.id(), claim.leaseVersion());
+          return new ContextResult(type, ResultStatus.FAILED);
+      }
     }
 
     private SnapshotClaim claimSnapshot(Long userId, LocalDate date, DiaryContextType type) {
