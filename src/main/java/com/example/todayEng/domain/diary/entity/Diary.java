@@ -59,6 +59,9 @@ public class Diary extends BaseTimeEntity {
     @ColumnDefault("'NOT_STARTED'")
     private DiaryContextCollectionStatus contextCollectionStatus;
 
+    @Column(name = "context_collection_claimed_at")
+    private LocalDateTime contextCollectionClaimedAt;
+
     @Column(name = "memo", length = 2000)
     private String memo;
 

@@ -30,7 +30,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import javax.imageio.ImageIO;
@@ -61,17 +64,22 @@ class DiaryContextServiceTest {
 
     @BeforeEach
     void setUp() {
+        Clock clock = Clock.fixed(
+                Instant.parse("2026-07-30T10:00:00Z"),
+                ZoneId.of("Asia/Seoul")
+        );
         service = new DiaryContextService(diaryRepository, persistenceService,
                 accountRepository, dataClient, imageAnalysisClient,
                 new ImageUploadValidator(), diaryMemoryService, snapshotRepository,
-                new ObjectMapper());
+                new ObjectMapper(), clock);
         User user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
         diary = Diary.create(user, LocalDate.of(2026, 7, 30));
         ReflectionTestUtils.setField(diary, "id", 10L);
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary));
-        given(diaryRepository.claimContextCollection(10L, 1L)).willReturn(1);
+        given(diaryRepository.claimContextCollection(eq(10L), eq(1L), any()))
+                .willReturn(1);
         given(diaryMemoryService.create(1L, 10L))
                 .willReturn(Optional.empty());
         given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of());
@@ -142,7 +150,10 @@ class DiaryContextServiceTest {
 
     @Test
     void rejectsDuplicateContextGenerationBeforeCollecting() {
-        given(diaryRepository.claimContextCollection(10L, 1L)).willReturn(0);
+        given(diaryRepository.claimContextCollection(eq(10L), eq(1L), any()))
+                .willReturn(0);
+        given(diaryRepository.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
+                .willReturn(0);
 
         assertThatThrownBy(() -> service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of()))
@@ -163,13 +174,49 @@ class DiaryContextServiceTest {
         given(diaryRepository.findByIdAndUserId(10L, 1L))
                 .willReturn(Optional.of(diary))
                 .willReturn(Optional.of(completedDiary));
-        given(diaryRepository.claimContextCollection(10L, 1L)).willReturn(0);
+        given(diaryRepository.claimContextCollection(eq(10L), eq(1L), any()))
+                .willReturn(0);
+        given(diaryRepository.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
+                .willReturn(0);
 
         assertThatThrownBy(() -> service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of()))
                 .isInstanceOf(BaseException.class)
                 .extracting(exception -> ((BaseException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.DIARY_ALREADY_COMPLETED);
+    }
+
+    @Test
+    void reclaimsStaleCollectingClaimAfterCrashAndProceeds() throws Exception {
+        given(diaryRepository.claimContextCollection(eq(10L), eq(1L), any()))
+                .willReturn(0);
+        given(diaryRepository.reclaimStaleContextCollection(eq(10L), eq(1L), any(), any()))
+                .willReturn(1);
+        var image = new MockMultipartFile(
+                "images", "day.jpg", "image/jpeg",
+                imageBytes(true));
+        var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
+        given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
+
+        var response = service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null, null), List.of(image));
+
+        assertThat(response.contexts()).singleElement()
+                .matches(result -> result.success());
+        verify(persistenceService).completeContextCollection(1L, 10L);
+    }
+
+    @Test
+    void failsClaimedCollectionWhenAnUnrecoverableErrorEscapes() {
+        given(diaryMemoryService.create(1L, 10L))
+                .willThrow(new OutOfMemoryError("simulated"));
+
+        assertThatThrownBy(() -> service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null, null), List.of()))
+                .isInstanceOf(OutOfMemoryError.class);
+
+        verify(persistenceService).failContextCollection(1L, 10L);
+        verify(persistenceService, never()).completeContextCollection(any(), any());
     }
 
     @Test

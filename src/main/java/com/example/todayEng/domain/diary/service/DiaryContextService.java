@@ -21,7 +21,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -38,6 +41,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class DiaryContextService {
 
+    private static final Duration CLAIM_STALE_AFTER = Duration.ofMinutes(10);
+
     private final DiaryRepository diaryRepository;
     private final DiaryContextPersistenceService persistenceService;
     private final ExternalAccountRepository externalAccountRepository;
@@ -47,6 +52,7 @@ public class DiaryContextService {
     private final DiaryMemoryService diaryMemoryService;
     private final DailyContextSnapshotRepository snapshotRepository;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     public DiaryContextCreateResponse createContexts(
             Long userId,
@@ -59,19 +65,31 @@ public class DiaryContextService {
         if (diary.getStatus() != DiaryStatus.IN_PROGRESS) {
             throw new BaseException(ErrorCode.DIARY_ALREADY_COMPLETED);
         }
-        if (diaryRepository.claimContextCollection(diaryId, userId) != 1) {
+        if (!claimContextCollection(diaryId, userId)) {
             throw new BaseException(resolveClaimFailureReason(userId, diaryId));
         }
 
+        boolean completed = false;
         try {
             DiaryContextCreateResponse response = collectContexts(
                     userId, diaryId, diary, request, images);
             persistenceService.completeContextCollection(userId, diaryId);
+            completed = true;
             return response;
-        } catch (RuntimeException exception) {
-            persistenceService.failContextCollection(userId, diaryId);
-            throw exception;
+        } finally {
+            if (!completed) {
+                persistenceService.failContextCollection(userId, diaryId);
+            }
         }
+    }
+
+    private boolean claimContextCollection(Long diaryId, Long userId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (diaryRepository.claimContextCollection(diaryId, userId, now) == 1) {
+            return true;
+        }
+        return diaryRepository.reclaimStaleContextCollection(
+                diaryId, userId, now, now.minus(CLAIM_STALE_AFTER)) == 1;
     }
 
     private ErrorCode resolveClaimFailureReason(Long userId, Long diaryId) {

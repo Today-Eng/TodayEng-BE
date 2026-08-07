@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,7 +44,8 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Diary d
-               set d.contextCollectionStatus = com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus.COLLECTING
+               set d.contextCollectionStatus = com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus.COLLECTING,
+                   d.contextCollectionClaimedAt = :now
              where d.id = :diaryId
                and d.user.id = :userId
                and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.IN_PROGRESS
@@ -54,7 +56,25 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
             """)
     int claimContextCollection(
             @Param("diaryId") Long diaryId,
-            @Param("userId") Long userId
+            @Param("userId") Long userId,
+            @Param("now") LocalDateTime now
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Diary d
+               set d.contextCollectionClaimedAt = :now
+             where d.id = :diaryId
+               and d.user.id = :userId
+               and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.IN_PROGRESS
+               and d.contextCollectionStatus = com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus.COLLECTING
+               and d.contextCollectionClaimedAt < :staleBefore
+            """)
+    int reclaimStaleContextCollection(
+            @Param("diaryId") Long diaryId,
+            @Param("userId") Long userId,
+            @Param("now") LocalDateTime now,
+            @Param("staleBefore") LocalDateTime staleBefore
     );
 
     Optional<Diary> findByIdAndUserId(Long diaryId, Long userId);
