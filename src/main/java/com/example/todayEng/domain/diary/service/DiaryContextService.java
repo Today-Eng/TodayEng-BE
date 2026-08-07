@@ -42,6 +42,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class DiaryContextService {
 
     private static final Duration CLAIM_STALE_AFTER = Duration.ofMinutes(10);
+    private static final int MAX_MEMO_LENGTH = 200;
 
     private final DiaryRepository diaryRepository;
     private final DiaryContextPersistenceService persistenceService;
@@ -111,6 +112,7 @@ public class DiaryContextService {
             List<MultipartFile> images
     ) {
         List<MultipartFile> validatedImages = imageUploadValidator.validate(images);
+        validateMemo(request.memo());
         validateLocation(request.location());
         List<DiaryContext> contexts = new ArrayList<>();
 
@@ -248,11 +250,17 @@ public class DiaryContextService {
         }
     }
 
+    private void validateMemo(String memo) {
+        if (memo != null && memo.length() > MAX_MEMO_LENGTH) {
+            throw new BaseException(ErrorCode.DIARY_MEMO_TOO_LONG);
+        }
+    }
+
     private void validateLocation(DiaryContextCreateRequest.Location location) {
         if (location != null
                 && (location.latitude() < -90 || location.latitude() > 90
                 || location.longitude() < -180 || location.longitude() > 180)) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+            throw new BaseException(ErrorCode.INVALID_DIARY_LOCATION);
         }
     }
 

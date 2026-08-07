@@ -120,7 +120,7 @@ public class DailyContextPreloadService {
                 || !Double.isFinite(location.longitude())
                 || location.latitude() < -90 || location.latitude() > 90
                 || location.longitude() < -180 || location.longitude() > 180)) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+            throw new BaseException(ErrorCode.INVALID_DIARY_LOCATION);
         }
     }
 }

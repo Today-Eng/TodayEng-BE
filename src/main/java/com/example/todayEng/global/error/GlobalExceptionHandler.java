@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -125,6 +127,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.warn("NoResourceFoundException: {}", ex.getMessage());
         return ResponseEntity.status(status)
                 .body(ApiResponse.error(ErrorCode.NOT_FOUND));
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHttpMediaTypeNotSupported(
+            @NonNull HttpMediaTypeNotSupportedException ex, @NonNull HttpHeaders headers,
+            @NonNull HttpStatusCode status, @NonNull WebRequest request) {
+        log.warn("HttpMediaTypeNotSupportedException: {}", ex.getMessage());
+        return ResponseEntity.status(ErrorCode.UNSUPPORTED_MEDIA_TYPE.getStatus())
+                .body(ApiResponse.error(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            @NonNull MaxUploadSizeExceededException ex, @NonNull HttpHeaders headers,
+            @NonNull HttpStatusCode status, @NonNull WebRequest request) {
+        log.warn("MaxUploadSizeExceededException: {}", ex.getMessage());
+        return ResponseEntity.status(ErrorCode.FILE_SIZE_EXCEEDED.getStatus())
+                .body(ApiResponse.error(ErrorCode.FILE_SIZE_EXCEEDED));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

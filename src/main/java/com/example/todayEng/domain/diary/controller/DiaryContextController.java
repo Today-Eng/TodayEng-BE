@@ -4,8 +4,13 @@ import com.example.todayEng.domain.diary.dto.request.DiaryContextCreateRequest;
 import com.example.todayEng.domain.diary.dto.response.DiaryContextCreateResponse;
 import com.example.todayEng.domain.diary.service.DiaryContextService;
 import com.example.todayEng.global.common.ApiResponse;
+import com.example.todayEng.global.error.ErrorCode;
+import com.example.todayEng.global.error.exception.BaseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
-import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,30 +18,50 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+@Tag(name = "회고 컨텍스트", description = "회고 질문 생성에 사용할 컨텍스트 수집 API")
 @RestController
 @RequestMapping("/api/diaries")
 @RequiredArgsConstructor
 public class DiaryContextController {
 
     private final DiaryContextService diaryContextService;
+    private final ObjectMapper objectMapper;
 
-    @Operation(summary = "회고 질문 생성용 컨텍스트 생성")
+    @Operation(
+            summary = "회고 질문 생성용 컨텍스트 생성",
+            description = "multipart/form-data로 요청합니다. "
+                    + "request part는 memo와 location을 담은 JSON 문자열이며 생략할 수 있습니다. "
+                    + "images part는 jpeg·png·webp만 허용하고 최대 2장, 장당 7MB, 합계 14MB이며 보내지 않아도 됩니다."
+    )
     @PostMapping(value = "/{diaryId}/contexts",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<DiaryContextCreateResponse> createContexts(
-            @AuthenticationPrincipal Long userId,
-            @PathVariable Long diaryId,
-            @Valid @RequestPart("request") DiaryContextCreateRequest request,
-            @RequestPart(value = "images", required = false)
-            List<MultipartFile> images
+            @Parameter(hidden = true) @AuthenticationPrincipal Long userId,
+            @Parameter(description = "회고 ID", example = "1") @PathVariable Long diaryId,
+            @Parameter(description = "memo와 location을 담은 JSON 문자열")
+            @RequestPart(value = "request", required = false) String request,
+            @Parameter(description = "첨부 이미지 (0~2장)")
+            @RequestPart(value = "images", required = false) List<MultipartFile> images
     ) {
         return ApiResponse.success(
-                diaryContextService.createContexts(userId, diaryId, request, images)
+                diaryContextService.createContexts(
+                        userId, diaryId, parseRequest(request), images)
         );
+    }
+
+    // part별 Content-Type 지정 없이도 받을 수 있도록 문자열로 받아 직접 역직렬화한다
+    private DiaryContextCreateRequest parseRequest(String request) {
+        if (request == null || request.isBlank()) {
+            return new DiaryContextCreateRequest(null, null);
+        }
+        try {
+            return objectMapper.readValue(request, DiaryContextCreateRequest.class);
+        } catch (JsonProcessingException exception) {
+            throw new BaseException(ErrorCode.INVALID_HTTP_BODY);
+        }
     }
 }
