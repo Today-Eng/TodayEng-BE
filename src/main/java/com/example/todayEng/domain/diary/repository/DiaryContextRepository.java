@@ -6,6 +6,9 @@ import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface DiaryContextRepository extends JpaRepository<DiaryContext, Long> {
 
@@ -17,5 +20,9 @@ public interface DiaryContextRepository extends JpaRepository<DiaryContext, Long
             Diary diary,
             DiaryContextType contextType
     );
+
+    @Modifying
+    @Query("DELETE FROM DiaryContext c WHERE c.diary.id = :diaryId")
+    void deleteAllByDiaryId(@Param("diaryId") Long diaryId);
 
 }

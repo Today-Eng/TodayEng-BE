@@ -117,6 +117,17 @@ public class Diary extends BaseTimeEntity {
         this.pauseExpiresAt = pauseExpiresAt;
     }
 
+    public void delete() {
+        if (this.status != DiaryStatus.COMPLETED) {
+            throw new IllegalStateException(
+                    "Only a completed diary can be deleted."
+            );
+        }
+
+        this.status = DiaryStatus.DELETED;
+        this.memo = null;
+    }
+
     public void completeQuestionGeneration() {
         this.questionGenerationStatus = ReflectionQuestionGenerationStatus.COMPLETED;
     }
