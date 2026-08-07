@@ -21,14 +21,14 @@ public class DiaryPauseController {
 
     private final DiaryPauseService diaryPauseService;
 
-    @Operation(summary = "회고 중단", description = "현재 진행 상태를 보존하고 회고를 중단합니다. 24시간 동안 재개할 수 있습니다.")
+    @Operation(summary = "회고 중간 종료", description = "현재까지 저장된 내용을 보존하고 답변 개수와 무관하게 회고를 완료합니다. 완료 후에는 재개할 수 없습니다.")
     @PatchMapping("/{diaryId}/pause")
     public ApiResponse<DiaryPauseResponse> pause(
             @Parameter(hidden = true) @AuthenticationPrincipal Long userId,
             @Parameter(description = "회고 ID", example = "1") @PathVariable Long diaryId
     ) {
         return ApiResponse.success(
-                "회고가 중단되었습니다.",
+                "회고가 중간 종료되었습니다.",
                 diaryPauseService.pause(userId, diaryId)
         );
     }

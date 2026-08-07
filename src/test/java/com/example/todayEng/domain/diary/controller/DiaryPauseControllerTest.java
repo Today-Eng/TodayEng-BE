@@ -39,20 +39,20 @@ class DiaryPauseControllerTest {
     @MockBean private JwtTokenProvider jwtTokenProvider;
 
     @Test
-    void authenticatedUserCanPauseDiary() throws Exception {
-        LocalDateTime pausedAt = LocalDateTime.of(2026, 8, 3, 22, 30);
+    void authenticatedUserCanEndDiaryEarly() throws Exception {
+        LocalDateTime completedAt = LocalDateTime.of(2026, 8, 3, 22, 30);
         given(jwtTokenProvider.parse("valid-token", "access"))
                 .willReturn(Jwts.claims().subject("1").build());
         given(diaryPauseService.pause(1L, 10L)).willReturn(new DiaryPauseResponse(
-                10L, DiaryStatus.PAUSED, pausedAt, pausedAt.plusHours(24)));
+                10L, DiaryStatus.COMPLETED, completedAt));
 
         mockMvc.perform(patch("/api/diaries/10/pause")
                         .header("Authorization", "Bearer valid-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.diaryId").value(10))
-                .andExpect(jsonPath("$.data.status").value("PAUSED"))
-                .andExpect(jsonPath("$.data.expiresAt").value("2026-08-04T22:30:00"));
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.completedAt").value("2026-08-03T22:30:00"));
 
         verify(diaryPauseService).pause(1L, 10L);
     }

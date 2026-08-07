@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ConnectionCallback;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+
 @Component
 @RequiredArgsConstructor
 public class ReferenceDataSeeder implements ApplicationRunner {
@@ -23,17 +26,24 @@ public class ReferenceDataSeeder implements ApplicationRunner {
             return;
         }
 
-        Integer acquired = jdbcTemplate.queryForObject(
-                "SELECT GET_LOCK('todayeng_reference_data_seed', 30)", Integer.class);
-        if (!Integer.valueOf(1).equals(acquired)) {
-            throw new IllegalStateException("기준 데이터 시딩 잠금을 획득하지 못했습니다.");
-        }
-        try {
-            seedReferenceData();
-        } finally {
-            jdbcTemplate.queryForObject(
-                    "SELECT RELEASE_LOCK('todayeng_reference_data_seed')", Integer.class);
-        }
+        jdbcTemplate.execute((ConnectionCallback<Void>) connection -> {
+            Integer acquired = queryLockResult(
+                    connection,
+                    "SELECT GET_LOCK('todayeng_reference_data_seed', 30)"
+            );
+            if (!Integer.valueOf(1).equals(acquired)) {
+                throw new IllegalStateException("기준 데이터 시딩 잠금을 획득하지 못했습니다.");
+            }
+            try {
+                seedReferenceData();
+            } finally {
+                queryLockResult(
+                        connection,
+                        "SELECT RELEASE_LOCK('todayeng_reference_data_seed')"
+                );
+            }
+            return null;
+        });
     }
 
     private void seedReferenceData() {
@@ -45,5 +55,12 @@ public class ReferenceDataSeeder implements ApplicationRunner {
     private boolean isMySql() {
         return Boolean.TRUE.equals(jdbcTemplate.execute((ConnectionCallback<Boolean>) connection ->
                 connection.getMetaData().getDatabaseProductName().toLowerCase().contains("mysql")));
+    }
+
+    private Integer queryLockResult(Connection connection, String sql) throws SQLException {
+        try (var statement = connection.createStatement();
+             var resultSet = statement.executeQuery(sql)) {
+            return resultSet.next() ? resultSet.getObject(1, Integer.class) : null;
+        }
     }
 }
