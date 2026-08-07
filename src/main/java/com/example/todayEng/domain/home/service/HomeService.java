@@ -120,7 +120,7 @@ public class HomeService {
                     null,
                     date,
                     date.getDayOfWeek().name(),
-                    "AVAILABLE",
+                    "NOT_STARTED",
                     List.of(),
                     null,
                     null
@@ -250,7 +250,7 @@ public class HomeService {
                     }
                     return "IN_PROGRESS";
                 })
-                .orElse("AVAILABLE");
+                .orElse("NOT_STARTED");
         return new HomeResponse.TodaySummary(
                 today,
                 today.getDayOfWeek().name(),

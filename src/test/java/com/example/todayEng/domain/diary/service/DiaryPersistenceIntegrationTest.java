@@ -14,7 +14,10 @@ import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -50,11 +53,15 @@ class DiaryPersistenceIntegrationTest {
         entityManager.flush();
         entityManager.clear();
 
-        contextPersistenceService.saveMemo(userId, diaryId,
+        diaryRepository.claimContextCollection(diaryId, userId, LocalDateTime.now());
+        long leaseVersion = diaryRepository.findById(diaryId).orElseThrow()
+                .getContextCollectionLeaseVersion();
+
+        contextPersistenceService.saveMemo(userId, diaryId, leaseVersion,
                 String.valueOf('m'), objectMapper.createObjectNode());
-        contextPersistenceService.saveSuccess(userId, diaryId,
+        contextPersistenceService.saveSuccess(userId, diaryId, leaseVersion,
                 DiaryContextType.PHOTO, objectMapper.createObjectNode());
-        contextPersistenceService.saveSuccess(userId, diaryId,
+        contextPersistenceService.saveSuccess(userId, diaryId, leaseVersion,
                 DiaryContextType.WEATHER, objectMapper.createObjectNode());
         entityManager.flush();
         entityManager.clear();
@@ -107,6 +114,11 @@ class DiaryPersistenceIntegrationTest {
         @Bean
         ObjectMapper objectMapper() {
             return new ObjectMapper();
+        }
+
+        @Bean
+        Clock clock() {
+            return Clock.system(ZoneId.of("Asia/Seoul"));
         }
     }
 }

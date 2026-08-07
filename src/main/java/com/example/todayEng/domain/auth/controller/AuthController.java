@@ -25,6 +25,13 @@ public class AuthController {
         return ApiResponse.success(authService.googleLogin(request.idToken()));
     }
 
+    @Operation(summary = "토큰 재발급", description = "유효한 Refresh Token을 검증하고 Access Token과 Refresh Token을 새로 발급합니다.")
+    @SecurityRequirements
+    @PostMapping("/refresh")
+    public ApiResponse<TokenRefreshResponse> refresh(@Valid @RequestBody TokenRefreshRequest request) {
+        return ApiResponse.success(authService.refresh(request.refreshToken()));
+    }
+
     @Operation(summary = "로그아웃", description = "현재 사용자에게 발급된 Refresh Token을 폐기합니다. Access Token 인증이 필요합니다.")
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@AuthenticationPrincipal Long userId,

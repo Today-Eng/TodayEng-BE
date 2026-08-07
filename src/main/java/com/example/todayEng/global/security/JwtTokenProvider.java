@@ -27,15 +27,24 @@ public class JwtTokenProvider {
         this.refreshExpiration = refreshExpiration;
     }
 
-    public IssuedToken issueAccessToken(Long userId) { return issue(userId, "access", accessExpiration); }
-    public IssuedToken issueRefreshToken(Long userId) { return issue(userId, "refresh", refreshExpiration); }
+    public IssuedToken issueAccessToken(Long userId) {
+        return issue(userId, "access", accessExpiration, null);
+    }
 
-    private IssuedToken issue(Long userId, String type, long expirationMillis) {
+    public IssuedToken issueRefreshToken(Long userId, String sessionId) {
+        return issue(userId, "refresh", refreshExpiration, sessionId);
+    }
+
+    private IssuedToken issue(Long userId, String type, long expirationMillis, String sessionId) {
         Instant now = Instant.now();
         Instant expires = now.plusMillis(expirationMillis);
         String jti = UUID.randomUUID().toString();
-        String token = Jwts.builder().subject(userId.toString()).id(jti).claim("type", type)
-                .issuedAt(Date.from(now)).expiration(Date.from(expires)).signWith(key).compact();
+        JwtBuilder builder = Jwts.builder().subject(userId.toString()).id(jti).claim("type", type);
+        if (sessionId != null) {
+            builder.claim("sid", sessionId);
+        }
+        String token = builder.issuedAt(Date.from(now)).expiration(Date.from(expires))
+                .signWith(key).compact();
         return new IssuedToken(token, jti, LocalDateTime.ofInstant(expires, ZoneId.systemDefault()));
     }
 

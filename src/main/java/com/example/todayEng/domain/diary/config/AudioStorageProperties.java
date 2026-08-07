@@ -13,6 +13,10 @@ public record AudioStorageProperties(
                 : directory;
         publicUrlPrefix = publicUrlPrefix == null || publicUrlPrefix.isBlank()
                 ? "/files/audio"
-                : publicUrlPrefix;
+                : publicUrlPrefix.replaceAll("/+$", "");
+        if (publicUrlPrefix.isBlank()) {
+            throw new IllegalArgumentException(
+                    "storage.audio.public-url-prefix must not resolve to the root path");
+        }
     }
 }

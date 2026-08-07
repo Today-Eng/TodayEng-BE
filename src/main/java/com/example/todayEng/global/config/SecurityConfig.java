@@ -83,6 +83,7 @@ public class SecurityConfig {
                             "/files/audio/**",
                             "/api/auth/google",
                             "/api/auth/test",
+                            "/api/auth/refresh",
                             "/v3/api-docs/**",
                             "/swagger-ui/**",
                             "/swagger-ui.html",
