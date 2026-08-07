@@ -101,6 +101,7 @@ public enum ErrorCode {
     DIARY_CONTEXT_ALREADY_GENERATED(HttpStatus.CONFLICT, "D036", "회고 컨텍스트가 이미 생성되었거나 생성 중입니다."),
     DIARY_ALREADY_DELETED(HttpStatus.CONFLICT, "D037", "이미 삭제된 회고입니다."),
     DIARY_DELETE_NOT_ALLOWED(HttpStatus.CONFLICT, "D038", "완료된 회고만 삭제할 수 있습니다."),
+    REFLECTION_QUESTION_CLAIM_LOST(HttpStatus.CONFLICT, "D039", "질문 생성 작업이 다른 요청으로 회수되었습니다."),
 
 
     // Notification (N)

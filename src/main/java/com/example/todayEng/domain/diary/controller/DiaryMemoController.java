@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/diaries")
 @RequiredArgsConstructor
-@Tag(name = "회고 관리", description = "회고 시작, 중단, 완료 및 메모 수정 API")
+@Tag(name = "회고 관리", description = "회고 시작·재개, 완료, 메모 수정 및 삭제 API")
 public class DiaryMemoController {
 
     private final DiaryMemoService diaryMemoService;

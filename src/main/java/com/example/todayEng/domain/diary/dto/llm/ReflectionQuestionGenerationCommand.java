@@ -8,6 +8,7 @@ import java.util.List;
 public record ReflectionQuestionGenerationCommand(
         Long userId,
         Long diaryId,
+        long leaseVersion,
         EnglishLevel englishLevel,
         List<String> interests,
         List<ContextInput> contexts
