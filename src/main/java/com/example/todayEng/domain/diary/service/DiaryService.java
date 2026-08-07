@@ -11,15 +11,15 @@ import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+// 유니크 제약 충돌 후 재조회가 새 스냅샷을 보려면 서비스 레벨 트랜잭션이 없어야 한다.
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class DiaryService {
 
     private static final int DIARY_WRITABLE_PERIOD_DAYS = 7;
@@ -29,7 +29,6 @@ public class DiaryService {
     private final DiaryRepository diaryRepository;
     private final UserRepository userRepository;
 
-    @Transactional
     public DiaryStartResponse startDiary(
             Long userId,
             DiaryStartRequest request
@@ -44,8 +43,10 @@ public class DiaryService {
                         ErrorCode.USER_NOT_FOUND
                 ));
 
-        diaryRepository.findByUserAndDiaryDate(user, diaryDate)
-                .ifPresent(this::throwAlreadyExistingDiaryException);
+        Optional<Diary> existingDiary = diaryRepository.findByUserAndDiaryDate(user, diaryDate);
+        if (existingDiary.isPresent()) {
+            return resumeOrReject(existingDiary.get());
+        }
 
         Diary diary = Diary.create(user, diaryDate);
 
@@ -57,10 +58,12 @@ public class DiaryService {
                 throw exception;
             }
 
-            // 동시 생성 요청으로 (user_id, diary_date) 유니크 제약 충돌 시, 먼저 저장된 회고는 IN_PROGRESS 상태
-            throw new BaseException(
-                    ErrorCode.DIARY_ALREADY_IN_PROGRESS
-            );
+            Diary concurrentlyCreated = diaryRepository.findByUserAndDiaryDate(user, diaryDate)
+                    .orElseThrow(() -> new BaseException(
+                            ErrorCode.DIARY_ALREADY_IN_PROGRESS
+                    ));
+
+            return resumeOrReject(concurrentlyCreated);
         }
     }
 
@@ -95,11 +98,9 @@ public class DiaryService {
         }
     }
 
-    private void throwAlreadyExistingDiaryException(Diary diary) {
+    private DiaryStartResponse resumeOrReject(Diary diary) {
         if (diary.getStatus() == DiaryStatus.IN_PROGRESS) {
-            throw new BaseException(
-                    ErrorCode.DIARY_ALREADY_IN_PROGRESS
-            );
+            return DiaryStartResponse.from(diary, true);
         }
 
         if (diary.getStatus() == DiaryStatus.COMPLETED) {

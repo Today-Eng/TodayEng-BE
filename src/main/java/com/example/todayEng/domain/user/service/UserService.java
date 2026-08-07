@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +43,29 @@ public class UserService {
             agreement.updateAgreement(item.agree());
             userTermsRepository.save(agreement);
         }
+    }
+
+    public AgreementsResponse getAgreements(Long userId) {
+        getUser(userId);
+
+        Map<Long, UserTerms> agreementByTermId = userTermsRepository.findAllByUserId(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        agreement -> agreement.getTerms().getId(),
+                        Function.identity()
+                ));
+
+        List<AgreementResponse> agreements = termsRepository.findAll()
+                .stream()
+                .sorted(Comparator.comparingInt(Terms::getDisplayOrder))
+                .map(terms -> agreementResponse(terms, agreementByTermId.get(terms.getId())))
+                .toList();
+
+        boolean allRequiredAgreed = agreements.stream()
+                .filter(AgreementResponse::required)
+                .allMatch(agreement -> agreement.agreementStatus() == AgreementStatus.AGREED);
+
+        return new AgreementsResponse(allRequiredAgreed, agreements);
     }
 
     @Transactional
@@ -143,5 +168,22 @@ public class UserService {
 
     private List<InterestResponse> interestResponses(List<InterestTag> tags) {
         return tags.stream().map(tag -> new InterestResponse(tag.getId(), tag.getTagName().name())).toList();
+    }
+
+    private AgreementResponse agreementResponse(Terms terms, UserTerms userTerms) {
+        AgreementStatus status = userTerms == null
+                ? AgreementStatus.NOT_ANSWERED
+                : userTerms.isAgree() ? AgreementStatus.AGREED : AgreementStatus.DISAGREED;
+
+        return new AgreementResponse(
+                terms.getId(),
+                terms.getTermsType(),
+                terms.getDisplayName(),
+                terms.getContent(),
+                terms.isRequired(),
+                terms.getDisplayOrder(),
+                status,
+                userTerms == null ? null : userTerms.getAgreedAt()
+        );
     }
 }

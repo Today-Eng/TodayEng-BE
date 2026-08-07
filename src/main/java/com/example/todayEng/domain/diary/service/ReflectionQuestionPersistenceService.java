@@ -7,6 +7,7 @@ import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.DiaryQuestion;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
+import com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus;
 import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
 import com.example.todayEng.domain.diary.repository.DiaryQuestionRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
@@ -17,6 +18,9 @@ import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -24,18 +28,23 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReflectionQuestionPersistenceService {
+
+    private static final Duration CLAIM_STALE_AFTER = Duration.ofMinutes(10);
 
     private final DiaryRepository diaryRepository;
     private final DiaryContextRepository contextRepository;
     private final DiaryQuestionRepository questionRepository;
     private final UserInterestRepository userInterestRepository;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Transactional
     public ReflectionQuestionGenerationCommand prepare(
@@ -49,7 +58,7 @@ public class ReflectionQuestionPersistenceService {
             throw new BaseException(ErrorCode.DIARY_NOT_IN_PROGRESS);
         }
 
-        if (diaryRepository.claimQuestionGeneration(diaryId, userId) != 1) {
+        if (!claimQuestionGeneration(diaryId, userId)) {
             throw new BaseException(
                     ErrorCode.REFLECTION_QUESTIONS_ALREADY_GENERATED
             );
@@ -83,6 +92,7 @@ public class ReflectionQuestionPersistenceService {
         return new ReflectionQuestionGenerationCommand(
                 userId,
                 diaryId,
+                claimedDiary.getQuestionGenerationLeaseVersion(),
                 englishLevel,
                 List.copyOf(interests),
                 contexts.stream()
@@ -102,6 +112,12 @@ public class ReflectionQuestionPersistenceService {
     ) {
         List<ReflectionQuestionLlmResponse.GeneratedQuestion> generated =
                 validateAndSort(command, llmResponse);
+
+        // 클레임이 회수된 뒤 도착한 이전 요청이 질문을 중복 저장하지 않도록 소유권을 먼저 확정한다
+        if (!finishIfOwned(command, ReflectionQuestionGenerationStatus.COMPLETED)) {
+            throw new BaseException(ErrorCode.REFLECTION_QUESTION_CLAIM_LOST);
+        }
+
         Diary diary = diaryRepository
                 .findByIdAndUserId(command.diaryId(), command.userId())
                 .orElseThrow(() -> new BaseException(ErrorCode.ACCESS_DENIED));
@@ -134,7 +150,6 @@ public class ReflectionQuestionPersistenceService {
                 .toList();
 
         List<DiaryQuestion> saved = questionRepository.saveAllAndFlush(questions);
-        diary.completeQuestionGeneration();
 
         return new ReflectionSessionResponse(
                 command.diaryId(),
@@ -146,9 +161,23 @@ public class ReflectionQuestionPersistenceService {
     }
 
     @Transactional
-    public void markFailed(Long userId, Long diaryId) {
-        diaryRepository.findByIdAndUserId(diaryId, userId)
-                .ifPresent(Diary::failQuestionGeneration);
+    public void markFailed(ReflectionQuestionGenerationCommand command) {
+        if (!finishIfOwned(command, ReflectionQuestionGenerationStatus.FAILED)) {
+            log.warn("Question generation lease lost: diaryId={}, expectedLeaseVersion={}",
+                    command.diaryId(), command.leaseVersion());
+        }
+    }
+
+    private boolean finishIfOwned(
+            ReflectionQuestionGenerationCommand command,
+            ReflectionQuestionGenerationStatus targetStatus
+    ) {
+        return diaryRepository.finishQuestionGenerationIfOwned(
+                command.diaryId(),
+                command.userId(),
+                targetStatus,
+                command.leaseVersion()
+        ) == 1;
     }
 
     private List<ReflectionQuestionLlmResponse.GeneratedQuestion> validateAndSort(
@@ -190,6 +219,16 @@ public class ReflectionQuestionPersistenceService {
                         ReflectionQuestionLlmResponse.GeneratedQuestion::order
                 ))
                 .toList();
+    }
+
+    private boolean claimQuestionGeneration(Long diaryId, Long userId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (diaryRepository.claimQuestionGeneration(diaryId, userId, now) == 1) {
+            return true;
+        }
+        // 이전 시도가 GENERATING에서 죽어 고착된 경우, 일정 시간이 지났으면 재시도로 복구
+        return diaryRepository.reclaimStaleQuestionGeneration(
+                diaryId, userId, now, now.minus(CLAIM_STALE_AFTER)) == 1;
     }
 
     private boolean isBlank(String value) {

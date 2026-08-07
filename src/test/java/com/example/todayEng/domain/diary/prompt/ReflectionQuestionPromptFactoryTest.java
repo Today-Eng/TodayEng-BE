@@ -20,6 +20,7 @@ class ReflectionQuestionPromptFactoryTest {
         var command = new ReflectionQuestionGenerationCommand(
                 1L,
                 10L,
+                1L,
                 EnglishLevel.INTERMEDIATE,
                 List.of("MUSIC"),
                 List.of(new ReflectionQuestionGenerationCommand.ContextInput(
@@ -44,7 +45,7 @@ class ReflectionQuestionPromptFactoryTest {
     @Test
     void createsNonInventingInterestFallbackPromptWithoutContext() {
         var command = new ReflectionQuestionGenerationCommand(
-                1L, 10L, EnglishLevel.BEGINNER, List.of("MUSIC", "TRAVEL"), List.of());
+                1L, 10L, 1L, EnglishLevel.BEGINNER, List.of("MUSIC", "TRAVEL"), List.of());
 
         String prompt = promptFactory.create(command);
 

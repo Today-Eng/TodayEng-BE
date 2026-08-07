@@ -25,6 +25,12 @@ public class UserController {
         return ApiResponse.success();
     }
 
+    @Operation(summary = "내 약관 동의 조회", description = "전체 약관 내용과 로그인한 회원의 약관별 동의 상태를 조회합니다.")
+    @GetMapping("/agreements")
+    public ApiResponse<AgreementsResponse> agreements(@AuthenticationPrincipal Long userId) {
+        return ApiResponse.success(userService.getAgreements(userId));
+    }
+
     @Operation(summary = "온보딩 완료", description = "닉네임, 프로필 이미지, 학습 난이도와 관심사를 저장하여 온보딩을 완료합니다.")
     @PostMapping("/onboarding")
     public ApiResponse<OnboardingResponse> onboarding(@AuthenticationPrincipal Long userId,

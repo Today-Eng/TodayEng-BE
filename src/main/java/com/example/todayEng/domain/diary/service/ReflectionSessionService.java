@@ -30,7 +30,7 @@ public class ReflectionSessionService {
                     llmClient.generateQuestions(command);
             response = persistenceService.saveQuestions(command, llmResponse);
         } catch (RuntimeException exception) {
-            persistenceService.markFailed(userId, diaryId);
+            persistenceService.markFailed(command);
             throw exception;
         }
         try {
