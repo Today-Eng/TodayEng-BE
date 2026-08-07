@@ -11,6 +11,7 @@ import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,12 +52,14 @@ class DiaryPauseServiceTest {
     void completedDiaryCanBeEndedAgainIdempotently() {
         Diary diary = Diary.create(user(1L), LocalDate.now());
         diary.complete();
+        LocalDateTime originalCompletedAt = diary.getCompletedAt();
         given(diaryRepository.findByIdForUpdate(10L)).willReturn(Optional.of(diary));
 
         var response = diaryPauseService.pause(1L, 10L);
 
         assertThat(response.status()).isEqualTo(DiaryStatus.COMPLETED);
-        assertThat(response.completedAt()).isEqualTo(diary.getCompletedAt());
+        assertThat(response.completedAt()).isEqualTo(originalCompletedAt);
+        assertThat(diary.getCompletedAt()).isEqualTo(originalCompletedAt);
     }
 
     private User user(Long id) {
