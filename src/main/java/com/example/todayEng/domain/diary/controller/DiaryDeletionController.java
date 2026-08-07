@@ -6,12 +6,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -24,7 +22,6 @@ public class DiaryDeletionController {
 
     @Operation(summary = "회고 삭제", description = "완료된 회고를 삭제합니다. 회고 내용(질문/답변/컨텍스트)은 모두 삭제되며 같은 날짜에 재작성은 불가합니다.")
     @DeleteMapping("/{diaryId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
     public ApiResponse<Void> delete(
             @Parameter(hidden = true) @AuthenticationPrincipal Long userId,
             @Parameter(description = "회고 ID", example = "1") @PathVariable Long diaryId

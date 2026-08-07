@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping("/home")
+@RequestMapping("/api/home")
 @RequiredArgsConstructor
 public class HomeController {
 
