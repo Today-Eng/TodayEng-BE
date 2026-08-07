@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.home.controller;
 
 import com.example.todayEng.domain.home.dto.DailyContextPreloadRequest;
+import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse;
 import com.example.todayEng.domain.home.service.DailyContextPreloadService;
 import com.example.todayEng.global.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,13 +20,17 @@ public class DailyContextPreloadController {
 
     private final DailyContextPreloadService preloadService;
 
-    @Operation(summary = "오늘의 컨텍스트 사전 수집")
+    @Operation(summary = "오늘의 컨텍스트 사전 수집",
+            description = "오늘 날짜의 날씨·캘린더·Spotify 컨텍스트를 미리 수집합니다. "
+                    + "오늘 회고가 이미 시작됐으면 수집하지 않고 skipReason을 반환하며, "
+                    + "개별 수집 실패는 해당 타입의 status로만 표시되고 응답은 200을 유지합니다.")
     @PostMapping("/preload")
-    public ApiResponse<Void> preload(
+    public ApiResponse<DailyContextPreloadResponse> preload(
             @AuthenticationPrincipal Long userId,
             @Valid @RequestBody(required = false) DailyContextPreloadRequest request
     ) {
-        preloadService.preload(userId, request == null ? null : request.location());
-        return ApiResponse.success();
+        return ApiResponse.success(
+                preloadService.preload(userId, request == null ? null : request.location())
+        );
     }
 }

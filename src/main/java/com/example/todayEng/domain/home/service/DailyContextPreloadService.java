@@ -7,12 +7,19 @@ import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
+import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse;
+import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse.ContextResult;
+import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse.ResultStatus;
+import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse.SkipReason;
 import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceService.SnapshotClaim;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,39 +37,48 @@ public class DailyContextPreloadService {
     private final DailyContextSnapshotPersistenceService persistenceService;
     private final Clock clock;
 
-    public void preload(Long userId, Location location) {
+    public DailyContextPreloadResponse preload(Long userId, Location location) {
         LocalDate today = LocalDate.now(clock);
         validateLocation(location);
         if (diaryRepository.findByUserIdAndDiaryDate(userId, today).isPresent()) {
-            return;
+            log.debug("Daily context preload skipped: userId={}, date={}, reason={}",
+                    userId, today, SkipReason.DIARY_ALREADY_STARTED);
+            return DailyContextPreloadResponse.skipped(today, SkipReason.DIARY_ALREADY_STARTED);
         }
-        if (location != null) {
-            collect(userId, today, DiaryContextType.WEATHER,
-                    () -> contextDataClient.fetchWeather(location, today));
-        }
+
+        List<ContextResult> results = new ArrayList<>();
+        results.add(location == null
+                ? new ContextResult(DiaryContextType.WEATHER, ResultStatus.NO_LOCATION)
+                : collect(userId, today, DiaryContextType.WEATHER,
+                        () -> contextDataClient.fetchWeather(location, today)));
 
         externalAccountRepository.findAllByUser_Id(userId).stream()
                 .filter(ExternalAccount::isUseEnabled)
-                .forEach(account -> collectExternal(userId, today, account));
+                .map(account -> collectExternal(userId, today, account))
+                .filter(Objects::nonNull)
+                .forEach(results::add);
+
+        return DailyContextPreloadResponse.collected(today, results);
     }
 
-    private void collectExternal(
+    private ContextResult collectExternal(
             Long userId,
             LocalDate date,
             ExternalAccount account
     ) {
         if (account.getProvider() == ExternalServiceProvider.GOOGLE_CALENDAR) {
-            collect(userId, date, DiaryContextType.CALENDAR,
+            return collect(userId, date, DiaryContextType.CALENDAR,
                     () -> contextDataClient.fetchCalendar(
                             account.getAccessToken(), date));
         } else if (account.getProvider() == ExternalServiceProvider.SPOTIFY) {
-            collect(userId, date, DiaryContextType.SPOTIFY,
+            return collect(userId, date, DiaryContextType.SPOTIFY,
                     () -> contextDataClient.fetchSpotify(
                             account.getAccessToken(), date));
         }
+        return null;
     }
 
-    private void collect(
+    private ContextResult collect(
             Long userId,
             LocalDate date,
             DiaryContextType type,
@@ -70,7 +86,9 @@ public class DailyContextPreloadService {
     ) {
         SnapshotClaim claim = claimSnapshot(userId, date, type);
         if (claim == null) {
-            return;
+            log.debug("Daily context preload skipped: userId={}, date={}, type={}, "
+                    + "reason=ALREADY_IN_PROGRESS", userId, date, type);
+            return new ContextResult(type, ResultStatus.ALREADY_IN_PROGRESS);
         }
 
         try {
@@ -79,10 +97,12 @@ public class DailyContextPreloadService {
                 throw new IllegalStateException("Context collector returned no data");
             }
             persistenceService.succeed(claim.id(), claim.leaseVersion(), data);
+            return new ContextResult(type, ResultStatus.SUCCEEDED);
         } catch (RuntimeException exception) {
-            log.warn("Daily context preload failed: type={}, exception={}",
-                    type, exception.getClass().getSimpleName());
+            log.warn("Daily context preload failed: userId={}, date={}, type={}, exception={}, message={}",
+                    userId, date, type, exception.getClass().getName(), exception.getMessage(), exception);
             persistenceService.fail(claim.id(), claim.leaseVersion());
+            return new ContextResult(type, ResultStatus.FAILED);
         }
     }
 
