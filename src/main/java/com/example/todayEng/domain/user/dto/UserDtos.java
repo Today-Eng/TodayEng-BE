@@ -1,9 +1,11 @@
 package com.example.todayEng.domain.user.dto;
 
 import com.example.todayEng.domain.user.entity.enums.EnglishLevel;
+import com.example.todayEng.domain.user.entity.enums.TermsType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public final class UserDtos {
@@ -13,6 +15,26 @@ public final class UserDtos {
             @Schema(description = "약관 ID", example = "1") @NotNull Long termId,
             @Schema(description = "동의 여부", example = "true") @NotNull Boolean agree) {}
     public record AgreementsRequest(@NotEmpty List<@Valid AgreementItem> agreements) {}
+
+    public enum AgreementStatus {
+        AGREED,
+        DISAGREED,
+        NOT_ANSWERED
+    }
+
+    public record AgreementResponse(
+            Long termId,
+            TermsType termsType,
+            String title,
+            String content,
+            boolean required,
+            int displayOrder,
+            AgreementStatus agreementStatus,
+            LocalDateTime agreedAt) {}
+
+    public record AgreementsResponse(
+            boolean allRequiredAgreed,
+            List<AgreementResponse> agreements) {}
 
     public record OnboardingRequest(
             @Schema(description = "닉네임", example = "현경")
