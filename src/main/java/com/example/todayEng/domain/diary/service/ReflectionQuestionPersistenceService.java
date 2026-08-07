@@ -113,7 +113,7 @@ public class ReflectionQuestionPersistenceService {
         List<ReflectionQuestionLlmResponse.GeneratedQuestion> generated =
                 validateAndSort(command, llmResponse);
 
-        // 클레임이 회수된 뒤 도착한 이전 요청이 질문을 중복 저장하지 않도록 소유권을 먼저 확정한다
+        // 회수된 이전 요청이 질문을 중복 저장하지 않도록 저장 전에 소유권을 확정한다
         if (!finishIfOwned(command, ReflectionQuestionGenerationStatus.COMPLETED)) {
             throw new BaseException(ErrorCode.REFLECTION_QUESTION_CLAIM_LOST);
         }

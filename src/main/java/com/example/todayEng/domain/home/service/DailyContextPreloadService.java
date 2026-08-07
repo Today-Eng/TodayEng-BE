@@ -14,6 +14,7 @@ import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse.SkipReas
 import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceService.SnapshotClaim;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
+import com.example.todayEng.global.log.ExternalCallLog;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -99,8 +100,8 @@ public class DailyContextPreloadService {
             persistenceService.succeed(claim.id(), claim.leaseVersion(), data);
             return new ContextResult(type, ResultStatus.SUCCEEDED);
         } catch (RuntimeException exception) {
-            log.warn("Daily context preload failed: userId={}, date={}, type={}, exception={}, message={}",
-                    userId, date, type, exception.getClass().getName(), exception.getMessage(), exception);
+            log.warn("Daily context preload failed: userId={}, date={}, type={}, cause={}",
+                    userId, date, type, ExternalCallLog.describe(exception));
             persistenceService.fail(claim.id(), claim.leaseVersion());
             return new ContextResult(type, ResultStatus.FAILED);
         }
@@ -120,7 +121,7 @@ public class DailyContextPreloadService {
                 || !Double.isFinite(location.longitude())
                 || location.latitude() < -90 || location.latitude() > 90
                 || location.longitude() < -180 || location.longitude() > 180)) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+            throw new BaseException(ErrorCode.INVALID_DIARY_LOCATION);
         }
     }
 }

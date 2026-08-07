@@ -5,6 +5,8 @@ import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse;
 import com.example.todayEng.domain.home.service.DailyContextPreloadService;
 import com.example.todayEng.global.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "회고 컨텍스트", description = "회고 질문 생성에 사용할 컨텍스트 수집 API")
 @RestController
 @RequestMapping("/api/daily-contexts")
 @RequiredArgsConstructor
@@ -26,7 +29,7 @@ public class DailyContextPreloadController {
                     + "개별 수집 실패는 해당 타입의 status로만 표시되고 응답은 200을 유지합니다.")
     @PostMapping("/preload")
     public ApiResponse<DailyContextPreloadResponse> preload(
-            @AuthenticationPrincipal Long userId,
+            @Parameter(hidden = true) @AuthenticationPrincipal Long userId,
             @Valid @RequestBody(required = false) DailyContextPreloadRequest request
     ) {
         return ApiResponse.success(

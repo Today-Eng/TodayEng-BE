@@ -16,6 +16,7 @@ import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
+import com.example.todayEng.global.log.ExternalCallLog;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -42,6 +43,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class DiaryContextService {
 
     private static final Duration CLAIM_STALE_AFTER = Duration.ofMinutes(10);
+    private static final int MAX_MEMO_LENGTH = 200;
 
     private final DiaryRepository diaryRepository;
     private final DiaryContextPersistenceService persistenceService;
@@ -111,6 +113,7 @@ public class DiaryContextService {
             List<MultipartFile> images
     ) {
         List<MultipartFile> validatedImages = imageUploadValidator.validate(images);
+        validateMemo(request.memo());
         validateLocation(request.location());
         List<DiaryContext> contexts = new ArrayList<>();
 
@@ -171,8 +174,8 @@ public class DiaryContextService {
             if (preload == null) {
                 throw exception;
             }
-            log.warn("Spotify refresh failed, falling back to preloaded context: exception={}",
-                    exception.getClass().getSimpleName());
+            log.warn("Spotify refresh failed, falling back to preloaded context: cause={}",
+                    ExternalCallLog.describe(exception));
             return preload;
         }
         if (fresh == null) {
@@ -233,8 +236,8 @@ public class DiaryContextService {
             context.ifPresent(ignored -> cleanupSnapshot(userId, diaryDate, type));
             return context;
         } catch (RuntimeException exception) {
-            log.warn("Diary context collection failed: diaryId={}, type={}, exception={}",
-                    diaryId, type, exception.getClass().getSimpleName());
+            log.warn("Diary context collection failed: diaryId={}, type={}, cause={}",
+                    diaryId, type, ExternalCallLog.describe(exception));
             return persistenceService.saveFailure(userId, diaryId, leaseVersion, type);
         }
     }
@@ -248,11 +251,19 @@ public class DiaryContextService {
         }
     }
 
+    private void validateMemo(String memo) {
+        if (memo != null && memo.length() > MAX_MEMO_LENGTH) {
+            throw new BaseException(ErrorCode.DIARY_MEMO_TOO_LONG);
+        }
+    }
+
     private void validateLocation(DiaryContextCreateRequest.Location location) {
         if (location != null
-                && (location.latitude() < -90 || location.latitude() > 90
+                && (!Double.isFinite(location.latitude())
+                || !Double.isFinite(location.longitude())
+                || location.latitude() < -90 || location.latitude() > 90
                 || location.longitude() < -180 || location.longitude() > 180)) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+            throw new BaseException(ErrorCode.INVALID_DIARY_LOCATION);
         }
     }
 
