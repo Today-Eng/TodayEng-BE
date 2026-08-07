@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import com.example.todayEng.domain.diary.dto.request.DiaryStartRequest;
 import com.example.todayEng.domain.diary.entity.Diary;
+import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.repository.UserRepository;
@@ -110,18 +111,20 @@ class DiaryServiceTest {
     }
 
     @Test
-    @DisplayName("이미 진행 중인 회고가 있으면 예외가 발생한다")
-    void startDiary_alreadyInProgress_throws() {
+    @DisplayName("이미 진행 중인 회고가 있으면 새로 생성하지 않고 재개한다")
+    void startDiary_alreadyInProgress_resumes() {
         LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
         Diary inProgressDiary = Diary.create(user, today);
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(diaryRepository.findByUserAndDiaryDate(user, today))
                 .willReturn(Optional.of(inProgressDiary));
 
-        assertThatThrownBy(() -> diaryService.startDiary(userId, new DiaryStartRequest(today)))
-                .isInstanceOf(BaseException.class)
-                .extracting(exception -> ((BaseException) exception).getErrorCode())
-                .isEqualTo(ErrorCode.DIARY_ALREADY_IN_PROGRESS);
+        var response = diaryService.startDiary(userId, new DiaryStartRequest(today));
+
+        assertThat(response.resumed()).isTrue();
+        assertThat(response.diaryId()).isEqualTo(inProgressDiary.getId());
+        assertThat(response.diaryDate()).isEqualTo(today);
+        assertThat(response.status()).isEqualTo(DiaryStatus.IN_PROGRESS);
 
         verify(diaryRepository, never()).saveAndFlush(any());
     }
@@ -143,8 +146,26 @@ class DiaryServiceTest {
     }
 
     @Test
-    @DisplayName("동시 생성 요청으로 (user_id, diary_date) 유니크 제약이 깨지면 진행 중 예외로 변환된다")
-    void startDiary_concurrentDuplicate_throwsAlreadyInProgress() {
+    @DisplayName("동시 생성 요청으로 유니크 제약이 깨지면 먼저 저장된 회고를 재개한다")
+    void startDiary_concurrentDuplicate_resumes() {
+        LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
+        Diary concurrentlyCreated = Diary.create(user, today);
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(diaryRepository.findByUserAndDiaryDate(user, today))
+                .willReturn(Optional.empty())
+                .willReturn(Optional.of(concurrentlyCreated));
+        given(diaryRepository.saveAndFlush(any(Diary.class)))
+                .willThrow(uniqueConstraintViolation("uk_diary_user_date"));
+
+        var response = diaryService.startDiary(userId, new DiaryStartRequest(today));
+
+        assertThat(response.resumed()).isTrue();
+        assertThat(response.status()).isEqualTo(DiaryStatus.IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("유니크 제약 충돌 후 재조회가 비면 진행 중 예외로 변환된다")
+    void startDiary_concurrentDuplicateButGone_throwsAlreadyInProgress() {
         LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(diaryRepository.findByUserAndDiaryDate(user, today)).willReturn(Optional.empty());

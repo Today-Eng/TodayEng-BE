@@ -99,6 +99,10 @@ public enum ErrorCode {
     INVALID_DIARY_YEAR_MONTH(HttpStatus.BAD_REQUEST, "D034", "조회할 연도 또는 월이 올바르지 않습니다."),
     DIARY_NOT_COMPLETED(HttpStatus.CONFLICT, "D035", "완료된 회고만 메모를 수정할 수 있습니다."),
     DIARY_CONTEXT_ALREADY_GENERATED(HttpStatus.CONFLICT, "D036", "회고 컨텍스트가 이미 생성되었거나 생성 중입니다."),
+    DIARY_ALREADY_DELETED(HttpStatus.CONFLICT, "D037", "이미 삭제된 회고입니다."),
+    DIARY_DELETE_NOT_ALLOWED(HttpStatus.CONFLICT, "D038", "완료된 회고만 삭제할 수 있습니다."),
+    REFLECTION_QUESTION_CLAIM_LOST(HttpStatus.CONFLICT, "D039", "질문 생성 작업이 다른 요청으로 회수되었습니다."),
+
 
     // Notification (N)
     PUSH_SUBSCRIPTION_REQUIRED(HttpStatus.BAD_REQUEST, "N001", "푸시 구독 정보가 없어 알림을 활성화할 수 없습니다."),

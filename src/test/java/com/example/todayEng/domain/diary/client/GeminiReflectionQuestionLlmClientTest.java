@@ -93,6 +93,7 @@ class GeminiReflectionQuestionLlmClientTest {
         return new ReflectionQuestionGenerationCommand(
                 1L,
                 10L,
+                1L,
                 EnglishLevel.BEGINNER,
                 List.of(),
                 List.of()

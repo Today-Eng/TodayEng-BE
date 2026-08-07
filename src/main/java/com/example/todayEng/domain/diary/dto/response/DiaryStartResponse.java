@@ -24,11 +24,15 @@ public record DiaryStartResponse(
 ) {
 
     public static DiaryStartResponse from(Diary diary) {
+        return from(diary, false);
+    }
+
+    public static DiaryStartResponse from(Diary diary, boolean resumed) {
         return new DiaryStartResponse(
                 diary.getId(),
                 diary.getDiaryDate(),
                 diary.getStatus(),
-                false,
+                resumed,
                 diary.getCreatedAt()
         );
     }

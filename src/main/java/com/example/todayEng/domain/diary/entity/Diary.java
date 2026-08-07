@@ -54,6 +54,13 @@ public class Diary extends BaseTimeEntity {
     @ColumnDefault("'NOT_STARTED'")
     private ReflectionQuestionGenerationStatus questionGenerationStatus;
 
+    @Column(name = "question_generation_claimed_at")
+    private LocalDateTime questionGenerationClaimedAt;
+
+    @Column(name = "question_generation_lease_version", nullable = false)
+    @ColumnDefault("0")
+    private long questionGenerationLeaseVersion;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "context_collection_status", nullable = false, length = 20)
     @ColumnDefault("'NOT_STARTED'")
@@ -87,6 +94,7 @@ public class Diary extends BaseTimeEntity {
         this.diaryDate = diaryDate;
         this.status = DiaryStatus.IN_PROGRESS;
         this.questionGenerationStatus = ReflectionQuestionGenerationStatus.NOT_STARTED;
+        this.questionGenerationLeaseVersion = 0L;
         this.contextCollectionStatus = DiaryContextCollectionStatus.NOT_STARTED;
         this.contextCollectionLeaseVersion = 0L;
     }
@@ -130,6 +138,17 @@ public class Diary extends BaseTimeEntity {
         this.status = DiaryStatus.PAUSED;
         this.pausedAt = pausedAt;
         this.pauseExpiresAt = pauseExpiresAt;
+    }
+
+    public void delete() {
+        if (this.status != DiaryStatus.COMPLETED) {
+            throw new IllegalStateException(
+                    "Only a completed diary can be deleted."
+            );
+        }
+
+        this.status = DiaryStatus.DELETED;
+        this.memo = null;
     }
 
     public void completeQuestionGeneration() {

@@ -72,5 +72,11 @@ public interface DiaryAnswerRepository extends JpaRepository<DiaryAnswer, Long> 
     List<DiaryAnswer> findAllForMemoryAnalysis(
             @Param("diaryIds") List<Long> diaryIds
     );
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM DiaryAnswer a WHERE a.question.diary.id = :diaryId")
+    void deleteAllByDiaryId(@Param("diaryId") Long diaryId);
+
+    @Query("SELECT a.audioKey FROM DiaryAnswer a WHERE a.question.diary.id = :diaryId AND a.audioKey IS NOT NULL")
+    List<String> findAudioKeysByDiaryId(@Param("diaryId") Long diaryId);
 }
 
