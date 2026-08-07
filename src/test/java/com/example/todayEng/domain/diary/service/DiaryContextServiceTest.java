@@ -119,6 +119,8 @@ class DiaryContextServiceTest {
                 .isInstanceOf(BaseException.class)
                 .extracting(exception -> ((BaseException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_DIARY_LOCATION);
+
+        verify(dataClient, never()).fetchWeather(any(), any());
     }
 
     @Test

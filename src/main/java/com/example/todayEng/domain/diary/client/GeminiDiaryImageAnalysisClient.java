@@ -2,6 +2,7 @@ package com.example.todayEng.domain.diary.client;
 
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
+import com.example.todayEng.global.log.ExternalCallLog;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -68,16 +69,19 @@ public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient 
                     .path("candidates").path(0).path("content")
                     .path("parts").path(0).path("text").asText(null);
             if (analysis == null || analysis.isBlank()) {
-                log.warn("Gemini image analysis returned no text: model={}, response={}",
-                        model, response);
+                int candidateCount = response == null
+                        ? 0
+                        : response.path("candidates").size();
+                log.warn("Gemini image analysis returned no text: model={}, hasResponse={}, "
+                        + "candidateCount={}", model, response != null, candidateCount);
                 throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
             }
             return objectMapper.readTree(analysis);
         } catch (BaseException exception) {
             throw exception;
         } catch (IOException | RestClientException exception) {
-            log.warn("Gemini image analysis failed: model={}, imageCount={}, message={}",
-                    model, images.size(), exception.getMessage(), exception);
+            log.warn("Gemini image analysis failed: model={}, imageCount={}, cause={}",
+                    model, images.size(), ExternalCallLog.describe(exception));
             throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }

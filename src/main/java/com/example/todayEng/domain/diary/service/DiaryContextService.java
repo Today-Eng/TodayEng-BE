@@ -16,6 +16,7 @@ import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
+import com.example.todayEng.global.log.ExternalCallLog;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -173,8 +174,8 @@ public class DiaryContextService {
             if (preload == null) {
                 throw exception;
             }
-            log.warn("Spotify refresh failed, falling back to preloaded context: exception={}",
-                    exception.getClass().getSimpleName());
+            log.warn("Spotify refresh failed, falling back to preloaded context: cause={}",
+                    ExternalCallLog.describe(exception));
             return preload;
         }
         if (fresh == null) {
@@ -235,9 +236,8 @@ public class DiaryContextService {
             context.ifPresent(ignored -> cleanupSnapshot(userId, diaryDate, type));
             return context;
         } catch (RuntimeException exception) {
-            log.warn("Diary context collection failed: diaryId={}, type={}, exception={}, message={}",
-                    diaryId, type, exception.getClass().getName(), exception.getMessage(),
-                    exception);
+            log.warn("Diary context collection failed: diaryId={}, type={}, cause={}",
+                    diaryId, type, ExternalCallLog.describe(exception));
             return persistenceService.saveFailure(userId, diaryId, leaseVersion, type);
         }
     }
