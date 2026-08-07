@@ -81,7 +81,8 @@ public class Terms extends BaseTimeEntity {
         return termsType.getDisplayOrder();
     }
 
-    public void updateContent(String content) {
+    public void synchronize(String content) {
+        this.term = termsType.getDisplayName();
         this.content = content;
     }
 }
