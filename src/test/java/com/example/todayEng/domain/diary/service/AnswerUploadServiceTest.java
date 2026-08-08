@@ -32,12 +32,33 @@ class AnswerUploadServiceTest {
         when(answer.getTranscriptionStatus()).thenReturn(TranscriptionStatus.UPLOADED);
         when(validator.validate(file)).thenReturn(valid);
         when(storage.storeAnswer(1L, 2L, valid.bytes())).thenReturn("key");
-        when(persistenceService.createUploaded(3L, 1L, 2L, "key")).thenReturn(answer);
+        when(persistenceService.prepareUploaded(3L, 1L, 2L, "key"))
+                .thenReturn(new AnswerPersistenceService.UploadPreparation(answer, null, null, false));
 
         var response = service.upload(3L, 1L, 2L, file);
 
         assertThat(response.status()).isEqualTo(TranscriptionStatus.UPLOADED);
         verify(asyncService).transcribe(3L, 1L, 2L, 9L);
+    }
+
+    @Test
+    void replacesFailedAnswerAudioAndStartsTranscriptionAgain() {
+        var file = new MockMultipartFile("audio", new byte[]{2});
+        var valid = new AudioUploadValidator.ValidatedAudio(new byte[]{2});
+        DiaryAnswer answer = mock(DiaryAnswer.class);
+        when(answer.getId()).thenReturn(9L);
+        when(answer.getTranscriptionStatus()).thenReturn(TranscriptionStatus.UPLOADED);
+        when(validator.validate(file)).thenReturn(valid);
+        when(storage.storeAnswer(1L, 2L, valid.bytes())).thenReturn("new-key");
+        var preparation = new AnswerPersistenceService.UploadPreparation(
+                answer, "failed-key", "previous STT error", true);
+        when(persistenceService.prepareUploaded(3L, 1L, 2L, "new-key")).thenReturn(preparation);
+
+        var response = service.upload(3L, 1L, 2L, file);
+
+        assertThat(response.answerId()).isEqualTo(9L);
+        verify(asyncService).transcribe(3L, 1L, 2L, 9L);
+        verify(storage).deleteQuietly("failed-key");
     }
 
     @Test
@@ -48,7 +69,8 @@ class AnswerUploadServiceTest {
         when(answer.getId()).thenReturn(9L);
         when(validator.validate(file)).thenReturn(valid);
         when(storage.storeAnswer(1L, 2L, valid.bytes())).thenReturn("key");
-        when(persistenceService.createUploaded(3L, 1L, 2L, "key")).thenReturn(answer);
+        var preparation = new AnswerPersistenceService.UploadPreparation(answer, null, null, false);
+        when(persistenceService.prepareUploaded(3L, 1L, 2L, "key")).thenReturn(preparation);
         doThrow(new TaskRejectedException("queue full"))
                 .when(asyncService).transcribe(3L, 1L, 2L, 9L);
 
@@ -56,7 +78,7 @@ class AnswerUploadServiceTest {
                 .isInstanceOf(TaskRejectedException.class);
 
         var inOrder = inOrder(persistenceService, storage);
-        inOrder.verify(persistenceService).deleteUploaded(9L);
+        inOrder.verify(persistenceService).rollbackUploaded(preparation);
         inOrder.verify(storage).deleteQuietly("key");
     }
 
@@ -70,9 +92,10 @@ class AnswerUploadServiceTest {
         when(answer.getId()).thenReturn(9L);
         when(validator.validate(file)).thenReturn(valid);
         when(storage.storeAnswer(1L, 2L, valid.bytes())).thenReturn("key");
-        when(persistenceService.createUploaded(3L, 1L, 2L, "key")).thenReturn(answer);
+        var preparation = new AnswerPersistenceService.UploadPreparation(answer, null, null, false);
+        when(persistenceService.prepareUploaded(3L, 1L, 2L, "key")).thenReturn(preparation);
         doThrow(submissionFailure).when(asyncService).transcribe(3L, 1L, 2L, 9L);
-        doThrow(cleanupFailure).when(persistenceService).deleteUploaded(9L);
+        doThrow(cleanupFailure).when(persistenceService).rollbackUploaded(preparation);
 
         assertThatThrownBy(() -> service.upload(3L, 1L, 2L, file))
                 .isSameAs(submissionFailure)

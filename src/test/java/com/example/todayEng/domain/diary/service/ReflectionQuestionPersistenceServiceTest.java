@@ -65,6 +65,7 @@ class ReflectionQuestionPersistenceServiceTest {
         );
         user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
+        user.updateProfile("성연", null);
         user.updateEnglishLevel(EnglishLevel.INTERMEDIATE);
         diary = Diary.create(user, LocalDate.now());
         ReflectionTestUtils.setField(diary, "id", 10L);
@@ -93,6 +94,7 @@ class ReflectionQuestionPersistenceServiceTest {
         var result = service.prepare(1L, 10L);
 
         assertThat(result.leaseVersion()).isEqualTo(7L);
+        assertThat(result.nickname()).isEqualTo("성연");
         assertThat(result.englishLevel()).isEqualTo(EnglishLevel.INTERMEDIATE);
         assertThat(result.interests()).containsExactly("MUSIC");
         assertThat(result.contexts()).hasSize(1);
@@ -147,6 +149,7 @@ class ReflectionQuestionPersistenceServiceTest {
                 1L,
                 10L,
                 1L,
+                "성연",
                 EnglishLevel.INTERMEDIATE,
                 List.of("MUSIC"),
                 List.of(new com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand.ContextInput(
@@ -198,6 +201,7 @@ class ReflectionQuestionPersistenceServiceTest {
                 1L,
                 10L,
                 1L,
+                "성연",
                 EnglishLevel.INTERMEDIATE,
                 List.of("MUSIC"),
                 List.of(new com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand.ContextInput(
@@ -229,6 +233,7 @@ class ReflectionQuestionPersistenceServiceTest {
                 1L,
                 10L,
                 1L,
+                "성연",
                 EnglishLevel.BEGINNER,
                 List.of(),
                 List.of(new com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionGenerationCommand.ContextInput(

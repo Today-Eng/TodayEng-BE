@@ -21,6 +21,7 @@ class ReflectionQuestionPromptFactoryTest {
                 1L,
                 10L,
                 1L,
+                "성연",
                 EnglishLevel.INTERMEDIATE,
                 List.of("MUSIC"),
                 List.of(new ReflectionQuestionGenerationCommand.ContextInput(
@@ -37,6 +38,9 @@ class ReflectionQuestionPromptFactoryTest {
                 .contains("Never invent")
                 .contains("exactly one context")
                 .contains("INTERMEDIATE")
+                .contains("성연")
+                .contains("only when it makes the question feel natural")
+                .contains("untrusted reference data")
                 .contains("MUSIC")
                 .contains("Had lunch")
                 .contains("contextId");
@@ -45,7 +49,8 @@ class ReflectionQuestionPromptFactoryTest {
     @Test
     void createsNonInventingInterestFallbackPromptWithoutContext() {
         var command = new ReflectionQuestionGenerationCommand(
-                1L, 10L, 1L, EnglishLevel.BEGINNER, List.of("MUSIC", "TRAVEL"), List.of());
+                1L, 10L, 1L, "성연", EnglishLevel.BEGINNER,
+                List.of("MUSIC", "TRAVEL"), List.of());
 
         String prompt = promptFactory.create(command);
 
@@ -54,5 +59,30 @@ class ReflectionQuestionPromptFactoryTest {
                 .contains("Never claim or imply")
                 .contains("contextId as null")
                 .contains("MUSIC", "TRAVEL", "BEGINNER");
+    }
+
+    @Test
+    void replacesNullNicknameWithEmptyStringInContextPrompt() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, 1L, null, EnglishLevel.INTERMEDIATE, List.of("MUSIC"),
+                List.of(new ReflectionQuestionGenerationCommand.ContextInput(
+                        100L, DiaryContextType.MEMO,
+                        objectMapper.createObjectNode().put("memo", "Had lunch"))));
+
+        String prompt = promptFactory.create(command);
+
+        assertThat(command.nickname()).isEmpty();
+        assertThat(prompt).contains("nickname: \"\"").doesNotContain("nickname: null");
+    }
+
+    @Test
+    void replacesNullNicknameWithEmptyStringInInterestFallbackPrompt() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, 1L, null, EnglishLevel.BEGINNER, List.of("MUSIC"), List.of());
+
+        String prompt = promptFactory.create(command);
+
+        assertThat(command.nickname()).isEmpty();
+        assertThat(prompt).contains("nickname: \"\"").doesNotContain("nickname: null");
     }
 }
