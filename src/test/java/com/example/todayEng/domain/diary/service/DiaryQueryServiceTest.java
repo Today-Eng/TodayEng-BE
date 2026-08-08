@@ -294,6 +294,46 @@ class DiaryQueryServiceTest {
     }
 
     @Test
+    @DisplayName("MAIN 1번이 없으면 다음 MAIN 질문을 대표로 사용한다")
+    void getMonthlyDiaries_fallsBackToNextMainWhenOrderOneMissing() {
+        Diary diary = createCompletedDiary(1L, LocalDate.of(2026, 7, 26));
+
+        DiaryQuestion mainOrderThree = createMainQuestion(
+                12L, diary, 3, "Q3", "질문3", "k3"
+        );
+        DiaryAnswer answerForMainThree = createSucceededAnswer(
+                101L, mainOrderThree, "orig-3", "corr-3", null
+        );
+
+        given(
+                diaryRepository
+                        .findAllByUserIdAndStatusAndDiaryDateBetweenOrderByDiaryDateDesc(
+                                userId,
+                                DiaryStatus.COMPLETED,
+                                LocalDate.of(2026, 7, 1),
+                                LocalDate.of(2026, 7, 31)
+                        )
+        ).willReturn(List.of(diary));
+
+        given(
+                diaryQuestionRepository
+                        .findAllByDiaryIdInAndQuestionTypeOrderByDiaryIdAscQuestionOrderAsc(
+                                List.of(1L),
+                                QuestionType.MAIN
+                        )
+        ).willReturn(List.of(mainOrderThree));
+
+        given(diaryAnswerRepository.findAllByQuestionIdIn(List.of(12L)))
+                .willReturn(List.of(answerForMainThree));
+
+        DiaryMonthlyListResponse response = diaryQueryService.getMonthlyDiaries(userId, 2026, 7);
+
+        assertThat(response.diaries()).hasSize(1);
+        assertThat(response.diaries().get(0).questionText()).isEqualTo("Q3");
+        assertThat(response.diaries().get(0).correctedText()).isEqualTo("corr-3");
+    }
+
+    @Test
     @DisplayName("조회 월이 1에서 12 사이가 아니면 예외가 발생한다")
     void getMonthlyDiaries_invalidMonth_throws() {
         assertThatThrownBy(() ->
@@ -526,6 +566,37 @@ class DiaryQueryServiceTest {
                 .isEqualTo("I studied English today.");
         assertThat(questionAnswer.answer().correctedText())
                 .isEqualTo("I studied English today.");
+    }
+
+    @Test
+    @DisplayName("부분 완료 회고는 생성된 질문을 모두 반환하고 미답변은 answer null로 반환한다")
+    void getDiaryDetail_returnsAllGeneratedQuestionsEvenWhenAnswersAreMissing() {
+        Diary diary = createCompletedDiary(1L, LocalDate.of(2026, 7, 10));
+
+        DiaryQuestion main1 = createMainQuestion(11L, diary, 1, "Q1", "질문1", "k1");
+        DiaryQuestion followUp2 = createFollowUpQuestion(12L, diary, main1, "Q2", "질문2");
+        DiaryQuestion main3 = createMainQuestion(13L, diary, 3, "Q3", "질문3", "k3");
+
+        DiaryAnswer onlyFirstAnswer = DiaryAnswer.create(main1, "orig-1");
+        ReflectionTestUtils.setField(onlyFirstAnswer, "id", 101L);
+
+        given(diaryRepository.findByIdAndUserIdAndStatus(1L, userId, DiaryStatus.COMPLETED))
+                .willReturn(Optional.of(diary));
+        given(diaryQuestionRepository.findAllByDiaryIdInReflectionOrder(1L))
+                .willReturn(List.of(main1, followUp2, main3));
+        given(diaryAnswerRepository.findAllByQuestionIdIn(List.of(11L, 12L, 13L)))
+                .willReturn(List.of(onlyFirstAnswer));
+
+        DiaryDetailResponse response = diaryQueryService.getDiaryDetail(userId, 1L);
+
+        assertThat(response.keywords()).containsExactly("k1", "k3");
+        assertThat(response.qaList()).hasSize(3);
+        assertThat(response.qaList().get(0).answer()).isNotNull();
+        assertThat(response.qaList().get(0).answer().originalText()).isEqualTo("orig-1");
+        assertThat(response.qaList().get(0).answer().correctedText()).isNull();
+        assertThat(response.qaList().get(0).answer().correctionReason()).isNull();
+        assertThat(response.qaList().get(1).answer()).isNull();
+        assertThat(response.qaList().get(2).answer()).isNull();
     }
 
     @Test
