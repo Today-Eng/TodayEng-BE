@@ -298,8 +298,14 @@ class DiaryQueryServiceTest {
     void getMonthlyDiaries_fallsBackToNextMainWhenOrderOneMissing() {
         Diary diary = createCompletedDiary(1L, LocalDate.of(2026, 7, 26));
 
+        DiaryQuestion mainOrderTwo = createMainQuestion(
+                11L, diary, 2, "Q2", "질문2", "k2"
+        );
         DiaryQuestion mainOrderThree = createMainQuestion(
                 12L, diary, 3, "Q3", "질문3", "k3"
+        );
+        DiaryAnswer answerForMainTwo = createSucceededAnswer(
+                100L, mainOrderTwo, "orig-2", "corr-2", null
         );
         DiaryAnswer answerForMainThree = createSucceededAnswer(
                 101L, mainOrderThree, "orig-3", "corr-3", null
@@ -321,16 +327,17 @@ class DiaryQueryServiceTest {
                                 List.of(1L),
                                 QuestionType.MAIN
                         )
-        ).willReturn(List.of(mainOrderThree));
+        ).willReturn(List.of(mainOrderTwo, mainOrderThree));
 
-        given(diaryAnswerRepository.findAllByQuestionIdIn(List.of(12L)))
-                .willReturn(List.of(answerForMainThree));
+        given(diaryAnswerRepository.findAllByQuestionIdIn(List.of(11L)))
+                .willReturn(List.of(answerForMainTwo, answerForMainThree));
 
         DiaryMonthlyListResponse response = diaryQueryService.getMonthlyDiaries(userId, 2026, 7);
 
         assertThat(response.diaries()).hasSize(1);
-        assertThat(response.diaries().get(0).questionText()).isEqualTo("Q3");
-        assertThat(response.diaries().get(0).correctedText()).isEqualTo("corr-3");
+        assertThat(response.diaries().get(0).keywords()).containsExactly("k2", "k3");
+        assertThat(response.diaries().get(0).questionText()).isEqualTo("Q2");
+        assertThat(response.diaries().get(0).correctedText()).isEqualTo("corr-2");
     }
 
     @Test
@@ -591,10 +598,17 @@ class DiaryQueryServiceTest {
 
         assertThat(response.keywords()).containsExactly("k1", "k3");
         assertThat(response.qaList()).hasSize(3);
+        assertThat(response.qaList()).extracting(DiaryDetailResponse.QuestionAnswer::questionId)
+                .containsExactly(11L, 12L, 13L);
+        assertThat(response.qaList()).extracting(DiaryDetailResponse.QuestionAnswer::questionOrder)
+                .containsExactly(1, 2, 3);
+        assertThat(response.qaList()).extracting(DiaryDetailResponse.QuestionAnswer::questionType)
+                .containsExactly(QuestionType.MAIN, QuestionType.FOLLOW_UP, QuestionType.MAIN);
         assertThat(response.qaList().get(0).answer()).isNotNull();
         assertThat(response.qaList().get(0).answer().originalText()).isEqualTo("orig-1");
         assertThat(response.qaList().get(0).answer().correctedText()).isNull();
         assertThat(response.qaList().get(0).answer().correctionReason()).isNull();
+        assertThat(response.qaList().get(0).answer().alternativeExpression()).isNull();
         assertThat(response.qaList().get(1).answer()).isNull();
         assertThat(response.qaList().get(2).answer()).isNull();
     }
