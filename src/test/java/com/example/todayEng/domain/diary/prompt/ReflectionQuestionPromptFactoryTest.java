@@ -60,4 +60,29 @@ class ReflectionQuestionPromptFactoryTest {
                 .contains("contextId as null")
                 .contains("MUSIC", "TRAVEL", "BEGINNER");
     }
+
+    @Test
+    void replacesNullNicknameWithEmptyStringInContextPrompt() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, 1L, null, EnglishLevel.INTERMEDIATE, List.of("MUSIC"),
+                List.of(new ReflectionQuestionGenerationCommand.ContextInput(
+                        100L, DiaryContextType.MEMO,
+                        objectMapper.createObjectNode().put("memo", "Had lunch"))));
+
+        String prompt = promptFactory.create(command);
+
+        assertThat(command.nickname()).isEmpty();
+        assertThat(prompt).contains("nickname: \"\"").doesNotContain("nickname: null");
+    }
+
+    @Test
+    void replacesNullNicknameWithEmptyStringInInterestFallbackPrompt() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, 1L, null, EnglishLevel.BEGINNER, List.of("MUSIC"), List.of());
+
+        String prompt = promptFactory.create(command);
+
+        assertThat(command.nickname()).isEmpty();
+        assertThat(prompt).contains("nickname: \"\"").doesNotContain("nickname: null");
+    }
 }

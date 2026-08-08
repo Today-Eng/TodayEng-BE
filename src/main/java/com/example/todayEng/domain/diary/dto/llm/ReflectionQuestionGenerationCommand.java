@@ -15,6 +15,10 @@ public record ReflectionQuestionGenerationCommand(
         List<ContextInput> contexts
 ) {
 
+    public ReflectionQuestionGenerationCommand {
+        nickname = nickname == null ? "" : nickname;
+    }
+
     public record ContextInput(
             Long contextId,
             DiaryContextType contextType,

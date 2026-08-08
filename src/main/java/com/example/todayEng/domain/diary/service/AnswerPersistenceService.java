@@ -39,13 +39,14 @@ public class AnswerPersistenceService {
                 throw new BaseException(ErrorCode.ANSWER_ALREADY_EXISTS);
             }
             String previousAudioKey = answer.getAudioKey();
+            String previousTranscriptionError = answer.getTranscriptionError();
             answer.retryTranscription(key);
-            return new UploadPreparation(answer, previousAudioKey, true);
+            return new UploadPreparation(answer, previousAudioKey, previousTranscriptionError, true);
         }
         try {
             DiaryAnswer answer = answerRepository.saveAndFlush(DiaryAnswer.createUploaded(
                     ownedQuestion(userId, diaryId, questionId), key));
-            return new UploadPreparation(answer, null, false);
+            return new UploadPreparation(answer, null, null, false);
         } catch (DataIntegrityViolationException exception) {
             throw new BaseException(ErrorCode.ANSWER_ALREADY_EXISTS);
         }
@@ -55,7 +56,8 @@ public class AnswerPersistenceService {
     public void rollbackUploaded(UploadPreparation preparation) {
         if (preparation.retry()) {
             answerRepository.findById(preparation.answer().getId())
-                    .ifPresent(answer -> answer.restoreFailedTranscription(preparation.previousAudioKey()));
+                    .ifPresent(answer -> answer.restoreFailedTranscription(
+                            preparation.previousAudioKey(), preparation.previousTranscriptionError()));
         } else {
             answerRepository.deleteById(preparation.answer().getId());
             answerRepository.flush();
@@ -98,5 +100,10 @@ public class AnswerPersistenceService {
         return safe.substring(0, Math.min(500, safe.length()));
     }
 
-    public record UploadPreparation(DiaryAnswer answer, String previousAudioKey, boolean retry) { }
+    public record UploadPreparation(
+            DiaryAnswer answer,
+            String previousAudioKey,
+            String previousTranscriptionError,
+            boolean retry
+    ) { }
 }

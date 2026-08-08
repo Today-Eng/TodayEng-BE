@@ -33,7 +33,7 @@ class AnswerUploadServiceTest {
         when(validator.validate(file)).thenReturn(valid);
         when(storage.storeAnswer(1L, 2L, valid.bytes())).thenReturn("key");
         when(persistenceService.prepareUploaded(3L, 1L, 2L, "key"))
-                .thenReturn(new AnswerPersistenceService.UploadPreparation(answer, null, false));
+                .thenReturn(new AnswerPersistenceService.UploadPreparation(answer, null, null, false));
 
         var response = service.upload(3L, 1L, 2L, file);
 
@@ -50,7 +50,8 @@ class AnswerUploadServiceTest {
         when(answer.getTranscriptionStatus()).thenReturn(TranscriptionStatus.UPLOADED);
         when(validator.validate(file)).thenReturn(valid);
         when(storage.storeAnswer(1L, 2L, valid.bytes())).thenReturn("new-key");
-        var preparation = new AnswerPersistenceService.UploadPreparation(answer, "failed-key", true);
+        var preparation = new AnswerPersistenceService.UploadPreparation(
+                answer, "failed-key", "previous STT error", true);
         when(persistenceService.prepareUploaded(3L, 1L, 2L, "new-key")).thenReturn(preparation);
 
         var response = service.upload(3L, 1L, 2L, file);
@@ -68,7 +69,7 @@ class AnswerUploadServiceTest {
         when(answer.getId()).thenReturn(9L);
         when(validator.validate(file)).thenReturn(valid);
         when(storage.storeAnswer(1L, 2L, valid.bytes())).thenReturn("key");
-        var preparation = new AnswerPersistenceService.UploadPreparation(answer, null, false);
+        var preparation = new AnswerPersistenceService.UploadPreparation(answer, null, null, false);
         when(persistenceService.prepareUploaded(3L, 1L, 2L, "key")).thenReturn(preparation);
         doThrow(new TaskRejectedException("queue full"))
                 .when(asyncService).transcribe(3L, 1L, 2L, 9L);
@@ -91,7 +92,7 @@ class AnswerUploadServiceTest {
         when(answer.getId()).thenReturn(9L);
         when(validator.validate(file)).thenReturn(valid);
         when(storage.storeAnswer(1L, 2L, valid.bytes())).thenReturn("key");
-        var preparation = new AnswerPersistenceService.UploadPreparation(answer, null, false);
+        var preparation = new AnswerPersistenceService.UploadPreparation(answer, null, null, false);
         when(persistenceService.prepareUploaded(3L, 1L, 2L, "key")).thenReturn(preparation);
         doThrow(submissionFailure).when(asyncService).transcribe(3L, 1L, 2L, 9L);
         doThrow(cleanupFailure).when(persistenceService).rollbackUploaded(preparation);
