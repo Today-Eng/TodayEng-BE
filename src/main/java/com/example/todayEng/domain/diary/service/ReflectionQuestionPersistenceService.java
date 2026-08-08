@@ -93,6 +93,7 @@ public class ReflectionQuestionPersistenceService {
                 userId,
                 diaryId,
                 claimedDiary.getQuestionGenerationLeaseVersion(),
+                claimedDiary.getUser().getNickname(),
                 englishLevel,
                 List.copyOf(interests),
                 contexts.stream()
