@@ -51,7 +51,10 @@ class SpeechTranscriptionAsyncServiceTest {
 
         verify(persistenceService).fail(4L, "failed");
         verify(storage, never()).deleteQuietly("key");
-        verifyNoInteractions(emitterManager);
+        verify(emitterManager).sendProcessingFailed(eq(1L), eq(2L),
+                argThat(payload -> payload.stage().equals("TRANSCRIPTION")
+                        && payload.errorCode().equals("INTERNAL_ERROR")));
+        verify(emitterManager, never()).sendAnswerTranscribed(anyLong(), anyLong(), any());
     }
 
     @Test

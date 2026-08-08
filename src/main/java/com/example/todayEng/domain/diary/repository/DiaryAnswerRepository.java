@@ -5,8 +5,10 @@ import java.util.Optional;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 public interface DiaryAnswerRepository extends JpaRepository<DiaryAnswer, Long> {
 
@@ -34,6 +36,10 @@ public interface DiaryAnswerRepository extends JpaRepository<DiaryAnswer, Long> 
     );
 
     boolean existsByQuestionId(Long questionId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from DiaryAnswer a where a.question.id = :questionId")
+    Optional<DiaryAnswer> findByQuestionIdForUpdate(@Param("questionId") Long questionId);
 
     Optional<DiaryAnswer> findByIdAndQuestionIdAndQuestionDiaryIdAndQuestionDiaryUserId(
             Long answerId, Long questionId, Long diaryId, Long userId);

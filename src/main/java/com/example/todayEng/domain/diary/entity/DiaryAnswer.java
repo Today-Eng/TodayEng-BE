@@ -119,6 +119,23 @@ public class DiaryAnswer extends BaseTimeEntity {
         this.transcriptionError = error;
     }
 
+    public void retryTranscription(String audioKey) {
+        this.originalText = null;
+        this.audioKey = audioKey;
+        this.transcriptionStatus = TranscriptionStatus.UPLOADED;
+        this.transcriptionError = null;
+        this.correctedText = null;
+        this.correctionReason = null;
+        this.alternativeExpression = null;
+        this.correctionStatus = CorrectionStatus.PENDING;
+        this.correctionError = null;
+    }
+
+    public void restoreFailedTranscription(String audioKey) {
+        this.audioKey = audioKey;
+        this.transcriptionStatus = TranscriptionStatus.FAILED;
+    }
+
     public void updateOriginalText(String originalText) {
         this.originalText = originalText;
         this.correctedText = null;

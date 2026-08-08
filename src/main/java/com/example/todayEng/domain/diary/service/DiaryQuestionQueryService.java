@@ -6,6 +6,7 @@ import com.example.todayEng.domain.diary.entity.DiaryAnswer;
 import com.example.todayEng.domain.diary.entity.DiaryQuestion;
 import com.example.todayEng.domain.diary.entity.enums.CorrectionStatus;
 import com.example.todayEng.domain.diary.entity.enums.TtsStatus;
+import com.example.todayEng.domain.diary.entity.enums.TranscriptionStatus;
 import com.example.todayEng.domain.diary.repository.DiaryAnswerRepository;
 import com.example.todayEng.domain.diary.repository.DiaryQuestionRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
@@ -50,6 +51,10 @@ public class DiaryQuestionQueryService {
                             toResponse(question, null));
                 }
                 return new NextDiaryQuestionResponse(NextQuestionStatus.WAITING, null);
+            }
+            if (answer.getTranscriptionStatus() == TranscriptionStatus.FAILED) {
+                return new NextDiaryQuestionResponse(NextQuestionStatus.QUESTION_READY,
+                        toResponse(question, answer));
             }
             if (answer.getCorrectionStatus() != CorrectionStatus.SUCCEEDED) {
                 return new NextDiaryQuestionResponse(NextQuestionStatus.WAITING, null);
