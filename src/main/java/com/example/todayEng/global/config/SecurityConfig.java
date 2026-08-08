@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -83,6 +84,9 @@ public class SecurityConfig {
                             DispatcherType.ASYNC,
                             DispatcherType.ERROR
                     ).permitAll();
+
+                    // CorsFilter가 preflight를 먼저 처리하지만, 방어적으로 인가 단계에서도 OPTIONS를 막지 않는다.
+                    authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
 
                     authorize.requestMatchers(
                             "/health",

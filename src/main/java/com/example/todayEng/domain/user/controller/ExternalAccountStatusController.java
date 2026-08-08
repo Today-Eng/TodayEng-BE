@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "External Account", description = "외부 서비스 연동 관리 API")
+@Tag(name = "외부 서비스 연동 관리", description = "외부 서비스 연동 상태 조회, 사용 설정 변경 및 연동 해제 API")
 @RestController
 @RequestMapping("/api/integrations")
 @RequiredArgsConstructor
