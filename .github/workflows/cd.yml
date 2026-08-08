@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: production-deploy
@@ -20,7 +21,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Build and Deploy
+    name: Blue-Green Deploy
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
@@ -29,6 +30,10 @@ jobs:
 
     env:
       IMAGE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+      GCP_PROJECT_ID: todayeng-503801
+      URL_MAP: todayeng-lb
+      BLUE_BACKEND: todayeng-blue-backend
+      GREEN_BACKEND: todayeng-green-backend
 
     steps:
       - name: Checkout repository
@@ -68,16 +73,68 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to GCP VM
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Detect active and standby environment
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CURRENT_BACKEND_URL=$(gcloud compute url-maps describe "${URL_MAP}" \
+            --global \
+            --format="value(defaultService)")
+
+          CURRENT_BACKEND="${CURRENT_BACKEND_URL##*/}"
+
+          echo "Current active backend: ${CURRENT_BACKEND}"
+
+          if [ "${CURRENT_BACKEND}" = "${BLUE_BACKEND}" ]; then
+            ACTIVE_COLOR="blue"
+            STANDBY_COLOR="green"
+            STANDBY_BACKEND="${GREEN_BACKEND}"
+
+          elif [ "${CURRENT_BACKEND}" = "${GREEN_BACKEND}" ]; then
+            ACTIVE_COLOR="green"
+            STANDBY_COLOR="blue"
+            STANDBY_BACKEND="${BLUE_BACKEND}"
+
+          else
+            echo "Unknown current backend: ${CURRENT_BACKEND}"
+            exit 1
+          fi
+
+          echo "Active environment: ${ACTIVE_COLOR}"
+          echo "Standby environment: ${STANDBY_COLOR}"
+          echo "Standby backend: ${STANDBY_BACKEND}"
+
+          echo "active_color=${ACTIVE_COLOR}" >> "$GITHUB_OUTPUT"
+          echo "standby_color=${STANDBY_COLOR}" >> "$GITHUB_OUTPUT"
+          echo "standby_backend=${STANDBY_BACKEND}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy SHA image to Green standby
+        if: steps.target.outputs.standby_color == 'green'
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.VM_HOST }}
+          host: ${{ secrets.GREEN_VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             set -e
 
             cd /opt/todayeng
+
+            echo "Deploying image: ${{ env.IMAGE_TAG }}"
+            echo "Target environment: Green"
 
             IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
               --env-file .env \
@@ -89,20 +146,19 @@ jobs:
               -f docker-compose.prod.yml \
               up -d
 
-            echo "Waiting for application startup..."
+            echo "Waiting for Green application startup..."
 
             for attempt in $(seq 1 30); do
               if curl --fail --silent --output /dev/null \
                 http://127.0.0.1:8080/health; then
 
-                echo "Application health check passed."
+                echo "Green application health check passed."
 
                 IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
                   --env-file .env \
                   -f docker-compose.prod.yml \
                   ps
 
-                docker image prune -f
                 exit 0
               fi
 
@@ -110,7 +166,7 @@ jobs:
               sleep 5
             done
 
-            echo "Application health check failed."
+            echo "Green application health check failed."
 
             IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
               --env-file .env \
@@ -120,3 +176,141 @@ jobs:
             docker logs --tail 200 todayeng-app
 
             exit 1
+
+      - name: Deploy SHA image to Blue standby
+        if: steps.target.outputs.standby_color == 'blue'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.BLUE_VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -e
+
+            cd /opt/todayeng
+
+            echo "Deploying image: ${{ env.IMAGE_TAG }}"
+            echo "Target environment: Blue"
+
+            IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
+              --env-file .env \
+              -f docker-compose.prod.yml \
+              pull
+
+            IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
+              --env-file .env \
+              -f docker-compose.prod.yml \
+              up -d
+
+            echo "Waiting for Blue application startup..."
+
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --output /dev/null \
+                http://127.0.0.1:8080/health; then
+
+                echo "Blue application health check passed."
+
+                IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
+                  --env-file .env \
+                  -f docker-compose.prod.yml \
+                  ps
+
+                exit 0
+              fi
+
+              echo "Health check attempt ${attempt}/30 failed."
+              sleep 5
+            done
+
+            echo "Blue application health check failed."
+
+            IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
+              --env-file .env \
+              -f docker-compose.prod.yml \
+              ps
+
+            docker logs --tail 200 todayeng-app
+
+            exit 1
+
+      - name: Wait for GCP standby backend health
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BACKEND="${{ steps.target.outputs.standby_backend }}"
+
+          echo "Waiting for GCP backend health: ${BACKEND}"
+
+          for attempt in $(seq 1 30); do
+            HEALTH=$(gcloud compute backend-services get-health "${BACKEND}" \
+              --global \
+              --format="value(status.healthStatus.healthState)" \
+              | head -n 1)
+
+            echo "Backend health: ${HEALTH:-UNKNOWN}"
+
+            if [ "${HEALTH}" = "HEALTHY" ]; then
+              echo "Standby backend is healthy."
+              exit 0
+            fi
+
+            echo "GCP backend health check attempt ${attempt}/30 failed."
+            sleep 10
+          done
+
+          echo "Standby backend did not become healthy."
+          exit 1
+
+      - name: Switch traffic to standby
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BACKEND="${{ steps.target.outputs.standby_backend }}"
+
+          echo "Switching URL Map from ${{ steps.target.outputs.active_color }} to ${{ steps.target.outputs.standby_color }}"
+          echo "New backend: ${BACKEND}"
+
+          gcloud compute url-maps set-default-service "${URL_MAP}" \
+            --default-service="${BACKEND}" \
+            --global
+
+      - name: Verify URL Map update
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EXPECTED="${{ steps.target.outputs.standby_backend }}"
+
+          for attempt in $(seq 1 30); do
+            CURRENT_URL=$(gcloud compute url-maps describe "${URL_MAP}" \
+              --global \
+              --format="value(defaultService)")
+
+            CURRENT="${CURRENT_URL##*/}"
+
+            echo "Current URL Map backend: ${CURRENT}"
+
+            if [ "${CURRENT}" = "${EXPECTED}" ]; then
+              echo "URL Map update completed."
+              exit 0
+            fi
+
+            echo "URL Map update attempt ${attempt}/30 not reflected yet."
+            sleep 5
+          done
+
+          echo "URL Map update verification failed."
+          exit 1
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "======================================"
+          echo "Blue-Green deployment completed"
+          echo "======================================"
+          echo "Previous active : ${{ steps.target.outputs.active_color }}"
+          echo "New active      : ${{ steps.target.outputs.standby_color }}"
+          echo "Backend         : ${{ steps.target.outputs.standby_backend }}"
+          echo "Image tag       : ${{ env.IMAGE_TAG }}"
