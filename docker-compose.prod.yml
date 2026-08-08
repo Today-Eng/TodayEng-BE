@@ -1,11 +1,14 @@
 services:
   app:
-    image: ${DOCKERHUB_USERNAME}/todayeng-be:latest
+    image: ${DOCKERHUB_USERNAME}/todayeng-be:${IMAGE_TAG}
     container_name: todayeng-app
     restart: unless-stopped
 
     env_file:
       - /opt/todayeng/.env
+
+    volumes:
+      - /opt/todayeng/secrets/google-credentials.json:/app/secrets/google-credentials.json:ro
 
     ports:
       - "127.0.0.1:8080:8080"
