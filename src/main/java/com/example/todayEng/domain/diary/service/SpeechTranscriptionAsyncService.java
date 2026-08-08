@@ -5,6 +5,7 @@ import com.example.todayEng.domain.diary.dto.sse.DiarySsePayload;
 import com.example.todayEng.domain.diary.entity.DiaryAnswer;
 import com.example.todayEng.domain.diary.sse.DiarySseEmitterManager;
 import com.example.todayEng.domain.diary.storage.AudioFileStorage;
+import com.example.todayEng.global.error.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -32,6 +33,14 @@ public class SpeechTranscriptionAsyncService {
             persistenceService.complete(answerId, text);
         } catch (RuntimeException exception) {
             persistenceService.fail(answerId, exception.getMessage());
+            try {
+                emitterManager.sendProcessingFailed(userId, diaryId,
+                        new DiarySsePayload.ProcessingFailed("TRANSCRIPTION", errorCode(exception),
+                                "음성 인식에 실패했습니다. 다시 녹음해 주세요."));
+            } catch (RuntimeException notificationException) {
+                log.error("STT failure notification failed: diaryId={}, questionId={}, answerId={}",
+                        diaryId, questionId, answerId, notificationException);
+            }
             log.error("STT processing failed: diaryId={}, questionId={}, answerId={}",
                     diaryId, questionId, answerId, exception);
             return;
@@ -51,5 +60,10 @@ public class SpeechTranscriptionAsyncService {
             log.error("Unable to start answer correction: diaryId={}, questionId={}, answerId={}",
                     diaryId, questionId, answerId, exception);
         }
+    }
+
+    private String errorCode(RuntimeException exception) {
+        return exception instanceof BaseException baseException
+                ? baseException.getErrorCode().getCode() : "INTERNAL_ERROR";
     }
 }

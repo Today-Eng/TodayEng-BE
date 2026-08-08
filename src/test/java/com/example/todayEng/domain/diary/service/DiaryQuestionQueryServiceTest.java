@@ -80,6 +80,22 @@ class DiaryQuestionQueryServiceTest {
         assertThat(service.getNextQuestion(1L, 2L).status()).isEqualTo(NextQuestionStatus.WAITING);
     }
 
+    @Test void returnsFailedTranscriptionQuestionForRetry() {
+        DiaryQuestion first = question(10L, 1, true);
+        DiaryAnswer failed = DiaryAnswer.createUploaded(first, "failed-audio");
+        ReflectionTestUtils.setField(failed, "id", 20L);
+        failed.failTranscription("STT failed");
+        when(questionRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of(first));
+        when(answerRepository.findAllByDiaryIdInReflectionOrder(2L)).thenReturn(List.of(failed));
+
+        var result = service.getNextQuestion(1L, 2L);
+
+        assertThat(result.status()).isEqualTo(NextQuestionStatus.QUESTION_READY);
+        assertThat(result.question().questionId()).isEqualTo(10L);
+        assertThat(result.question().transcriptionStatus()).isEqualTo(
+                com.example.todayEng.domain.diary.entity.enums.TranscriptionStatus.FAILED);
+    }
+
     @Test void returnsReadyToCompleteAfterSixCorrectedAnswers() {
         List<DiaryQuestion> questions = new ArrayList<>();
         List<DiaryAnswer> answers = new ArrayList<>();

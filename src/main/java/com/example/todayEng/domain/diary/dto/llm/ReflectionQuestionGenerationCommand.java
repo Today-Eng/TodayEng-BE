@@ -9,10 +9,15 @@ public record ReflectionQuestionGenerationCommand(
         Long userId,
         Long diaryId,
         long leaseVersion,
+        String nickname,
         EnglishLevel englishLevel,
         List<String> interests,
         List<ContextInput> contexts
 ) {
+
+    public ReflectionQuestionGenerationCommand {
+        nickname = nickname == null ? "" : nickname;
+    }
 
     public record ContextInput(
             Long contextId,

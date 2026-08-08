@@ -24,22 +24,23 @@ class TermsSeederTest {
     TermsRepository termsRepository;
 
     @Test
-    void createsNewImmutableVersionsAndDeactivatesPreviousVersions() {
-        Terms previous = Terms.create(TermsType.SERVICE_USE, "previous content", 1);
+    void insertsOnlyMissingTermsWithoutCreatingANewVersion() {
+        Terms previous = Terms.create(TermsType.SERVICE_USE, "previous content", 2);
         given(termsRepository.findAll()).willReturn(List.of(previous));
 
         new TermsSeeder(termsRepository).seed();
 
-        assertThat(previous.isActive()).isFalse();
+        assertThat(previous.isActive()).isTrue();
         assertThat(previous.getContent()).isEqualTo("previous content");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Terms>> captor = ArgumentCaptor.forClass(List.class);
         verify(termsRepository).saveAll(captor.capture());
         assertThat(captor.getValue())
-                .hasSize(TermsType.values().length)
+                .hasSize(TermsType.values().length - 1)
                 .allMatch(Terms::isActive)
-                .allMatch(terms -> terms.getVersion() == 2);
+                .allMatch(terms -> terms.getVersion() == 1)
+                .noneMatch(terms -> terms.getTermsType() == TermsType.SERVICE_USE);
     }
 
     @Test
@@ -53,5 +54,17 @@ class TermsSeederTest {
 
         verify(termsRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
         assertThat(currentTerms).allMatch(Terms::isActive);
+    }
+
+    @Test
+    void reactivatesTheFirstVersionAndDeactivatesAccidentalDuplicates() {
+        Terms firstVersion = Terms.create(TermsType.SERVICE_USE, "original content", 1);
+        Terms accidentalSecondVersion = Terms.create(TermsType.SERVICE_USE, "duplicate content", 2);
+        given(termsRepository.findAll()).willReturn(List.of(firstVersion, accidentalSecondVersion));
+
+        new TermsSeeder(termsRepository).seed();
+
+        assertThat(firstVersion.isActive()).isTrue();
+        assertThat(accidentalSecondVersion.isActive()).isFalse();
     }
 }

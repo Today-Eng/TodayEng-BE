@@ -94,6 +94,7 @@ class GeminiReflectionQuestionLlmClientTest {
                 1L,
                 10L,
                 1L,
+                "성연",
                 EnglishLevel.BEGINNER,
                 List.of(),
                 List.of()
