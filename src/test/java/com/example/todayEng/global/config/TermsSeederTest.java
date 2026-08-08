@@ -25,7 +25,7 @@ class TermsSeederTest {
 
     @Test
     void insertsOnlyMissingTermsWithoutCreatingANewVersion() {
-        Terms previous = Terms.create(TermsType.SERVICE_USE, "previous content", 1);
+        Terms previous = Terms.create(TermsType.SERVICE_USE, "previous content", 2);
         given(termsRepository.findAll()).willReturn(List.of(previous));
 
         new TermsSeeder(termsRepository).seed();
