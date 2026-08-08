@@ -4,7 +4,7 @@ services:
     container_name: todayeng-mysql
     restart: unless-stopped
     ports:
-      - "3306:3306"
+      - "3308:3306"
     environment:
       MYSQL_DATABASE: today_eng
       MYSQL_USER: todayeng
