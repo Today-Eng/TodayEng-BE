@@ -8,9 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -21,28 +20,26 @@ public class TermsSeeder {
     @Transactional
     public void seed() {
         List<Terms> savedTerms = termsRepository.findAll();
-        Map<TermsKey, Terms> byKey = new HashMap<>();
-        savedTerms.forEach(terms -> byKey.put(new TermsKey(terms.getTermsType(), terms.getVersion()), terms));
-
-        TermsSeedCatalog.values().forEach(seed -> savedTerms.stream()
-                .filter(terms -> terms.getTermsType() == seed.type())
-                .filter(terms -> terms.getVersion() != seed.version())
-                .forEach(Terms::deactivate));
 
         List<Terms> missingTerms = TermsSeedCatalog.values().stream()
-                .filter(seed -> !byKey.containsKey(new TermsKey(seed.type(), seed.version())))
+                .filter(seed -> savedTerms.stream()
+                        .noneMatch(terms -> terms.getTermsType() == seed.type()))
                 .map(seed -> Terms.create(seed.type(), seed.content(), seed.version()))
                 .toList();
         if (!missingTerms.isEmpty()) {
             termsRepository.saveAll(missingTerms);
         }
 
-        TermsSeedCatalog.values().stream()
-                .map(seed -> byKey.get(new TermsKey(seed.type(), seed.version())))
-                .filter(java.util.Objects::nonNull)
-                .forEach(Terms::activate);
-    }
-
-    private record TermsKey(TermsType type, int version) {
+        // 같은 타입이 중복 생성된 경우 최초 버전을 기준 데이터로 복구한다.
+        TermsSeedCatalog.values().forEach(seed -> {
+            List<Terms> termsOfType = savedTerms.stream()
+                    .filter(terms -> terms.getTermsType() == seed.type())
+                    .sorted(Comparator.comparingInt(Terms::getVersion))
+                    .toList();
+            if (!termsOfType.isEmpty()) {
+                termsOfType.get(0).activate();
+                termsOfType.stream().skip(1).forEach(Terms::deactivate);
+            }
+        });
     }
 }

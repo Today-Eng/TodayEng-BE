@@ -6,7 +6,7 @@ import static com.example.todayEng.domain.user.entity.enums.TermsType.*;
 
 public final class TermsSeedCatalog {
 
-    private static final int CURRENT_VERSION = 2;
+    private static final int CURRENT_VERSION = 1;
 
     private static final List<TermsSeedData> VALUES = List.of(
             new TermsSeedData(SERVICE_USE, CURRENT_VERSION,
