@@ -47,8 +47,7 @@ class ProdOAuthAuthorizationSecurityTest {
             throws Exception {
         mockMvc.perform(post(
                         "/api/external-accounts/spotify/authorization"
-                )
-                        .param("userId", "1"))
+                ))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -75,8 +74,7 @@ class ProdOAuthAuthorizationSecurityTest {
                 .willThrow(new BaseException(ErrorCode.INVALID_TOKEN));
 
         mockMvc.perform(post("/api/external-accounts/spotify/authorization")
-                        .header("Authorization", "Bearer invalid")
-                        .param("userId", "1"))
+                        .header("Authorization", "Bearer invalid"))
                 .andExpect(status().isUnauthorized());
     }
 }
