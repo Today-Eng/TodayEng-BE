@@ -80,8 +80,10 @@ public interface NotificationSettingRepository
                   from Diary diary
                   where diary.user = notificationSetting.user
                     and diary.diaryDate = :today
-                    and diary.status =
-                        com.example.todayEng.domain.diary.entity.enums.DiaryStatus.COMPLETED
+                    and diary.status in (
+                        com.example.todayEng.domain.diary.entity.enums.DiaryStatus.COMPLETED,
+                        com.example.todayEng.domain.diary.entity.enums.DiaryStatus.DELETED
+                    )
               )
             """)
     List<WebPushTarget> findDiaryReminderTargets(
