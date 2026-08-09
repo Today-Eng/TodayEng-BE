@@ -3,6 +3,7 @@ package com.example.todayEng.domain.home.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -37,6 +38,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -83,6 +85,16 @@ class HomeServiceTest {
                 any(), any(), any())).willReturn(List.of());
         given(diaryRepository.findByUserIdAndDiaryDate(USER_ID, TODAY))
                 .willReturn(Optional.empty());
+        given(diaryRepository.countByUserIdAndStatus(
+                USER_ID, com.example.todayEng.domain.diary.entity.enums.DiaryStatus.COMPLETED
+        )).willReturn(12L);
+        given(diaryRepository.findCompletedDatesForStreak(eq(USER_ID), eq(TODAY), any()))
+                .willReturn(List.of(
+                        TODAY,
+                        TODAY.minusDays(1),
+                        TODAY.minusDays(2),
+                        TODAY.minusDays(3)
+                ));
         given(externalAccountRepository.findAllByUser_Id(USER_ID)).willReturn(List.of());
         given(snapshotRepository.findAllByUserIdAndContextDateAndCollectionStatus(
                 USER_ID, TODAY, DailyContextCollectionStatus.SUCCEEDED
@@ -95,6 +107,7 @@ class HomeServiceTest {
 
         assertThat(response.user().nickname()).isEqualTo("은우");
         assertThat(response.statistics().totalDiaryCount()).isEqualTo(12);
+        assertThat(response.statistics().currentDiaryStreak()).isEqualTo(4);
         assertThat(response.calendar().year()).isEqualTo(2026);
         assertThat(response.calendar().month()).isEqualTo(7);
         assertThat(response.today().date()).isEqualTo(TODAY);
@@ -104,6 +117,68 @@ class HomeServiceTest {
         assertThat(response.materials().weather().available()).isFalse();
         assertThat(response.materials().calendar().connected()).isFalse();
         assertThat(response.materials().spotify().connected()).isFalse();
+    }
+
+    @Test
+    void keepsStreakWhenLatestCompletedDiaryWasYesterday() {
+        given(diaryRepository.findCompletedDatesForStreak(eq(USER_ID), eq(TODAY), any()))
+                .willReturn(List.of(
+                        TODAY.minusDays(1),
+                        TODAY.minusDays(2),
+                        TODAY.minusDays(3)
+                ));
+
+        var response = homeService.getHome(USER_ID, null, null);
+
+        assertThat(response.statistics().currentDiaryStreak()).isEqualTo(3);
+    }
+
+    @Test
+    void resetsStreakWhenNeitherTodayNorYesterdayWasCompleted() {
+        given(diaryRepository.findCompletedDatesForStreak(eq(USER_ID), eq(TODAY), any()))
+                .willReturn(List.of(
+                        TODAY.minusDays(2),
+                        TODAY.minusDays(3)
+                ));
+
+        var response = homeService.getHome(USER_ID, null, null);
+
+        assertThat(response.statistics().currentDiaryStreak()).isZero();
+    }
+
+    @Test
+    void stopsStreakAtFirstMissingDate() {
+        given(diaryRepository.findCompletedDatesForStreak(eq(USER_ID), eq(TODAY), any()))
+                .willReturn(List.of(
+                        TODAY,
+                        TODAY.minusDays(1),
+                        TODAY.minusDays(3)
+                ));
+
+        var response = homeService.getHome(USER_ID, null, null);
+
+        assertThat(response.statistics().currentDiaryStreak()).isEqualTo(2);
+    }
+
+    @Test
+    void readsAnotherPageOnlyForStreakLongerThanPageSize() {
+        List<LocalDate> firstPage = java.util.stream.IntStream.range(0, 32)
+                .mapToObj(TODAY::minusDays)
+                .toList();
+        given(diaryRepository.findCompletedDatesForStreak(
+                USER_ID, TODAY, PageRequest.of(0, 32)
+        )).willReturn(firstPage);
+        given(diaryRepository.findCompletedDatesForStreak(
+                USER_ID, TODAY, PageRequest.of(1, 32)
+        )).willReturn(List.of(
+                TODAY.minusDays(32),
+                TODAY.minusDays(33),
+                TODAY.minusDays(34)
+        ));
+
+        var response = homeService.getHome(USER_ID, null, null);
+
+        assertThat(response.statistics().currentDiaryStreak()).isEqualTo(35);
     }
 
     @Test
