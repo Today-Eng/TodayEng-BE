@@ -1,5 +1,5 @@
 swagger:
-  server-url: ${SWAGGER_SERVER_URL:https://34-50-27-108.nip.io}
+  server-url: ${SWAGGER_SERVER_URL:https://34-36-20-162.nip.io}
   server-description: 배포 서버
 
 spring:
