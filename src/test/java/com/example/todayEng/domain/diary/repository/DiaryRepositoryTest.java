@@ -4,12 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextCollectionStatus;
+import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.repository.UserRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
@@ -18,6 +21,34 @@ class DiaryRepositoryTest {
 
     @Autowired UserRepository userRepository;
     @Autowired DiaryRepository diaryRepository;
+
+    @Test
+    void findsOnlyCompletedDiaryStatisticsInDescendingDateOrder() {
+        User user = userRepository.save(User.create());
+        Diary completedToday = Diary.create(user, LocalDate.of(2026, 8, 10));
+        completedToday.complete();
+        Diary completedYesterday = Diary.create(user, LocalDate.of(2026, 8, 9));
+        completedYesterday.complete();
+        Diary deleted = Diary.create(user, LocalDate.of(2026, 8, 8));
+        deleted.complete();
+        deleted.delete();
+        Diary inProgress = Diary.create(user, LocalDate.of(2026, 8, 7));
+        diaryRepository.saveAllAndFlush(List.of(
+                completedYesterday, deleted, inProgress, completedToday
+        ));
+
+        long count = diaryRepository.countByUserIdAndStatus(
+                user.getId(), DiaryStatus.COMPLETED);
+        var dates = diaryRepository.findCompletedDatesForStreak(
+                user.getId(), LocalDate.of(2026, 8, 10),
+                PageRequest.of(0, 32));
+
+        assertThat(count).isEqualTo(2);
+        assertThat(dates).containsExactly(
+                LocalDate.of(2026, 8, 10),
+                LocalDate.of(2026, 8, 9)
+        );
+    }
 
     @Test
     void claimsContextCollectionFromNotStartedAndStampsClaimedAt() {
