@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.benchmark;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.todayEng.domain.diary.dto.llm.DiaryMemoryAnalysisCommand;
 import com.example.todayEng.domain.diary.dto.llm.DiaryMemoryAnalysisCommand.DiaryInput;
@@ -54,6 +55,24 @@ class DiaryMemoryCandidateBenchmarkTest {
     }
 
     @Test
+    void rotatesCandidateOrderForEachRun() {
+        assertThat(rotatedCounts(1)).containsExactly(3, 5, 10, 20);
+        assertThat(rotatedCounts(2)).containsExactly(5, 10, 20, 3);
+        assertThat(rotatedCounts(3)).containsExactly(10, 20, 3, 5);
+        assertThat(rotatedCounts(4)).containsExactly(20, 3, 5, 10);
+        assertThat(rotatedCounts(5)).containsExactly(3, 5, 10, 20);
+    }
+
+    @Test
+    void rejectsNonPositiveRepetitionCount() {
+        assertThatThrownBy(() -> repetitions("0"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> repetitions("-1"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(repetitions("1")).isEqualTo(1);
+    }
+
+    @Test
     void compareCandidateCounts() throws Exception {
         Assumptions.assumeTrue(Boolean.parseBoolean(
                         System.getenv("DIARY_MEMORY_BENCHMARK")),
@@ -61,7 +80,7 @@ class DiaryMemoryCandidateBenchmarkTest {
         String apiKey = System.getenv("GEMINI_API_KEY");
         Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
                 "GEMINI_API_KEY is required");
-        int repetitions = Integer.parseInt(env(
+        int repetitions = repetitions(env(
                 "DIARY_MEMORY_BENCHMARK_RUNS", "3"));
         String model = env("GEMINI_MODEL", "gemini-2.5-flash");
         RestClient client = client(URI.create(env("GEMINI_BASE_URL",
@@ -70,10 +89,10 @@ class DiaryMemoryCandidateBenchmarkTest {
         assertThat(fixture).hasSizeGreaterThanOrEqualTo(20);
 
         List<Metric> metrics = new ArrayList<>();
-        for (int count : COUNTS) {
-            var command = new DiaryMemoryAnalysisCommand(999L,
-                    List.copyOf(fixture.subList(0, count)));
-            for (int run = 1; run <= repetitions; run++) {
+        for (int run = 1; run <= repetitions; run++) {
+            for (int count : rotatedCounts(run)) {
+                var command = new DiaryMemoryAnalysisCommand(999L,
+                        List.copyOf(fixture.subList(0, count)));
                 metrics.add(measure(client, apiKey, model, count, run, command));
             }
         }
@@ -134,6 +153,24 @@ class DiaryMemoryCandidateBenchmarkTest {
         return diary.reflections().stream().anyMatch(reflection ->
                 reflection.question().contains(value)
                         || reflection.answer().contains(value));
+    }
+
+    private List<Integer> rotatedCounts(int run) {
+        int start = Math.floorMod(run - 1, COUNTS.size());
+        List<Integer> order = new ArrayList<>(COUNTS.size());
+        for (int offset = 0; offset < COUNTS.size(); offset++) {
+            order.add(COUNTS.get((start + offset) % COUNTS.size()));
+        }
+        return order;
+    }
+
+    private int repetitions(String configuredValue) {
+        int repetitions = Integer.parseInt(configuredValue);
+        if (repetitions < 1) {
+            throw new IllegalArgumentException(
+                    "DIARY_MEMORY_BENCHMARK_RUNS must be at least 1");
+        }
+        return repetitions;
     }
 
     private RestClient client(URI baseUrl) {
