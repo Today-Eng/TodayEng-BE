@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -13,18 +14,17 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DiaryReminderScheduler {
 
-    private static final ZoneId SERVICE_ZONE_ID =
-            ZoneId.of("Asia/Seoul");
-
     private final NotificationService notificationService;
+    @Value("${notification.diary-reminder.zone:Asia/Seoul}")
+    private String reminderZone;
 
     @Scheduled(
-            cron = "0 0 22 * * *",
-            zone = "Asia/Seoul"
+            cron = "${notification.diary-reminder.cron:0 0 22 * * *}",
+            zone = "${notification.diary-reminder.zone:Asia/Seoul}"
     )
     public void sendDiaryReminders() {
         LocalDate today =
-                LocalDate.now(SERVICE_ZONE_ID);
+                LocalDate.now(ZoneId.of(reminderZone));
 
         log.info(
                 "회고 알림 스케줄러 시작. date={}",

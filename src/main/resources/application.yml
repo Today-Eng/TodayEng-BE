@@ -62,6 +62,11 @@ web-push:
     private-key: ${VAPID_PRIVATE_KEY}
     subject: ${VAPID_SUBJECT}
 
+notification:
+  diary-reminder:
+    cron: ${DIARY_REMINDER_CRON:0 0 22 * * *}
+    zone: ${DIARY_REMINDER_ZONE:Asia/Seoul}
+
 diary:
   sse:
     timeout-millis: 1800000
