@@ -189,6 +189,21 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
             LocalDate endDate
     );
 
+    long countByUserIdAndStatus(Long userId, DiaryStatus status);
+
+    @Query("""
+            select d.diaryDate from Diary d
+            where d.user.id = :userId
+              and d.status = com.example.todayEng.domain.diary.entity.enums.DiaryStatus.COMPLETED
+              and d.diaryDate <= :today
+            order by d.diaryDate desc
+            """)
+    List<LocalDate> findCompletedDatesForStreak(
+            @Param("userId") Long userId,
+            @Param("today") LocalDate today,
+            Pageable pageable
+    );
+
     Optional<Diary> findByIdAndUserIdAndStatus(
             Long diaryId,
             Long userId,

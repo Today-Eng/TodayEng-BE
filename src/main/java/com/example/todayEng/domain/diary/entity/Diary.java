@@ -19,6 +19,12 @@ import org.hibernate.annotations.ColumnDefault;
 @Entity
 @Table(
         name = "diary",
+        indexes = {
+                @Index(
+                        name = "idx_diary_user_status_date",
+                        columnList = "user_id,status,diary_date"
+                )
+        },
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_diary_user_date",

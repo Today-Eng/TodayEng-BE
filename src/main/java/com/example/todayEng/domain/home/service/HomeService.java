@@ -42,12 +42,15 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class HomeService {
+
+    private static final int STREAK_PAGE_SIZE = 32;
 
     private final UserRepository userRepository;
     private final DiaryRepository diaryRepository;
@@ -63,6 +66,7 @@ public class HomeService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
         LocalDate today = LocalDate.now(clock);
+        HomeResponse.Statistics statistics = statistics(userId, today);
         YearMonth targetMonth = resolveTargetMonth(year, month, today);
         List<LocalDate> writtenDates = diaryRepository
                 .findAllByUserIdAndDiaryDateBetweenOrderByDiaryDate(
@@ -86,10 +90,7 @@ public class HomeService {
 
         return new HomeResponse(
                 new HomeResponse.UserSummary(user.getNickname()),
-                new HomeResponse.Statistics(
-                        user.getTotalDiaryCount(),
-                        user.getCurrentStreak()
-                ),
+                statistics,
                 new HomeResponse.CalendarSummary(
                         targetMonth.getYear(),
                         targetMonth.getMonthValue(),
@@ -109,6 +110,57 @@ public class HomeService {
                         )
                 )
         );
+    }
+
+    private HomeResponse.Statistics statistics(Long userId, LocalDate today) {
+        long totalDiaryCount = diaryRepository.countByUserIdAndStatus(
+                userId,
+                DiaryStatus.COMPLETED
+        );
+        return new HomeResponse.Statistics(
+                totalDiaryCount,
+                currentStreak(userId, today)
+        );
+    }
+
+    private int currentStreak(Long userId, LocalDate today) {
+        int streak = 0;
+        LocalDate expectedDate = null;
+        int page = 0;
+        while (true) {
+            List<LocalDate> completedDates = diaryRepository
+                    .findCompletedDatesForStreak(
+                            userId,
+                            today,
+                            PageRequest.of(page, STREAK_PAGE_SIZE)
+                    );
+            if (completedDates.isEmpty()) {
+                return streak;
+            }
+
+            if (expectedDate == null) {
+                LocalDate latestDate = completedDates.get(0);
+                if (latestDate.equals(today)) {
+                    expectedDate = today;
+                } else if (latestDate.equals(today.minusDays(1))) {
+                    expectedDate = today.minusDays(1);
+                } else {
+                    return 0;
+                }
+            }
+
+            for (LocalDate completedDate : completedDates) {
+                if (!completedDate.equals(expectedDate)) {
+                    return streak;
+                }
+                streak++;
+                expectedDate = expectedDate.minusDays(1);
+            }
+            if (completedDates.size() < STREAK_PAGE_SIZE) {
+                return streak;
+            }
+            page++;
+        }
     }
 
     @Transactional(readOnly = true)
