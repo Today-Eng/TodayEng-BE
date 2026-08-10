@@ -20,6 +20,11 @@ import java.util.Optional;
 
 public interface DiaryRepository extends JpaRepository<Diary, Long> {
 
+    @Query("select d.id from Diary d where d.user.id = :userId")
+    List<Long> findAllIdsByUserId(@Param("userId") Long userId);
+
+    long deleteAllByUserId(Long userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select d from Diary d where d.id = :diaryId")
     Optional<Diary> findByIdForUpdate(@Param("diaryId") Long diaryId);

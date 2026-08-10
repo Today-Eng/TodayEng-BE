@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
 import com.example.todayEng.domain.notification.repository.NotificationSettingRepository;
+import com.example.todayEng.domain.diary.service.DiaryDeletionService;
+import com.example.todayEng.domain.home.repository.DailyContextSnapshotRepository;
 import com.example.todayEng.domain.user.dto.UserDtos.AgreementStatus;
 import com.example.todayEng.domain.user.entity.Terms;
 import com.example.todayEng.domain.user.entity.User;
@@ -13,6 +15,7 @@ import com.example.todayEng.domain.user.repository.AuthAccountRepository;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
 import com.example.todayEng.domain.user.repository.InterestTagRepository;
 import com.example.todayEng.domain.user.repository.RefreshTokenRepository;
+import com.example.todayEng.domain.user.repository.OAuthAuthorizationRequestRepository;
 import com.example.todayEng.domain.user.repository.TermsRepository;
 import com.example.todayEng.domain.user.repository.UserInterestRepository;
 import com.example.todayEng.domain.user.repository.UserRepository;
@@ -40,6 +43,9 @@ class UserAgreementQueryServiceTest {
     @Mock RefreshTokenRepository refreshTokenRepository;
     @Mock ExternalAccountRepository externalAccountRepository;
     @Mock NotificationSettingRepository notificationSettingRepository;
+    @Mock DailyContextSnapshotRepository dailyContextSnapshotRepository;
+    @Mock OAuthAuthorizationRequestRepository oAuthAuthorizationRequestRepository;
+    @Mock DiaryDeletionService diaryDeletionService;
 
     UserService userService;
     User user;
@@ -55,7 +61,10 @@ class UserAgreementQueryServiceTest {
                 authAccountRepository,
                 refreshTokenRepository,
                 externalAccountRepository,
-                notificationSettingRepository
+                notificationSettingRepository,
+                dailyContextSnapshotRepository,
+                oAuthAuthorizationRequestRepository,
+                diaryDeletionService
         );
         user = User.create();
         ReflectionTestUtils.setField(user, "id", USER_ID);
