@@ -63,7 +63,7 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
         } catch (BaseException exception) {
             throw exception;
         } catch (JsonProcessingException exception) {
-            throw invalidResponse("response text is not valid JSON");
+            throw invalidResponse("response text is not valid JSON", exception);
         } catch (RestClientException exception) {
             log.warn("LLM call failed: {}",
                     LlmCallLog.failure(FEATURE, properties.model(), exception));
@@ -72,8 +72,12 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
     }
 
     private BaseException invalidResponse(String reason) {
+        return invalidResponse(reason, null);
+    }
+
+    private BaseException invalidResponse(String reason, Throwable cause) {
         log.warn("LLM call failed: {}",
-                LlmCallLog.failure(FEATURE, properties.model(), reason));
+                LlmCallLog.failure(FEATURE, properties.model(), reason, cause));
         return new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
     }
 
@@ -100,8 +104,8 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
 
     private String extract(GeminiResponse response) {
         if (response == null || response.candidates() == null) throw invalidResponse("response has no candidates");
-        return response.candidates().stream().filter(c -> c.content() != null)
-                .flatMap(c -> c.content().parts().stream()).map(Part::text)
+        return response.candidates().stream().filter(c -> c != null && c.content() != null)
+                .flatMap(c -> c.content().parts().stream()).filter(p -> p != null).map(Part::text)
                 .filter(t -> t != null && !t.isBlank()).findFirst()
                 .orElseThrow(() -> invalidResponse("response has no usable text"));
     }

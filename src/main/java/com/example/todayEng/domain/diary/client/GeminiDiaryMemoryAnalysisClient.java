@@ -69,7 +69,7 @@ public class GeminiDiaryMemoryAnalysisClient
         } catch (BaseException exception) {
             throw exception;
         } catch (JsonProcessingException exception) {
-            throw invalidResponse("response text is not valid JSON");
+            throw invalidResponse("response text is not valid JSON", exception);
         } catch (RestClientException exception) {
             log.warn("LLM call failed: {}",
                     LlmCallLog.failure(FEATURE, properties.model(), exception));
@@ -78,8 +78,12 @@ public class GeminiDiaryMemoryAnalysisClient
     }
 
     private BaseException invalidResponse(String reason) {
+        return invalidResponse(reason, null);
+    }
+
+    private BaseException invalidResponse(String reason, Throwable cause) {
         log.warn("LLM call failed: {}",
-                LlmCallLog.failure(FEATURE, properties.model(), reason));
+                LlmCallLog.failure(FEATURE, properties.model(), reason, cause));
         return new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
     }
 
@@ -141,8 +145,9 @@ public class GeminiDiaryMemoryAnalysisClient
             throw invalidResponse("response has no candidates");
         }
         return response.candidates().stream()
-                .filter(candidate -> candidate.content() != null)
+                .filter(candidate -> candidate != null && candidate.content() != null)
                 .flatMap(candidate -> candidate.content().parts().stream())
+                .filter(part -> part != null)
                 .map(Part::text)
                 .filter(text -> text != null && !text.isBlank())
                 .findFirst()

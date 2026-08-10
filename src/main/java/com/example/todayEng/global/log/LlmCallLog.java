@@ -29,10 +29,31 @@ public final class LlmCallLog {
     }
 
     public static String failure(LlmFeature feature, String model, Throwable throwable) {
+        return failure(feature, model, null, throwable);
+    }
+
+    public static String failure(LlmFeature feature, String model, String reason) {
+        return failure(feature, model, reason, null);
+    }
+
+    public static String failure(
+            LlmFeature feature,
+            String model,
+            String reason,
+            Throwable throwable
+    ) {
         StringJoiner joiner = head(feature, model);
-        joiner.add("type=" + (throwable == null
-                ? "none"
-                : throwable.getClass().getSimpleName()));
+        if (reason != null) {
+            joiner.add("reason=" + sanitize(reason));
+        }
+        if (throwable != null) {
+            appendThrowable(joiner, throwable);
+        }
+        return joiner.toString();
+    }
+
+    private static void appendThrowable(StringJoiner joiner, Throwable throwable) {
+        joiner.add("type=" + throwable.getClass().getSimpleName());
 
         if (throwable instanceof RestClientResponseException responseException) {
             appendHttpDetails(joiner, responseException);
@@ -40,13 +61,6 @@ public final class LlmCallLog {
                 && throwable.getCause() != null) {
             joiner.add("cause=" + throwable.getCause().getClass().getSimpleName());
         }
-        return joiner.toString();
-    }
-
-    public static String failure(LlmFeature feature, String model, String reason) {
-        return head(feature, model)
-                .add("reason=" + sanitize(reason))
-                .toString();
     }
 
     private static StringJoiner head(LlmFeature feature, String model) {

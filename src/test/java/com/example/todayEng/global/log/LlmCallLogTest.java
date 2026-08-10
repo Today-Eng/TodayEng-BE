@@ -2,6 +2,7 @@ package com.example.todayEng.global.log;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import java.net.SocketTimeoutException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -121,6 +122,17 @@ class LlmCallLogTest {
                 LlmFeature.REFLECTION_QUESTION, "gemini-2.5-flash", "api key is not configured"))
                 .isEqualTo("feature=reflection-question, model=gemini-2.5-flash, "
                         + "reason=api key is not configured");
+    }
+
+    @Test
+    @DisplayName("사유와 예외를 함께 받으면 둘 다 남겨 실패 원인을 구분할 수 있다")
+    void describesReasonWithThrowable() {
+        assertThat(LlmCallLog.failure(
+                LlmFeature.ANSWER_CORRECTION, "gemini-2.5-flash",
+                "response text is not valid JSON",
+                new JsonParseException(null, "Unexpected character")))
+                .isEqualTo("feature=answer-correction, model=gemini-2.5-flash, "
+                        + "reason=response text is not valid JSON, type=JsonParseException");
     }
 
     @Test

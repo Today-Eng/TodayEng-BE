@@ -89,6 +89,26 @@ class GeminiReflectionQuestionLlmClientTest {
                 .isEqualTo(ErrorCode.INVALID_LLM_RESPONSE);
     }
 
+    @Test
+    void convertsNullCandidateElementsToDomainError() {
+        var command = command();
+        given(promptFactory.create(command)).willReturn("prompt");
+        server.expect(requestTo(
+                        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+                ))
+                .andRespond(withSuccess(
+                        "{\"candidates\":[null,{\"content\":{\"parts\":[null]}}]}",
+                        MediaType.APPLICATION_JSON
+                ));
+
+        assertThatThrownBy(() -> client.generateQuestions(command))
+                .isInstanceOf(BaseException.class)
+                .extracting(exception ->
+                        ((BaseException) exception).getErrorCode()
+                )
+                .isEqualTo(ErrorCode.INVALID_LLM_RESPONSE);
+    }
+
     private ReflectionQuestionGenerationCommand command() {
         return new ReflectionQuestionGenerationCommand(
                 1L,
