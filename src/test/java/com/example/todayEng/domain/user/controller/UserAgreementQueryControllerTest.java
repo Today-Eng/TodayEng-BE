@@ -90,7 +90,7 @@ class UserAgreementQueryControllerTest {
                         .content("""
                                 {
                                   "agreements": [
-                                    {"termId": 9, "agree": false}
+                                    {"termId": 9, "agree": true}
                                   ]
                                 }
                                 """))
@@ -98,6 +98,6 @@ class UserAgreementQueryControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").doesNotExist());
 
-        verify(userService).agree(1L, new AgreementsRequest(List.of(new AgreementItem(9L, false))));
+        verify(userService).agree(1L, new AgreementsRequest(List.of(new AgreementItem(9L, true))));
     }
 }
