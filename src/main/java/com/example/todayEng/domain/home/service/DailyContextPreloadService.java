@@ -7,6 +7,7 @@ import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
+import com.example.todayEng.domain.user.service.ExternalAccountTokenService;
 import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse;
 import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse.ContextResult;
 import com.example.todayEng.domain.home.dto.DailyContextPreloadResponse.ResultStatus;
@@ -36,6 +37,7 @@ public class DailyContextPreloadService {
     private final DiaryRepository diaryRepository;
     private final DiaryContextDataClient contextDataClient;
     private final DailyContextSnapshotPersistenceService persistenceService;
+    private final ExternalAccountTokenService tokenService;
     private final Clock clock;
 
     public DailyContextPreloadResponse preload(Long userId, Location location) {
@@ -69,12 +71,12 @@ public class DailyContextPreloadService {
     ) {
         if (account.getProvider() == ExternalServiceProvider.GOOGLE_CALENDAR) {
             return collect(userId, date, DiaryContextType.CALENDAR,
-                    () -> contextDataClient.fetchCalendar(
-                            account.getAccessToken(), date));
+                    () -> tokenService.callWithAccessToken(account,
+                            accessToken -> contextDataClient.fetchCalendar(accessToken, date)));
         } else if (account.getProvider() == ExternalServiceProvider.SPOTIFY) {
             return collect(userId, date, DiaryContextType.SPOTIFY,
-                    () -> contextDataClient.fetchSpotify(
-                            account.getAccessToken(), date));
+                    () -> tokenService.callWithAccessToken(account,
+                            accessToken -> contextDataClient.fetchSpotify(accessToken, date)));
         }
         return null;
     }

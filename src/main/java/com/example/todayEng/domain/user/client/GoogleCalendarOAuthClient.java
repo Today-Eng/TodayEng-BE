@@ -26,6 +26,9 @@ public class GoogleCalendarOAuthClient implements OAuthProviderClient {
     private static final String GRANT_TYPE =
             "authorization_code";
 
+    private static final String REFRESH_GRANT_TYPE =
+            "refresh_token";
+
     private static final String ACCESS_TYPE = "offline";
 
     private static final String PROMPT = "select_account consent";
@@ -139,6 +142,66 @@ public class GoogleCalendarOAuthClient implements OAuthProviderClient {
         } catch (RestClientException exception) {
             throw new BaseException(
                     ErrorCode.OAUTH_TOKEN_EXCHANGE_FAILED
+            );
+        }
+    }
+
+    @Override
+    public OAuthTokenResponse refreshAccessToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BaseException(ErrorCode.OAUTH_TOKEN_REFRESH_FAILED);
+        }
+
+        MultiValueMap<String, String> requestBody =
+                new LinkedMultiValueMap<>();
+
+        requestBody.add(
+                "client_id",
+                googleOAuthProperties.clientId()
+        );
+        requestBody.add(
+                "client_secret",
+                googleOAuthProperties.clientSecret()
+        );
+        requestBody.add(
+                "refresh_token",
+                refreshToken
+        );
+        requestBody.add(
+                "grant_type",
+                REFRESH_GRANT_TYPE
+        );
+
+        try {
+            GoogleOAuthTokenResponse response = restClient.post()
+                    .uri(googleOAuthProperties.tokenUri())
+                    .contentType(
+                            MediaType.APPLICATION_FORM_URLENCODED
+                    )
+                    .body(requestBody)
+                    .retrieve()
+                    .body(GoogleOAuthTokenResponse.class);
+
+            if (response == null
+                    || response.accessToken() == null
+                    || response.accessToken().isBlank()) {
+                throw new BaseException(
+                        ErrorCode.OAUTH_TOKEN_REFRESH_FAILED
+                );
+            }
+
+            return new OAuthTokenResponse(
+                    response.accessToken(),
+                    response.refreshToken(),
+                    response.expiresIn()
+            );
+
+        } catch (BaseException exception) {
+            throw exception;
+
+        } catch (RestClientException exception) {
+            throw new BaseException(
+                    ErrorCode.OAUTH_TOKEN_REFRESH_FAILED
             );
         }
     }
