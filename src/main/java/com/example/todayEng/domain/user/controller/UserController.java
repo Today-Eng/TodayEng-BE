@@ -25,6 +25,14 @@ public class UserController {
         return ApiResponse.success();
     }
 
+    @Operation(summary = "약관 동의 수정", description = "로그인한 회원의 약관별 동의 여부를 수정합니다.")
+    @PatchMapping("/agreements")
+    public ApiResponse<Void> updateAgreements(@AuthenticationPrincipal Long userId,
+                                              @Valid @RequestBody AgreementsRequest request) {
+        userService.agree(userId, request);
+        return ApiResponse.success();
+    }
+
     @Operation(summary = "내 약관 동의 조회", description = "전체 약관 내용과 로그인한 회원의 약관별 동의 상태를 조회합니다.")
     @GetMapping("/agreements")
     public ApiResponse<AgreementsResponse> agreements(@AuthenticationPrincipal Long userId) {

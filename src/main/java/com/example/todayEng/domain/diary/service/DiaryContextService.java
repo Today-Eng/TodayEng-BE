@@ -14,6 +14,7 @@ import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceS
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
+import com.example.todayEng.domain.user.service.ExternalAccountTokenService;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.example.todayEng.global.log.ExternalCallLog;
@@ -53,6 +54,7 @@ public class DiaryContextService {
     private final ImageUploadValidator imageUploadValidator;
     private final DiaryMemoryService diaryMemoryService;
     private final DailyContextSnapshotPersistenceService snapshotPersistenceService;
+    private final ExternalAccountTokenService tokenService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -154,8 +156,7 @@ public class DiaryContextService {
     ) {
         if (account.getProvider() == ExternalServiceProvider.GOOGLE_CALENDAR) {
             collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.CALENDAR,
-                    () -> contextDataClient.fetchCalendar(
-                            account.getAccessToken(), diary.getDiaryDate()))
+                    () -> collectCalendar(userId, diary, account))
                     .ifPresent(contexts::add);
         } else if (account.getProvider() == ExternalServiceProvider.SPOTIFY) {
             collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.SPOTIFY,
@@ -164,32 +165,53 @@ public class DiaryContextService {
         }
     }
 
+    /** Calendar는 일정이 갱신되어도 항목이 겹치므로 병합 없이 스냅샷을 그대로 사용한다. */
+    private JsonNode collectCalendar(Long userId, Diary diary, ExternalAccount account) {
+        JsonNode preload = findPreload(userId, diary.getDiaryDate(), DiaryContextType.CALENDAR);
+        JsonNode fresh = fetchOrFallback(preload, DiaryContextType.CALENDAR,
+                () -> tokenService.callWithAccessToken(account,
+                        accessToken -> contextDataClient.fetchCalendar(
+                                accessToken, diary.getDiaryDate())));
+        return fresh == null ? preload : fresh;
+    }
+
     private JsonNode collectSpotify(Long userId, Diary diary, ExternalAccount account) {
-        JsonNode preload = findSpotifyPreload(userId, diary.getDiaryDate());
-        JsonNode fresh;
-        try {
-            fresh = contextDataClient.fetchSpotify(
-                    account.getAccessToken(), diary.getDiaryDate());
-        } catch (RuntimeException exception) {
-            if (preload == null) {
-                throw exception;
-            }
-            log.warn("Spotify refresh failed, falling back to preloaded context: cause={}",
-                    ExternalCallLog.describe(exception));
-            return preload;
-        }
+        JsonNode preload = findPreload(userId, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
+        JsonNode fresh = fetchOrFallback(preload, DiaryContextType.SPOTIFY,
+                () -> tokenService.callWithAccessToken(account,
+                        accessToken -> contextDataClient.fetchSpotify(
+                                accessToken, diary.getDiaryDate())));
         if (fresh == null) {
             return preload;
         }
-        if (preload == null) {
+        if (preload == null || fresh == preload) {
             return fresh;
         }
         return mergeSpotifyItems(preload, fresh);
     }
 
-    private JsonNode findSpotifyPreload(Long userId, LocalDate date) {
+    /** 스냅샷이 없으면 원래 예외를 그대로 올려 수집 실패로 기록되게 한다. */
+    private JsonNode fetchOrFallback(
+            JsonNode preload,
+            DiaryContextType type,
+            Supplier<JsonNode> fetch
+    ) {
+        try {
+            return fetch.get();
+        } catch (RuntimeException exception) {
+            if (preload == null) {
+                throw exception;
+            }
+            log.warn("Context refresh failed, falling back to preloaded snapshot: "
+                            + "type={}, cause={}",
+                    type, ExternalCallLog.describe(exception));
+            return preload;
+        }
+    }
+
+    private JsonNode findPreload(Long userId, LocalDate date, DiaryContextType type) {
         return snapshotPersistenceService
-                .findSuccessfulContextData(userId, date, DiaryContextType.SPOTIFY)
+                .findSuccessfulContextData(userId, date, type)
                 .orElse(null);
     }
 

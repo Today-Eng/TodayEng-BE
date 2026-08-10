@@ -24,6 +24,7 @@ import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
+import com.example.todayEng.domain.user.service.ExternalAccountTokenService;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,6 +38,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,6 +64,7 @@ class DiaryContextServiceTest {
     @Mock DiaryImageAnalysisClient imageAnalysisClient;
     @Mock DiaryMemoryService diaryMemoryService;
     @Mock DailyContextSnapshotPersistenceService snapshotPersistenceService;
+    @Mock ExternalAccountTokenService tokenService;
     DiaryContextService service;
     Diary diary;
 
@@ -74,7 +77,13 @@ class DiaryContextServiceTest {
         service = new DiaryContextService(diaryRepository, persistenceService,
                 accountRepository, dataClient, imageAnalysisClient,
                 new ImageUploadValidator(), diaryMemoryService, snapshotPersistenceService,
-                new ObjectMapper(), clock);
+                tokenService, new ObjectMapper(), clock);
+        given(tokenService.<JsonNode>callWithAccessToken(any(), any()))
+                .willAnswer(invocation -> {
+                    ExternalAccount target = invocation.getArgument(0);
+                    Function<String, JsonNode> call = invocation.getArgument(1);
+                    return call.apply(target.getAccessToken());
+                });
         User user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
         diary = Diary.create(user, LocalDate.of(2026, 7, 30));
@@ -448,6 +457,50 @@ class DiaryContextServiceTest {
                 1L, 10L, LEASE_VERSION, DiaryContextType.SPOTIFY, preloadData);
         verify(persistenceService, never())
                 .saveFailure(any(), any(), anyLong(), eq(DiaryContextType.SPOTIFY));
+    }
+
+    @Test
+    void fallsBackToPreloadedCalendarDataWhenFreshFetchFails() throws Exception {
+        ExternalAccount calendar = mock(ExternalAccount.class);
+        given(calendar.getProvider()).willReturn(ExternalServiceProvider.GOOGLE_CALENDAR);
+        given(calendar.isUseEnabled()).willReturn(true);
+        given(calendar.getAccessToken()).willReturn("token");
+        given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of(calendar));
+
+        JsonNode preloadData = new ObjectMapper().readTree(
+                "{\"items\":[{\"summary\":\"Team sync\"}]}");
+        given(snapshotPersistenceService.findSuccessfulContextData(
+                1L, diary.getDiaryDate(), DiaryContextType.CALENDAR))
+                .willReturn(Optional.of(preloadData));
+        given(dataClient.fetchCalendar("token", diary.getDiaryDate()))
+                .willThrow(new RuntimeException("token expired"));
+
+        service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null, null), List.of());
+
+        verify(persistenceService).saveSuccess(
+                1L, 10L, LEASE_VERSION, DiaryContextType.CALENDAR, preloadData);
+        verify(persistenceService, never())
+                .saveFailure(any(), any(), anyLong(), eq(DiaryContextType.CALENDAR));
+    }
+
+    @Test
+    void savesCalendarFailureWhenFreshFetchFailsWithoutPreload() {
+        ExternalAccount calendar = mock(ExternalAccount.class);
+        given(calendar.getProvider()).willReturn(ExternalServiceProvider.GOOGLE_CALENDAR);
+        given(calendar.isUseEnabled()).willReturn(true);
+        given(calendar.getAccessToken()).willReturn("token");
+        given(accountRepository.findAllByUser_Id(1L)).willReturn(List.of(calendar));
+        given(dataClient.fetchCalendar("token", diary.getDiaryDate()))
+                .willThrow(new RuntimeException("token expired"));
+
+        var response = service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null, null), List.of());
+
+        assertThat(response.contexts()).singleElement()
+                .matches(result -> !result.success());
+        verify(persistenceService).saveFailure(
+                1L, 10L, LEASE_VERSION, DiaryContextType.CALENDAR);
     }
 
     private byte[] imageBytes(boolean jpeg) {

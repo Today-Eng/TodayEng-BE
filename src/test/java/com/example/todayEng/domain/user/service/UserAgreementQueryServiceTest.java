@@ -1,12 +1,15 @@
 package com.example.todayEng.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
 import com.example.todayEng.domain.notification.repository.NotificationSettingRepository;
 import com.example.todayEng.domain.diary.service.DiaryDeletionService;
 import com.example.todayEng.domain.home.repository.DailyContextSnapshotRepository;
 import com.example.todayEng.domain.user.dto.UserDtos.AgreementStatus;
+import com.example.todayEng.domain.user.dto.UserDtos.AgreementItem;
+import com.example.todayEng.domain.user.dto.UserDtos.AgreementsRequest;
 import com.example.todayEng.domain.user.entity.Terms;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.entity.UserTerms;
@@ -20,6 +23,8 @@ import com.example.todayEng.domain.user.repository.TermsRepository;
 import com.example.todayEng.domain.user.repository.UserInterestRepository;
 import com.example.todayEng.domain.user.repository.UserRepository;
 import com.example.todayEng.domain.user.repository.UserTermsRepository;
+import com.example.todayEng.global.error.ErrorCode;
+import com.example.todayEng.global.error.exception.BaseException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -110,6 +115,20 @@ class UserAgreementQueryServiceTest {
         var response = userService.getAgreements(USER_ID);
 
         assertThat(response.allRequiredAgreed()).isFalse();
+    }
+
+    @Test
+    void rejectsDisagreementToRequiredTerm() {
+        Terms requiredTerm = term(10L, TermsType.SERVICE_USE, "서비스 약관 내용");
+        given(termsRepository.findByIdAndActiveTrue(10L)).willReturn(Optional.of(requiredTerm));
+
+        assertThatThrownBy(() -> userService.agree(
+                USER_ID,
+                new AgreementsRequest(List.of(new AgreementItem(10L, false)))
+        ))
+                .isInstanceOf(BaseException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.REQUIRED_TERMS_NOT_AGREED);
     }
 
     private Terms term(Long id, TermsType type, String content) {

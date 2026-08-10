@@ -62,6 +62,7 @@ public enum ErrorCode {
     UNSUPPORTED_OAUTH_PROVIDER(HttpStatus.BAD_REQUEST, "E013", "지원하지 않는 외부 서비스 provider입니다."),
     OAUTH_STATE_CONSUME_FAILED(HttpStatus.CONFLICT, "E014", "OAuth 인증 요청 처리에 실패했습니다."),
     OAUTH_AUTHORIZATION_CODE_MISSING(HttpStatus.BAD_REQUEST, "E015", "OAuth Authorization Code가 존재하지 않습니다."),
+    OAUTH_TOKEN_REFRESH_FAILED(HttpStatus.BAD_GATEWAY, "E016", "OAuth 토큰 갱신에 실패했습니다. 외부 서비스를 다시 연동해 주세요."),
 
     // Diary (D)
     MAIN_QUESTION_CANNOT_HAVE_PARENT(HttpStatus.BAD_REQUEST, "D001", "메인 질문에는 상위 질문을 지정할 수 없습니다."),
