@@ -20,12 +20,16 @@ public class ExternalDiaryContextDataClient implements DiaryContextDataClient {
     public JsonNode fetchCalendar(String accessToken, LocalDate date) {
         String uri = UriComponentsBuilder
                 .fromUriString("https://www.googleapis.com/calendar/v3/calendars/primary/events")
-                .queryParam("timeMin", date.atStartOfDay(SERVICE_ZONE).toOffsetDateTime())
-                .queryParam("timeMax", date.plusDays(1).atStartOfDay(SERVICE_ZONE).toOffsetDateTime())
+                .queryParam("timeMin", rfc3339(date))
+                .queryParam("timeMax", rfc3339(date.plusDays(1)))
                 .queryParam("singleEvents", true)
                 .queryParam("orderBy", "startTime")
                 .build().encode().toUriString();
         return getWithBearer(uri, accessToken);
+    }
+
+    private String rfc3339(LocalDate date) {
+        return date.atStartOfDay(SERVICE_ZONE).toInstant().toString();
     }
 
     @Override
