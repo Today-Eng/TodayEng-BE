@@ -1,5 +1,6 @@
 package com.example.todayEng.domain.diary.client;
 
+import com.example.todayEng.domain.diary.config.GeminiProperties;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.example.todayEng.global.log.ExternalCallLog;
@@ -13,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -34,33 +34,30 @@ public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient 
             """;
 
     private final RestClient restClient;
+    private final GeminiProperties properties;
     private final ObjectMapper objectMapper;
 
     public GeminiDiaryImageAnalysisClient(
             @Qualifier("geminiRestClient") RestClient restClient,
+            GeminiProperties properties,
             ObjectMapper objectMapper
     ) {
         this.restClient = restClient;
+        this.properties = properties;
         this.objectMapper = objectMapper;
     }
 
-    @Value("${GEMINI_API_KEY:}")
-    private String apiKey;
-
-    @Value("${GEMINI_MODEL:gemini-2.5-flash}")
-    private String model;
-
     @Override
     public JsonNode analyze(List<MultipartFile> images) {
-        if (apiKey == null || apiKey.isBlank()) {
+        if (properties.apiKey() == null || properties.apiKey().isBlank()) {
             log.warn("Gemini image analysis skipped: GEMINI_API_KEY is not configured");
             throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
         }
 
         try {
             JsonNode response = restClient.post()
-                    .uri(API_URI, model)
-                    .header("x-goog-api-key", apiKey)
+                    .uri(API_URI, properties.model())
+                    .header("x-goog-api-key", properties.apiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(createRequest(images))
                     .retrieve()
@@ -73,7 +70,8 @@ public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient 
                         ? 0
                         : response.path("candidates").size();
                 log.warn("Gemini image analysis returned no text: model={}, hasResponse={}, "
-                        + "candidateCount={}", model, response != null, candidateCount);
+                        + "candidateCount={}", properties.model(), response != null,
+                        candidateCount);
                 throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
             }
             return objectMapper.readTree(analysis);
@@ -81,7 +79,7 @@ public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient 
             throw exception;
         } catch (IOException | RestClientException exception) {
             log.warn("Gemini image analysis failed: model={}, imageCount={}, cause={}",
-                    model, images.size(), ExternalCallLog.describe(exception));
+                    properties.model(), images.size(), ExternalCallLog.describe(exception));
             throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }
