@@ -7,19 +7,25 @@ import com.example.todayEng.domain.diary.entity.enums.QuestionType;
 import com.example.todayEng.domain.diary.prompt.AnswerCorrectionPromptFactory;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
+import com.example.todayEng.global.log.LlmCallLog;
+import com.example.todayEng.global.log.LlmFeature;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+@Slf4j
 @Component
 public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClient {
+
+    private static final LlmFeature FEATURE = LlmFeature.ANSWER_CORRECTION;
+
     private final RestClient restClient;
     private final GeminiProperties properties;
     private final AnswerCorrectionPromptFactory promptFactory;
@@ -35,7 +41,11 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
 
     @Override
     public AnswerCorrectionLlmResponse correct(AnswerCorrectionCommand command) {
-        if (properties.apiKey() == null || properties.apiKey().isBlank()) throw new BaseException(ErrorCode.LLM_API_FAILED);
+        if (properties.apiKey() == null || properties.apiKey().isBlank()) {
+            log.warn("LLM call failed: {}", LlmCallLog.failure(
+                    FEATURE, properties.model(), "api key is not configured"));
+            throw new BaseException(ErrorCode.LLM_API_FAILED);
+        }
         try {
             GeminiResponse response = restClient.post()
                     .uri("/v1beta/models/{model}:generateContent", properties.model())
@@ -53,10 +63,22 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
         } catch (BaseException exception) {
             throw exception;
         } catch (JsonProcessingException exception) {
-            throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
+            throw invalidResponse("response text is not valid JSON", exception);
         } catch (RestClientException exception) {
+            log.warn("LLM call failed: {}",
+                    LlmCallLog.failure(FEATURE, properties.model(), exception));
             throw new BaseException(ErrorCode.LLM_API_FAILED);
         }
+    }
+
+    private BaseException invalidResponse(String reason) {
+        return invalidResponse(reason, null);
+    }
+
+    private BaseException invalidResponse(String reason, Throwable cause) {
+        log.warn("LLM call failed: {}",
+                LlmCallLog.failure(FEATURE, properties.model(), reason, cause));
+        return new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
     }
 
     private Map<String, Object> schema(QuestionType type) {
@@ -81,11 +103,11 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
     }
 
     private String extract(GeminiResponse response) {
-        if (response == null || response.candidates() == null) throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
-        return response.candidates().stream().filter(c -> c.content() != null)
-                .flatMap(c -> c.content().parts().stream()).map(Part::text)
+        if (response == null || response.candidates() == null) throw invalidResponse("response has no candidates");
+        return response.candidates().stream().filter(c -> c != null && c.content() != null)
+                .flatMap(c -> c.content().parts().stream()).filter(p -> p != null).map(Part::text)
                 .filter(t -> t != null && !t.isBlank()).findFirst()
-                .orElseThrow(() -> new BaseException(ErrorCode.INVALID_LLM_RESPONSE));
+                .orElseThrow(() -> invalidResponse("response has no usable text"));
     }
 
     private void validate(QuestionType type, AnswerCorrectionLlmResponse r) {
@@ -93,7 +115,7 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
                 || (type == QuestionType.MAIN && (r.followUpQuestion() == null
                 || blank(r.followUpQuestion().questionText()) || blank(r.followUpQuestion().koreanTranslation())))
                 || (type == QuestionType.FOLLOW_UP && r.followUpQuestion() != null)) {
-            throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
+            throw invalidResponse("response does not satisfy the correction schema");
         }
     }
 

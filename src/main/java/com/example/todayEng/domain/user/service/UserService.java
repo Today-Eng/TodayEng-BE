@@ -1,6 +1,8 @@
 package com.example.todayEng.domain.user.service;
 
 import com.example.todayEng.domain.notification.repository.NotificationSettingRepository;
+import com.example.todayEng.domain.diary.service.DiaryDeletionService;
+import com.example.todayEng.domain.home.repository.DailyContextSnapshotRepository;
 import com.example.todayEng.domain.user.dto.UserDtos.*;
 import com.example.todayEng.domain.user.entity.*;
 import com.example.todayEng.domain.user.entity.enums.TermsType;
@@ -28,6 +30,9 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final ExternalAccountRepository externalAccountRepository;
     private final NotificationSettingRepository notificationSettingRepository;
+    private final DailyContextSnapshotRepository dailyContextSnapshotRepository;
+    private final OAuthAuthorizationRequestRepository oAuthAuthorizationRequestRepository;
+    private final DiaryDeletionService diaryDeletionService;
 
     @Transactional
     public void agree(Long userId, AgreementsRequest request) {
@@ -96,7 +101,12 @@ public class UserService {
     public void withdraw(Long userId) {
         User user = getUser(userId);
 
+        dailyContextSnapshotRepository.deleteAllByUserId(userId);
+        diaryDeletionService.deleteAllByUserId(userId);
+
         refreshTokenRepository.deleteAllByUserId(userId);
+
+        oAuthAuthorizationRequestRepository.deleteAllByUserId(userId);
 
         userTermsRepository.deleteAllByUserId(userId);
         userInterestRepository.deleteAllByUserId(userId);

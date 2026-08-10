@@ -1,8 +1,10 @@
 package com.example.todayEng.domain.diary.client;
 
+import com.example.todayEng.domain.diary.config.GeminiProperties;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
-import com.example.todayEng.global.log.ExternalCallLog;
+import com.example.todayEng.global.log.LlmCallLog;
+import com.example.todayEng.global.log.LlmFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -13,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -24,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Component
 public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient {
 
+    private static final LlmFeature FEATURE = LlmFeature.DIARY_IMAGE_ANALYSIS;
     private static final String API_URI =
             "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
     private static final String PROMPT = """
@@ -34,33 +36,31 @@ public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient 
             """;
 
     private final RestClient restClient;
+    private final GeminiProperties properties;
     private final ObjectMapper objectMapper;
 
     public GeminiDiaryImageAnalysisClient(
             @Qualifier("geminiRestClient") RestClient restClient,
+            GeminiProperties properties,
             ObjectMapper objectMapper
     ) {
         this.restClient = restClient;
+        this.properties = properties;
         this.objectMapper = objectMapper;
     }
 
-    @Value("${GEMINI_API_KEY:}")
-    private String apiKey;
-
-    @Value("${GEMINI_MODEL:gemini-2.5-flash}")
-    private String model;
-
     @Override
     public JsonNode analyze(List<MultipartFile> images) {
-        if (apiKey == null || apiKey.isBlank()) {
-            log.warn("Gemini image analysis skipped: GEMINI_API_KEY is not configured");
+        if (properties.apiKey() == null || properties.apiKey().isBlank()) {
+            log.warn("LLM call failed: {}", LlmCallLog.failure(
+                    FEATURE, properties.model(), "api key is not configured"));
             throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
         }
 
         try {
             JsonNode response = restClient.post()
-                    .uri(API_URI, model)
-                    .header("x-goog-api-key", apiKey)
+                    .uri(API_URI, properties.model())
+                    .header("x-goog-api-key", properties.apiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(createRequest(images))
                     .retrieve()
@@ -72,16 +72,19 @@ public class GeminiDiaryImageAnalysisClient implements DiaryImageAnalysisClient 
                 int candidateCount = response == null
                         ? 0
                         : response.path("candidates").size();
-                log.warn("Gemini image analysis returned no text: model={}, hasResponse={}, "
-                        + "candidateCount={}", model, response != null, candidateCount);
+                log.warn("LLM call failed: {}, candidateCount={}",
+                        LlmCallLog.failure(FEATURE, properties.model(),
+                                "response has no usable text"),
+                        candidateCount);
                 throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
             }
             return objectMapper.readTree(analysis);
         } catch (BaseException exception) {
             throw exception;
         } catch (IOException | RestClientException exception) {
-            log.warn("Gemini image analysis failed: model={}, imageCount={}, cause={}",
-                    model, images.size(), ExternalCallLog.describe(exception));
+            log.warn("LLM call failed: {}, imageCount={}",
+                    LlmCallLog.failure(FEATURE, properties.model(), exception),
+                    images.size());
             throw new BaseException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }
