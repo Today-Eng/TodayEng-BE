@@ -309,6 +309,23 @@ class DiaryContextServiceTest {
     }
 
     @Test
+    void usesPreloadedWeatherWhenLocationIsAbsent() {
+        JsonNode preload = new ObjectMapper().createObjectNode().put("temperature", 24);
+        given(snapshotPersistenceService.findSuccessfulContextData(
+                1L, diary.getDiaryDate(), DiaryContextType.WEATHER))
+                .willReturn(Optional.of(preload));
+
+        service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null, null), List.of());
+
+        verify(dataClient, never()).fetchWeather(any(), any());
+        verify(persistenceService).saveSuccess(
+                1L, 10L, LEASE_VERSION, DiaryContextType.WEATHER, preload);
+        verify(snapshotPersistenceService).cleanupCollected(
+                1L, diary.getDiaryDate(), DiaryContextType.WEATHER);
+    }
+
+    @Test
     void mergesSpotifyPreloadWithFreshFetchWithoutDuplicates() throws Exception {
         ExternalAccount spotify = mock(ExternalAccount.class);
         given(spotify.getProvider()).willReturn(ExternalServiceProvider.SPOTIFY);

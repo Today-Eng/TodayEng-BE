@@ -85,6 +85,9 @@ public class DailyContextPreloadService {
             DiaryContextType type,
             Supplier<JsonNode> collector
     ) {
+        if (persistenceService.findSuccessfulContextData(userId, date, type).isPresent()) {
+            return new ContextResult(type, ResultStatus.SUCCEEDED);
+        }
         SnapshotClaim claim = claimSnapshot(userId, date, type);
         if (claim == null) {
             log.debug("Daily context preload skipped: userId={}, date={}, type={}, "

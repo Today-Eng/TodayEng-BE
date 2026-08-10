@@ -132,6 +132,13 @@ public class DiaryContextService {
                     () -> contextDataClient.fetchWeather(
                             request.location(), diary.getDiaryDate()))
                     .ifPresent(contexts::add);
+        } else {
+            snapshotPersistenceService.findSuccessfulContextData(
+                            userId, diary.getDiaryDate(), DiaryContextType.WEATHER)
+                    .flatMap(preload -> collect(
+                            userId, diaryId, leaseVersion, diary.getDiaryDate(),
+                            DiaryContextType.WEATHER, () -> preload))
+                    .ifPresent(contexts::add);
         }
         diaryMemoryService.create(userId, diaryId).ifPresent(contexts::add);
 

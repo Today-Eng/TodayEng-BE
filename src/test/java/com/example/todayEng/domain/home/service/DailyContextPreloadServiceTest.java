@@ -111,6 +111,22 @@ class DailyContextPreloadServiceTest {
     }
 
     @Test
+    void reusesSuccessfulSnapshotWithoutCallingExternalApi() {
+        given(persistenceService.findSuccessfulContextData(
+                USER_ID, TODAY, DiaryContextType.WEATHER))
+                .willReturn(Optional.of(new ObjectMapper().createObjectNode()));
+
+        DailyContextPreloadResponse response =
+                service.preload(USER_ID, new Location(37.5, 127.0));
+
+        verify(persistenceService, never()).start(any(), any(), any());
+        verify(dataClient, never()).fetchWeather(any(), any());
+        assertThat(response.contexts())
+                .extracting(ContextResult::type, ContextResult::status)
+                .containsExactly(tuple(DiaryContextType.WEATHER, ResultStatus.SUCCEEDED));
+    }
+
+    @Test
     void skipsExternalCallWhenActiveSnapshotCannotBeReclaimed() {
         given(persistenceService.start(USER_ID, TODAY, DiaryContextType.WEATHER))
                 .willThrow(new DataIntegrityViolationException("duplicate"));
