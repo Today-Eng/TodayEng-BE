@@ -14,6 +14,8 @@ import java.util.Optional;
 
 public interface OAuthAuthorizationRequestRepository extends JpaRepository<OAuthAuthorizationRequest, Long> {
 
+    long deleteAllByUserId(Long userId);
+
     Optional<OAuthAuthorizationRequest> findByStateHashAndProvider(
             String stateHash,
             ExternalServiceProvider provider
