@@ -95,9 +95,9 @@ public class GeminiReflectionQuestionLlmClient
                         "questionText", Map.of("type", "string"),
                         "koreanTranslation", Map.of("type", "string"),
                         "keyword", Map.of("type", "string"),
+                        // 관심사 기반 질문은 근거 컨텍스트가 없어 null을 반환해야 한다
                         "contextId", Map.of(
-                                "type", "integer",
-                                "nullable", true
+                                "type", List.of("integer", "null")
                         )
                 ),
                 "required", List.of(

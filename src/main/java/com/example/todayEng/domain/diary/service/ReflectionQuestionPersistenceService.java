@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -125,7 +126,7 @@ public class ReflectionQuestionPersistenceService {
 
         List<Long> contextIds = generated.stream()
                 .map(ReflectionQuestionLlmResponse.GeneratedQuestion::contextId)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .distinct()
                 .toList();
         Map<Long, DiaryContext> contexts = contextRepository
@@ -190,9 +191,6 @@ public class ReflectionQuestionPersistenceService {
             throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
         }
 
-        Set<Long> allowedContextIds = command.contexts().stream()
-                .map(ReflectionQuestionGenerationCommand.ContextInput::contextId)
-                .collect(Collectors.toSet());
         Set<Integer> orders = response.questions().stream()
                 .map(ReflectionQuestionLlmResponse.GeneratedQuestion::order)
                 .collect(Collectors.toSet());
@@ -200,13 +198,10 @@ public class ReflectionQuestionPersistenceService {
             throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
         }
 
+        validateContextComposition(command, response);
+
         for (ReflectionQuestionLlmResponse.GeneratedQuestion question
                 : response.questions()) {
-            boolean interestFallback = allowedContextIds.isEmpty();
-            if ((interestFallback && question.contextId() != null)
-                    || (!interestFallback && !allowedContextIds.contains(question.contextId()))) {
-                throw new BaseException(ErrorCode.INVALID_QUESTION_CONTEXT);
-            }
             if (isBlank(question.questionText())
                     || isBlank(question.koreanTranslation())
                     || isBlank(question.keyword())
@@ -220,6 +215,35 @@ public class ReflectionQuestionPersistenceService {
                         ReflectionQuestionLlmResponse.GeneratedQuestion::order
                 ))
                 .toList();
+    }
+
+    /**
+     * 컨텍스트가 부족할 때 같은 소재가 반복되지 않도록, 컨텍스트 기반 질문과 관심사 기반
+     * 질문의 구성이 프롬프트에 요구한 정책과 일치하는지 검증한다.
+     */
+    private void validateContextComposition(
+            ReflectionQuestionGenerationCommand command,
+            ReflectionQuestionLlmResponse response
+    ) {
+        ReflectionQuestionGenerationCommand.QuestionPlan plan = command.plan();
+        Set<Long> allowedContextIds = command.contexts().stream()
+                .map(ReflectionQuestionGenerationCommand.ContextInput::contextId)
+                .collect(Collectors.toSet());
+        List<Long> usedContextIds = response.questions().stream()
+                .map(ReflectionQuestionLlmResponse.GeneratedQuestion::contextId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (usedContextIds.size() != plan.contextQuestionCount()) {
+            throw new BaseException(ErrorCode.INVALID_QUESTION_CONTEXT);
+        }
+        if (!allowedContextIds.containsAll(usedContextIds)) {
+            throw new BaseException(ErrorCode.INVALID_QUESTION_CONTEXT);
+        }
+        if (plan.requireDistinctContexts()
+                && Set.copyOf(usedContextIds).size() != usedContextIds.size()) {
+            throw new BaseException(ErrorCode.INVALID_QUESTION_CONTEXT);
+        }
     }
 
     private boolean claimQuestionGeneration(Long diaryId, Long userId) {
