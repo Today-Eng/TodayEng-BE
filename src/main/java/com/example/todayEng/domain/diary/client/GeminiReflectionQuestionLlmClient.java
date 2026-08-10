@@ -6,19 +6,25 @@ import com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionLlmResponse;
 import com.example.todayEng.domain.diary.prompt.ReflectionQuestionPromptFactory;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
+import com.example.todayEng.global.log.LlmCallLog;
+import com.example.todayEng.global.log.LlmFeature;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+@Slf4j
 @Component
 public class GeminiReflectionQuestionLlmClient
         implements ReflectionQuestionLlmClient {
+
+    private static final LlmFeature FEATURE = LlmFeature.REFLECTION_QUESTION;
 
     private final RestClient restClient;
     private final GeminiProperties properties;
@@ -42,6 +48,8 @@ public class GeminiReflectionQuestionLlmClient
             ReflectionQuestionGenerationCommand command
     ) {
         if (properties.apiKey() == null || properties.apiKey().isBlank()) {
+            log.warn("LLM call failed: {}", LlmCallLog.failure(
+                    FEATURE, properties.model(), "api key is not configured"));
             throw new BaseException(ErrorCode.LLM_API_FAILED);
         }
 
@@ -58,6 +66,8 @@ public class GeminiReflectionQuestionLlmClient
         } catch (BaseException exception) {
             throw exception;
         } catch (RestClientException exception) {
+            log.warn("LLM call failed: {}",
+                    LlmCallLog.failure(FEATURE, properties.model(), exception));
             throw new BaseException(ErrorCode.LLM_API_FAILED);
         }
     }
@@ -124,24 +134,35 @@ public class GeminiReflectionQuestionLlmClient
                     ReflectionQuestionLlmResponse.class
             );
         } catch (JsonProcessingException exception) {
-            throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
+            throw invalidResponse("response text is not valid JSON", exception);
         }
     }
 
     private String extractText(GeminiGenerateResponse response) {
         if (response == null || response.candidates() == null) {
-            throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
+            throw invalidResponse("response has no candidates");
         }
 
         return response.candidates().stream()
-                .filter(candidate -> candidate.content() != null)
+                .filter(candidate -> candidate != null && candidate.content() != null)
                 .flatMap(candidate -> candidate.content().parts().stream())
+                .filter(part -> part != null)
                 .map(GeminiPart::text)
                 .filter(text -> text != null && !text.isBlank())
                 .findFirst()
                 .orElseThrow(() ->
-                        new BaseException(ErrorCode.INVALID_LLM_RESPONSE)
+                        invalidResponse("response has no usable text")
                 );
+    }
+
+    private BaseException invalidResponse(String reason) {
+        return invalidResponse(reason, null);
+    }
+
+    private BaseException invalidResponse(String reason, Throwable cause) {
+        log.warn("LLM call failed: {}",
+                LlmCallLog.failure(FEATURE, properties.model(), reason, cause));
+        return new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
     }
 
     private record GeminiGenerateResponse(List<GeminiCandidate> candidates) {

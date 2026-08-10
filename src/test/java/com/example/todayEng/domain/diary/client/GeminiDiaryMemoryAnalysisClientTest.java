@@ -103,6 +103,24 @@ class GeminiDiaryMemoryAnalysisClientTest {
                                 .isEqualTo(ErrorCode.INVALID_LLM_RESPONSE));
     }
 
+    @Test
+    void convertsNullCandidateElementsToDomainError() {
+        var command = command();
+        given(promptFactory.create(command)).willReturn("prompt");
+        server.expect(requestTo(
+                        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+                ))
+                .andRespond(withSuccess(
+                        "{\"candidates\":[null,{\"content\":{\"parts\":[null]}}]}",
+                        MediaType.APPLICATION_JSON
+                ));
+
+        assertThatThrownBy(() -> client.analyze(command))
+                .isInstanceOfSatisfying(BaseException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.INVALID_LLM_RESPONSE));
+    }
+
     private String geminiResponse(String text) throws Exception {
         return objectMapper.writeValueAsString(Map.of(
                 "candidates", List.of(Map.of(
