@@ -49,6 +49,27 @@ public interface DailyContextSnapshotRepository
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE DailyContextSnapshot s
+            SET s.collectionStatus = :inProgress,
+                s.contextData = null,
+                s.updatedAt = :now,
+                s.leaseVersion = s.leaseVersion + 1
+            WHERE s.user.id = :userId
+              AND s.contextDate = :contextDate
+              AND s.contextType = :contextType
+              AND s.collectionStatus = :failed
+            """)
+    int restartFailed(
+            @Param("userId") Long userId,
+            @Param("contextDate") LocalDate contextDate,
+            @Param("contextType") DiaryContextType contextType,
+            @Param("inProgress") DailyContextCollectionStatus inProgress,
+            @Param("failed") DailyContextCollectionStatus failed,
+            @Param("now") LocalDateTime now
+    );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE DailyContextSnapshot s
             SET s.collectionStatus = :targetStatus, s.leaseVersion = s.leaseVersion + 1
             WHERE s.id = :id
               AND s.collectionStatus = :inProgress

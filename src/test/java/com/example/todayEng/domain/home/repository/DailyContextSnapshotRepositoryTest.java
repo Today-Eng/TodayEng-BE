@@ -110,6 +110,29 @@ class DailyContextSnapshotRepositoryTest {
     }
 
     @Test
+    void restartsFailedSnapshotInTheSameRow() {
+        User user = userRepository.save(User.create());
+        LocalDate date = LocalDate.of(2026, 8, 6);
+        DailyContextSnapshot snapshot = DailyContextSnapshot.start(
+                user, date, DiaryContextType.WEATHER);
+        snapshot.fail();
+        snapshotRepository.saveAndFlush(snapshot);
+
+        int updated = snapshotRepository.restartFailed(
+                user.getId(), date, DiaryContextType.WEATHER,
+                DailyContextCollectionStatus.IN_PROGRESS,
+                DailyContextCollectionStatus.FAILED,
+                LocalDateTime.now());
+
+        assertThat(updated).isEqualTo(1);
+        DailyContextSnapshot restarted = snapshotRepository.findById(snapshot.getId())
+                .orElseThrow();
+        assertThat(restarted.getCollectionStatus())
+                .isEqualTo(DailyContextCollectionStatus.IN_PROGRESS);
+        assertThat(restarted.getLeaseVersion()).isEqualTo(1L);
+    }
+
+    @Test
     void finishIfOwnedTransitionsMatchingInProgressSnapshotToSucceeded() {
         User user = userRepository.save(User.create());
         LocalDate date = LocalDate.of(2026, 8, 6);
