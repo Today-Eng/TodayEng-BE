@@ -62,6 +62,52 @@ class ReflectionQuestionPromptFactoryTest {
     }
 
     @Test
+    void asksForDistinctContextsWhenEnoughContextsExist() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, 1L, "성연", EnglishLevel.INTERMEDIATE, List.of("MUSIC"),
+                List.of(contextInput(100L), contextInput(101L), contextInput(102L)));
+
+        String prompt = promptFactory.create(command);
+
+        assertThat(prompt)
+                .contains("Exactly 3 question(s) must be grounded in the provided contexts.")
+                .contains("Exactly 0 question(s) must be based on the user's interests only.")
+                .contains("must use a different contextId")
+                .doesNotContain("Interest-based question rules");
+    }
+
+    @Test
+    void splitsQuestionsBetweenContextAndInterestWhenContextIsScarce() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, 1L, "성연", EnglishLevel.INTERMEDIATE, List.of("MUSIC"),
+                List.of(contextInput(100L)));
+
+        String prompt = promptFactory.create(command);
+
+        assertThat(prompt)
+                .contains("Exactly 1 question(s) must be grounded in the provided contexts.")
+                .contains("Exactly 2 question(s) must be based on the user's interests only.")
+                .contains("Context-grounded question rules")
+                .contains("Interest-based question rules")
+                .contains("contextId as null")
+                .doesNotContain("There is no diary context");
+    }
+
+    @Test
+    void allowsContextReuseWhenUserHasNoInterests() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, 1L, "성연", EnglishLevel.INTERMEDIATE, List.of(),
+                List.of(contextInput(100L)));
+
+        String prompt = promptFactory.create(command);
+
+        assertThat(prompt)
+                .contains("Exactly 3 question(s) must be grounded in the provided contexts.")
+                .doesNotContain("must use a different contextId")
+                .doesNotContain("Interest-based question rules");
+    }
+
+    @Test
     void replacesNullNicknameWithEmptyStringInContextPrompt() {
         var command = new ReflectionQuestionGenerationCommand(
                 1L, 10L, 1L, null, EnglishLevel.INTERMEDIATE, List.of("MUSIC"),
@@ -84,5 +130,13 @@ class ReflectionQuestionPromptFactoryTest {
 
         assertThat(command.nickname()).isEmpty();
         assertThat(prompt).contains("nickname: \"\"").doesNotContain("nickname: null");
+    }
+
+    private ReflectionQuestionGenerationCommand.ContextInput contextInput(long contextId) {
+        return new ReflectionQuestionGenerationCommand.ContextInput(
+                contextId,
+                DiaryContextType.MEMO,
+                objectMapper.createObjectNode().put("memo", "context " + contextId)
+        );
     }
 }
