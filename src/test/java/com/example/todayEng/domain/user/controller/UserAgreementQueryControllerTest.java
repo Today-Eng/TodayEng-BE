@@ -1,12 +1,16 @@
 package com.example.todayEng.domain.user.controller;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.todayEng.domain.user.dto.UserDtos.AgreementResponse;
+import com.example.todayEng.domain.user.dto.UserDtos.AgreementItem;
 import com.example.todayEng.domain.user.dto.UserDtos.AgreementStatus;
+import com.example.todayEng.domain.user.dto.UserDtos.AgreementsRequest;
 import com.example.todayEng.domain.user.dto.UserDtos.AgreementsResponse;
 import com.example.todayEng.domain.user.entity.enums.TermsType;
 import com.example.todayEng.domain.user.service.UserService;
@@ -24,6 +28,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -72,5 +77,27 @@ class UserAgreementQueryControllerTest {
     void unauthenticatedRequestIsRejected() throws Exception {
         mockMvc.perform(get("/api/users/me/agreements"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void authenticatedUserCanUpdateAgreement() throws Exception {
+        given(jwtTokenProvider.parse("valid-token", "access"))
+                .willReturn(Jwts.claims().subject("1").build());
+
+        mockMvc.perform(patch("/api/users/me/agreements")
+                        .header("Authorization", "Bearer valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "agreements": [
+                                    {"termId": 9, "agree": true}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(userService).agree(1L, new AgreementsRequest(List.of(new AgreementItem(9L, true))));
     }
 }
