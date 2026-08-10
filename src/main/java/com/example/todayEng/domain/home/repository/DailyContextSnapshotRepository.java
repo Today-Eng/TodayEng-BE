@@ -66,4 +66,6 @@ public interface DailyContextSnapshotRepository
             LocalDate contextDate,
             DiaryContextType contextType
     );
+
+    long deleteAllByUserId(Long userId);
 }

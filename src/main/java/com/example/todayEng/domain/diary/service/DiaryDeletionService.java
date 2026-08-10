@@ -60,4 +60,33 @@ public class DiaryDeletionService {
                 DiaryAudioCleanupEvent.of(answerAudioKeys, ttsAudioKeys)
         );
     }
+
+    @Transactional
+    public void deleteAllByUserId(Long userId) {
+        List<Long> diaryIds = diaryRepository.findAllIdsByUserId(userId);
+        if (diaryIds.isEmpty()) {
+            return;
+        }
+
+        List<String> answerAudioKeys = diaryIds.stream()
+                .flatMap(diaryId -> answerRepository.findAudioKeysByDiaryId(diaryId).stream())
+                .toList();
+        List<String> ttsAudioKeys = diaryIds.stream()
+                .flatMap(diaryId -> questionRepository.findTtsAudioKeysByDiaryId(diaryId).stream())
+                .toList();
+
+        for (Long diaryId : diaryIds) {
+            contextSourceRepository.deleteAllBySourceDiaryId(diaryId);
+            contextSourceRepository.deleteAllByContextDiaryId(diaryId);
+            answerRepository.deleteAllByDiaryId(diaryId);
+            questionRepository.deleteFollowUpsByDiaryId(diaryId);
+            questionRepository.deleteAllByDiaryId(diaryId);
+            contextRepository.deleteAllByDiaryId(diaryId);
+        }
+        diaryRepository.deleteAllByUserId(userId);
+
+        eventPublisher.publishEvent(
+                DiaryAudioCleanupEvent.of(answerAudioKeys, ttsAudioKeys)
+        );
+    }
 }
