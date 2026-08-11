@@ -59,16 +59,50 @@ class ReflectionSessionServiceTest {
     }
 
     @Test
-    void marksGenerationFailedWhenLlmFails() {
+    void usesDefaultQuestionsWhenLlmFails() {
         var command = new ReflectionQuestionGenerationCommand(
                 1L, 10L, 1L, "성연", EnglishLevel.BEGINNER, List.of(), List.of()
         );
-        RuntimeException failure = new RuntimeException("llm failed");
+        RuntimeException failure = new com.example.todayEng.global.error.exception.BaseException(
+                com.example.todayEng.global.error.ErrorCode.LLM_API_FAILED);
+        var fallbackResponse = new ReflectionSessionResponse(10L, List.of());
         given(persistenceService.prepare(1L, 10L)).willReturn(command);
         given(llmClient.generateQuestions(command)).willThrow(failure);
+        given(persistenceService.saveDefaultQuestions(command)).willReturn(fallbackResponse);
 
-        assertThatThrownBy(() -> service.create(1L, 10L))
-                .isSameAs(failure);
+        assertThat(service.create(1L, 10L)).isSameAs(fallbackResponse);
+        verify(persistenceService, never()).markFailed(command);
+        verify(emitterManager).sendQuestionsReady(eq(1L), eq(10L), any());
+        verify(questionTtsService).generateFirstQuestion(1L, fallbackResponse);
+    }
+
+    @Test
+    void marksGenerationFailedWhenLlmAndFallbackFail() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, 1L, "성연", EnglishLevel.BEGINNER, List.of(), List.of());
+        RuntimeException llmFailure = new com.example.todayEng.global.error.exception.BaseException(
+                com.example.todayEng.global.error.ErrorCode.INVALID_LLM_RESPONSE);
+        RuntimeException fallbackFailure = new RuntimeException("fallback failed");
+        given(persistenceService.prepare(1L, 10L)).willReturn(command);
+        given(llmClient.generateQuestions(command)).willThrow(llmFailure);
+        given(persistenceService.saveDefaultQuestions(command)).willThrow(fallbackFailure);
+
+        assertThatThrownBy(() -> service.create(1L, 10L)).isSameAs(fallbackFailure);
+        verify(persistenceService).markFailed(command);
+    }
+
+    @Test
+    void persistenceFailureDoesNotUseDefaultQuestions() {
+        var command = new ReflectionQuestionGenerationCommand(
+                1L, 10L, 1L, "성연", EnglishLevel.BEGINNER, List.of(), List.of());
+        var llmResponse = new ReflectionQuestionLlmResponse(List.of());
+        RuntimeException persistenceFailure = new RuntimeException("database failed");
+        given(persistenceService.prepare(1L, 10L)).willReturn(command);
+        given(llmClient.generateQuestions(command)).willReturn(llmResponse);
+        given(persistenceService.saveQuestions(command, llmResponse)).willThrow(persistenceFailure);
+
+        assertThatThrownBy(() -> service.create(1L, 10L)).isSameAs(persistenceFailure);
+        verify(persistenceService, never()).saveDefaultQuestions(command);
         verify(persistenceService).markFailed(command);
     }
 

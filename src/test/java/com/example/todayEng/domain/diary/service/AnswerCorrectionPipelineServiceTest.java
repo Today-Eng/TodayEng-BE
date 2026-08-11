@@ -60,8 +60,26 @@ class AnswerCorrectionPipelineServiceTest {
     }
 
     @Test
-    void failedLlmIsPersistedForRetry() {
+    void failedMainLlmUsesDefaultFollowUp() {
         var command = new AnswerCorrectionCommand(QuestionType.MAIN, "q", "a", EnglishLevel.BEGINNER, null);
+        var work = new AnswerCorrectionWork(1L, 2L, 3L, 4L, command);
+        when(persistenceService.claim(1L, 2L, 3L, 4L)).thenReturn(work);
+        when(llmClient.correct(command)).thenThrow(new BaseException(ErrorCode.LLM_API_FAILED));
+        var fallbackResult = new AnswerCorrectionResult(QuestionType.MAIN, 3L, 4L,
+                "a", "원문 유지", new AnswerCorrectionResult.NextQuestion(5L, "후속?", true), false);
+        when(persistenceService.completeWithDefaultFollowUp(work)).thenReturn(fallbackResult);
+
+        service.process(1L, 2L, 3L, 4L);
+
+        verify(persistenceService).completeWithDefaultFollowUp(work);
+        verify(persistenceService, never()).fail(eq(4L), any());
+        verify(ttsService).generateFollowUpQuestion(1L, 2L, 5L, "후속?");
+    }
+
+    @Test
+    void failedFollowUpLlmIsPersistedForRetry() {
+        var command = new AnswerCorrectionCommand(
+                QuestionType.FOLLOW_UP, "q", "a", EnglishLevel.BEGINNER, null);
         var work = new AnswerCorrectionWork(1L, 2L, 3L, 4L, command);
         when(persistenceService.claim(1L, 2L, 3L, 4L)).thenReturn(work);
         when(llmClient.correct(command)).thenThrow(new BaseException(ErrorCode.LLM_API_FAILED));

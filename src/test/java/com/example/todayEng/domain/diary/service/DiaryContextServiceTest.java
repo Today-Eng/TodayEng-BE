@@ -42,6 +42,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.concurrent.RejectedExecutionException;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,7 +81,7 @@ class DiaryContextServiceTest {
         service = new DiaryContextService(diaryRepository, persistenceService,
                 accountRepository, dataClient, imageAnalysisClient,
                 new ImageUploadValidator(), diaryMemoryService, snapshotPersistenceService,
-                tokenService, new ObjectMapper(), clock);
+                tokenService, new ObjectMapper(), clock, Runnable::run);
         given(tokenService.<JsonNode>callWithAccessToken(any(), any()))
                 .willAnswer(invocation -> {
                     ExternalAccount target = invocation.getArgument(0);
@@ -130,6 +131,42 @@ class DiaryContextServiceTest {
     }
 
     @Test
+    void missingWeatherValuesAreOmittedInsteadOfStoredAsZero() throws Exception {
+        JsonNode weather = new ObjectMapper().readTree("{\"daily\":{}}");
+        given(dataClient.fetchWeather(any(), eq(diary.getDiaryDate()))).willReturn(weather);
+
+        service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null,
+                        new DiaryContextCreateRequest.Location(37.5, 127.0)),
+                List.of());
+
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
+        verify(persistenceService).saveSuccess(eq(1L), eq(10L), eq(LEASE_VERSION),
+                eq(DiaryContextType.WEATHER), captor.capture());
+        assertThat(captor.getValue().isEmpty()).isTrue();
+    }
+
+    @Test
+    void runsCollectorInRequestThreadWhenExecutorRejectsIt() throws Exception {
+        ReflectionTestUtils.setField(service, "contextExecutor",
+                (java.util.concurrent.Executor) command -> {
+                    throw new RejectedExecutionException("full");
+                });
+        JsonNode weather = new ObjectMapper().readTree(
+                "{\"daily\":{\"weather_code\":[1]}}");
+        given(dataClient.fetchWeather(any(), eq(diary.getDiaryDate()))).willReturn(weather);
+
+        service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null,
+                        new DiaryContextCreateRequest.Location(37.5, 127.0)),
+                List.of());
+
+        verify(persistenceService).saveSuccess(eq(1L), eq(10L), eq(LEASE_VERSION),
+                eq(DiaryContextType.WEATHER), any());
+        verify(persistenceService).completeContextCollection(1L, 10L, LEASE_VERSION);
+    }
+
+    @Test
     void rejectsInfiniteCoordinates() {
         var request = new DiaryContextCreateRequest(
                 null,
@@ -148,7 +185,7 @@ class DiaryContextServiceTest {
         var image = new MockMultipartFile(
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
-        var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
+        var analysis = new ObjectMapper().readTree("{\"summary\":\"怨듭썝\"}");
         given(imageAnalysisClient.analyze(List.of(image))).willReturn(photoAnalysis(analysis));
 
         var response = service.createContexts(1L, 10L,
@@ -171,8 +208,8 @@ class DiaryContextServiceTest {
                 "images", "first.jpg", "image/jpeg", imageBytes(true));
         var second = new MockMultipartFile(
                 "images", "second.jpg", "image/jpeg", imageBytes(true));
-        JsonNode park = new ObjectMapper().createObjectNode().put("summary", "공원");
-        JsonNode cafe = new ObjectMapper().createObjectNode().put("summary", "카페");
+        JsonNode park = new ObjectMapper().createObjectNode().put("summary", "怨듭썝");
+        JsonNode cafe = new ObjectMapper().createObjectNode().put("summary", "移댄럹");
         given(imageAnalysisClient.analyze(List.of(first, second)))
                 .willReturn(new DiaryImageAnalysis(List.of(
                         new PhotoContext(List.of(0), park),
@@ -268,7 +305,7 @@ class DiaryContextServiceTest {
         var image = new MockMultipartFile(
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
-        var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
+        var analysis = new ObjectMapper().readTree("{\"summary\":\"怨듭썝\"}");
         given(imageAnalysisClient.analyze(List.of(image))).willReturn(photoAnalysis(analysis));
 
         var response = service.createContexts(1L, 10L,
@@ -301,7 +338,7 @@ class DiaryContextServiceTest {
         var image = new MockMultipartFile(
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
-        var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
+        var analysis = new ObjectMapper().readTree("{\"summary\":\"怨듭썝\"}");
         given(imageAnalysisClient.analyze(List.of(image))).willReturn(photoAnalysis(analysis));
 
         var response = service.createContexts(1L, 10L,
@@ -317,7 +354,7 @@ class DiaryContextServiceTest {
         var image = new MockMultipartFile(
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
-        var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
+        var analysis = new ObjectMapper().readTree("{\"summary\":\"怨듭썝\"}");
         given(imageAnalysisClient.analyze(List.of(image))).willReturn(photoAnalysis(analysis));
         willThrow(new RuntimeException("db blip"))
                 .given(snapshotPersistenceService)
@@ -345,8 +382,11 @@ class DiaryContextServiceTest {
         service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of());
 
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
         verify(persistenceService).saveSuccess(
-                1L, 10L, LEASE_VERSION, DiaryContextType.SPOTIFY, freshData);
+                eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY), captor.capture());
+        assertThat(captor.getValue().path("recentPlays").isArray()).isTrue();
+        assertThat(captor.getValue().path("totalPlays").asInt()).isZero();
         verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
     }
@@ -402,11 +442,9 @@ class DiaryContextServiceTest {
                 eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY),
                 captor.capture());
         JsonNode saved = captor.getValue();
-        assertThat(saved.path("items").size()).isEqualTo(2);
-        assertThat(saved.path("items").get(0).path("track").path("name").asText())
-                .isEqualTo("Evening Song");
-        assertThat(saved.path("items").get(1).path("track").path("name").asText())
-                .isEqualTo("Morning Song");
+        assertThat(saved.path("recentPlays").size()).isEqualTo(2);
+        assertThat(saved.path("recentPlays").toString()).contains("Evening Song", "Morning Song");
+        assertThat(saved.path("totalPlays").asInt()).isEqualTo(2);
         verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
     }
@@ -450,15 +488,11 @@ class DiaryContextServiceTest {
                 eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY),
                 captor.capture());
         JsonNode saved = captor.getValue();
-        assertThat(saved.path("items").size()).isEqualTo(1);
-        assertThat(saved.path("items").get(0).path("track").path("name").asText())
-                .isEqualTo("Morning Song");
-        assertThat(saved.path("href").asText())
-                .isEqualTo("https://api.spotify.com/v1/me/player/recently-played");
-        assertThat(saved.path("cursors").path("after").asText()).isEqualTo("123456");
-        assertThat(saved.path("cursors").path("before").asText()).isEqualTo("654321");
-        assertThat(saved.path("limit").asInt()).isEqualTo(50);
-        assertThat(saved.path("total").asInt()).isEqualTo(2);
+        assertThat(saved.path("recentPlays").size()).isEqualTo(1);
+        assertThat(saved.path("recentPlays").get(0).path("trackAndArtist").asText())
+                .contains("Morning Song");
+        assertThat(saved.path("totalPlays").asInt()).isEqualTo(1);
+        assertThat(saved.has("href")).isFalse();
     }
 
     @Test
@@ -504,8 +538,10 @@ class DiaryContextServiceTest {
         service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of());
 
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
         verify(persistenceService).saveSuccess(
-                1L, 10L, LEASE_VERSION, DiaryContextType.SPOTIFY, preloadData);
+                eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY), captor.capture());
+        assertThat(captor.getValue().path("recentPlays").toString()).contains("Morning Song");
         verify(persistenceService, never())
                 .saveFailure(any(), any(), anyLong(), eq(DiaryContextType.SPOTIFY));
     }
@@ -529,8 +565,11 @@ class DiaryContextServiceTest {
         service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of());
 
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
         verify(persistenceService).saveSuccess(
-                1L, 10L, LEASE_VERSION, DiaryContextType.CALENDAR, preloadData);
+                eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.CALENDAR), captor.capture());
+        assertThat(captor.getValue().path("events").get(0).path("title").asText())
+                .isEqualTo("Team sync");
         verify(persistenceService, never())
                 .saveFailure(any(), any(), anyLong(), eq(DiaryContextType.CALENDAR));
     }

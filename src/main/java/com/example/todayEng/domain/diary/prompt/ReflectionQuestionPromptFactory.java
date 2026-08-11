@@ -54,7 +54,6 @@ public class ReflectionQuestionPromptFactory {
             prompt.append(SHARED_RULES)
                     .append(UNTRUSTED_DATA_RULES)
                     .append(payload(command));
-
             return prompt.toString();
         } catch (JsonProcessingException exception) {
             throw new BaseException(ErrorCode.INTERNAL_SERVER_ERROR);

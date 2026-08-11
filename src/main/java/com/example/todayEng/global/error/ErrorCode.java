@@ -103,6 +103,7 @@ public enum ErrorCode {
     DIARY_ALREADY_DELETED(HttpStatus.CONFLICT, "D037", "이미 삭제된 회고입니다."),
     DIARY_DELETE_NOT_ALLOWED(HttpStatus.CONFLICT, "D038", "완료된 회고만 삭제할 수 있습니다."),
     REFLECTION_QUESTION_CLAIM_LOST(HttpStatus.CONFLICT, "D039", "질문 생성 작업이 다른 요청으로 회수되었습니다."),
+    DEFAULT_QUESTIONS_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "D043", "사용 가능한 기본 질문이 3개 이상 필요합니다."),
     TOO_MANY_DIARY_IMAGES(HttpStatus.BAD_REQUEST, "D040", "사진은 최대 2장까지 첨부할 수 있습니다."),
     DIARY_MEMO_TOO_LONG(HttpStatus.BAD_REQUEST, "D041", "메모는 최대 200자까지 입력할 수 있습니다."),
     INVALID_DIARY_LOCATION(HttpStatus.BAD_REQUEST, "D042", "위도 또는 경도 값이 올바르지 않습니다."),

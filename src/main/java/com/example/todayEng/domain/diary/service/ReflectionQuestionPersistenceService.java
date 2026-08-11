@@ -6,9 +6,12 @@ import com.example.todayEng.domain.diary.dto.response.ReflectionSessionResponse;
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.DiaryQuestion;
+import com.example.todayEng.domain.diary.entity.DefaultQuestion;
+import com.example.todayEng.domain.diary.entity.enums.QuestionGenerationType;
 import com.example.todayEng.domain.diary.entity.enums.DiaryStatus;
 import com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerationStatus;
 import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
+import com.example.todayEng.domain.diary.repository.DefaultQuestionRepository;
 import com.example.todayEng.domain.diary.repository.DiaryQuestionRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
 import com.example.todayEng.domain.user.entity.UserInterest;
@@ -22,6 +25,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,6 +49,7 @@ public class ReflectionQuestionPersistenceService {
     private final DiaryContextRepository contextRepository;
     private final DiaryQuestionRepository questionRepository;
     private final UserInterestRepository userInterestRepository;
+    private final DefaultQuestionRepository defaultQuestionRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -72,12 +78,13 @@ public class ReflectionQuestionPersistenceService {
             throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        List<DiaryContext> contexts = contextRepository
+        List<DiaryContext> successfulContexts = contextRepository
                 .findAllByDiaryIdAndSuccessTrueOrderById(diaryId);
-        if (contexts.stream().anyMatch(context -> context.getContextData() == null)) {
+        if (successfulContexts.stream().anyMatch(context -> context.getContextData() == null)) {
             claimedDiary.failQuestionGeneration();
             throw new BaseException(ErrorCode.DIARY_CONTEXT_NOT_FOUND);
         }
+        List<DiaryContext> contexts = selectDiverseContexts(successfulContexts);
 
         List<String> interests = userInterestRepository
                 .findAllByUserIdOrderByInterestTagId(userId)
@@ -153,6 +160,61 @@ public class ReflectionQuestionPersistenceService {
 
         List<DiaryQuestion> saved = questionRepository.saveAllAndFlush(questions);
 
+        return new ReflectionSessionResponse(
+                command.diaryId(),
+                saved.stream()
+                        .sorted(Comparator.comparing(DiaryQuestion::getQuestionOrder))
+                        .map(ReflectionSessionResponse.Question::from)
+                        .toList()
+        );
+    }
+
+    @Transactional
+    public ReflectionSessionResponse saveDefaultQuestions(
+            ReflectionQuestionGenerationCommand command
+    ) {
+        List<com.example.todayEng.domain.user.entity.enums.InterestTagName> interestNames =
+                command.interests().stream()
+                        .map(this::toInterestTagName)
+                        .filter(java.util.Objects::nonNull)
+                        .toList();
+
+        LinkedHashMap<Long, DefaultQuestion> candidates = new LinkedHashMap<>();
+        if (!interestNames.isEmpty()) {
+            defaultQuestionRepository.findActiveMainByInterestNames(interestNames)
+                    .forEach(question -> candidates.put(question.getId(), question));
+        }
+        defaultQuestionRepository.findAllActiveMain()
+                .forEach(question -> candidates.putIfAbsent(question.getId(), question));
+
+        List<DefaultQuestion> selected = new ArrayList<>(candidates.values()).stream()
+                .limit(3)
+                .toList();
+        if (selected.size() != 3) {
+            throw new BaseException(ErrorCode.DEFAULT_QUESTIONS_NOT_CONFIGURED);
+        }
+
+        if (!finishIfOwned(command, ReflectionQuestionGenerationStatus.COMPLETED)) {
+            throw new BaseException(ErrorCode.REFLECTION_QUESTION_CLAIM_LOST);
+        }
+
+        Diary diary = diaryRepository
+                .findByIdAndUserId(command.diaryId(), command.userId())
+                .orElseThrow(() -> new BaseException(ErrorCode.ACCESS_DENIED));
+        List<DiaryQuestion> questions = new ArrayList<>();
+        for (int index = 0; index < selected.size(); index++) {
+            DefaultQuestion defaultQuestion = selected.get(index);
+            questions.add(DiaryQuestion.createMainQuestion(
+                    diary,
+                    index * 2 + 1,
+                    defaultQuestion.getQuestionText().trim(),
+                    QuestionGenerationType.DEFAULT,
+                    defaultQuestion.getKoreanTranslation().trim(),
+                    defaultQuestion.getInterestTag().getTagName().name(),
+                    defaultQuestion
+            ));
+        }
+        List<DiaryQuestion> saved = questionRepository.saveAllAndFlush(questions);
         return new ReflectionSessionResponse(
                 command.diaryId(),
                 saved.stream()
@@ -263,5 +325,41 @@ public class ReflectionQuestionPersistenceService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private List<DiaryContext> selectDiverseContexts(List<DiaryContext> contexts) {
+        return contexts.stream()
+                .filter(context -> context.getContextData() != null)
+                .filter(context -> informationSize(context.getContextData()) > 2)
+                .sorted(Comparator
+                        .comparingInt((DiaryContext context) -> contextPriority(context.getContextType()))
+                        .thenComparing(Comparator.comparingInt(
+                                (DiaryContext context) -> informationSize(context.getContextData())).reversed())
+                        .thenComparing(DiaryContext::getId))
+                .limit(5)
+                .toList();
+    }
+
+    private int contextPriority(com.example.todayEng.domain.diary.entity.enums.DiaryContextType type) {
+        return switch (type) {
+            case MEMO -> 0;
+            case PHOTO -> 1;
+            case DIARY_MEMORY -> 2;
+            case CALENDAR -> 3;
+            case SPOTIFY -> 4;
+            case WEATHER -> 5;
+        };
+    }
+
+    private int informationSize(JsonNode data) {
+        return data == null ? 0 : data.toString().replaceAll("[\\s\\{\\}\\[\\]\",:]", "").length();
+    }
+
+    private com.example.todayEng.domain.user.entity.enums.InterestTagName toInterestTagName(String value) {
+        try {
+            return com.example.todayEng.domain.user.entity.enums.InterestTagName.valueOf(value);
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            return null;
+        }
     }
 }
