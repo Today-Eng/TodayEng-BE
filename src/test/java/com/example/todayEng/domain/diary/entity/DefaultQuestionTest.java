@@ -14,33 +14,42 @@ class DefaultQuestionTest {
 
     @Test
     void createsMainQuestionWithInterestTag() {
-        DefaultQuestion question =
-                DefaultQuestion.createMain(music, "What did you listen to?", "무엇을 들었나요?");
+        DefaultQuestion question = DefaultQuestion.createMain(
+                "MAIN_MUSIC_01", music, "What did you listen to?", "Korean translation");
 
+        assertThat(question.getQuestionCode()).isEqualTo("MAIN_MUSIC_01");
         assertThat(question.getQuestionType()).isEqualTo(QuestionType.MAIN);
         assertThat(question.getInterestTag()).isEqualTo(music);
     }
 
     @Test
     void rejectsMainQuestionWithoutInterestTag() {
-        assertThatThrownBy(() ->
-                DefaultQuestion.createMain(null, "How was your day?", "오늘 어땠나요?"))
+        assertThatThrownBy(() -> DefaultQuestion.createMain(
+                "MAIN_DAILY_01", null, "How was your day?", "Korean translation"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsQuestionWithoutCode() {
+        assertThatThrownBy(() -> DefaultQuestion.createMain(
+                " ", music, "How was your day?", "Korean translation"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void createsGenericFollowUpWithoutInterestTag() {
-        DefaultQuestion question =
-                DefaultQuestion.createFollowUp(null, "Could you tell me more?", "더 말해주시겠어요?");
+        DefaultQuestion question = DefaultQuestion.createFollowUp(
+                "FOLLOW_UP_01", null, "Could you tell me more?", "Korean translation");
 
+        assertThat(question.getQuestionCode()).isEqualTo("FOLLOW_UP_01");
         assertThat(question.getQuestionType()).isEqualTo(QuestionType.FOLLOW_UP);
         assertThat(question.getInterestTag()).isNull();
     }
 
     @Test
     void createsInterestSpecificFollowUp() {
-        DefaultQuestion question =
-                DefaultQuestion.createFollowUp(music, "Why was it meaningful?", "왜 의미 있었나요?");
+        DefaultQuestion question = DefaultQuestion.createFollowUp(
+                "FOLLOW_UP_MUSIC_01", music, "Why was it meaningful?", "Korean translation");
 
         assertThat(question.getQuestionType()).isEqualTo(QuestionType.FOLLOW_UP);
         assertThat(question.getInterestTag()).isEqualTo(music);

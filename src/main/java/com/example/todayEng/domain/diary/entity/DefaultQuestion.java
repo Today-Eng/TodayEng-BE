@@ -14,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +22,13 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "default_question")
+@Table(
+        name = "default_question",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_default_question_code",
+                columnNames = "question_code"
+        )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultQuestion extends BaseTimeEntity {
 
@@ -29,6 +36,9 @@ public class DefaultQuestion extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "default_question_id")
     private Long id;
+
+    @Column(name = "question_code", nullable = false, length = 100)
+    private String questionCode;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interest_tag_id")
@@ -49,14 +59,19 @@ public class DefaultQuestion extends BaseTimeEntity {
 
     @Builder(access = AccessLevel.PRIVATE)
     private DefaultQuestion(
+            String questionCode,
             InterestTag interestTag,
             QuestionType questionType,
             String questionText,
             String koreanTranslation
     ) {
-        if (questionType == QuestionType.MAIN && interestTag == null) {
-            throw new IllegalArgumentException("MAIN 기본 질문에는 관심 분야가 필요합니다.");
+        if (questionCode == null || questionCode.isBlank()) {
+            throw new IllegalArgumentException("Default question code is required.");
         }
+        if (questionType == QuestionType.MAIN && interestTag == null) {
+            throw new IllegalArgumentException("MAIN default question requires an interest tag.");
+        }
+        this.questionCode = questionCode;
         this.interestTag = interestTag;
         this.questionType = questionType;
         this.questionText = questionText;
@@ -65,11 +80,13 @@ public class DefaultQuestion extends BaseTimeEntity {
     }
 
     public static DefaultQuestion createMain(
+            String questionCode,
             InterestTag interestTag,
             String questionText,
             String koreanTranslation
     ) {
         return DefaultQuestion.builder()
+                .questionCode(questionCode)
                 .interestTag(interestTag)
                 .questionType(QuestionType.MAIN)
                 .questionText(questionText)
@@ -78,11 +95,13 @@ public class DefaultQuestion extends BaseTimeEntity {
     }
 
     public static DefaultQuestion createFollowUp(
+            String questionCode,
             InterestTag interestTag,
             String questionText,
             String koreanTranslation
     ) {
         return DefaultQuestion.builder()
+                .questionCode(questionCode)
                 .interestTag(interestTag)
                 .questionType(QuestionType.FOLLOW_UP)
                 .questionText(questionText)
