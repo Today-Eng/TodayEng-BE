@@ -77,8 +77,8 @@ public class ReflectionQuestionPersistenceService {
             throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        List<DiaryContext> contexts = contextRepository
-                .findAllByDiaryIdAndSuccessTrueOrderById(diaryId);
+        List<DiaryContext> contexts = selectDiverseContexts(contextRepository
+                .findAllByDiaryIdAndSuccessTrueOrderById(diaryId));
         if (contexts.stream().anyMatch(context -> context.getContextData() == null)) {
             claimedDiary.failQuestionGeneration();
             throw new BaseException(ErrorCode.DIARY_CONTEXT_NOT_FOUND);
@@ -276,6 +276,16 @@ public class ReflectionQuestionPersistenceService {
             }
         }
 
+        if (allowedContextIds.size() >= 3) {
+            long selectedContextCount = response.questions().stream()
+                    .map(ReflectionQuestionLlmResponse.GeneratedQuestion::contextId)
+                    .distinct()
+                    .count();
+            if (selectedContextCount != 3) {
+                throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
+            }
+        }
+
         return response.questions().stream()
                 .sorted(Comparator.comparing(
                         ReflectionQuestionLlmResponse.GeneratedQuestion::order
@@ -295,6 +305,34 @@ public class ReflectionQuestionPersistenceService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private List<DiaryContext> selectDiverseContexts(List<DiaryContext> contexts) {
+        return contexts.stream()
+                .filter(context -> context.getContextData() != null)
+                .filter(context -> informationSize(context.getContextData()) > 2)
+                .sorted(Comparator
+                        .comparingInt((DiaryContext context) -> contextPriority(context.getContextType()))
+                        .thenComparing(Comparator.comparingInt(
+                                (DiaryContext context) -> informationSize(context.getContextData())).reversed())
+                        .thenComparing(DiaryContext::getId))
+                .limit(5)
+                .toList();
+    }
+
+    private int contextPriority(com.example.todayEng.domain.diary.entity.enums.DiaryContextType type) {
+        return switch (type) {
+            case MEMO -> 0;
+            case PHOTO -> 1;
+            case DIARY_MEMORY -> 2;
+            case CALENDAR -> 3;
+            case SPOTIFY -> 4;
+            case WEATHER -> 5;
+        };
+    }
+
+    private int informationSize(JsonNode data) {
+        return data == null ? 0 : data.toString().replaceAll("[\\s\\{\\}\\[\\]\",:]", "").length();
     }
 
     private com.example.todayEng.domain.user.entity.enums.InterestTagName toInterestTagName(String value) {

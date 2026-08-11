@@ -32,14 +32,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
-import lombok.RequiredArgsConstructor;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.CompletionException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class DiaryContextService {
 
     private static final Duration CLAIM_STALE_AFTER = Duration.ofMinutes(10);
@@ -55,6 +57,33 @@ public class DiaryContextService {
     private final DailyContextSnapshotPersistenceService snapshotPersistenceService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final Executor contextExecutor;
+
+    public DiaryContextService(
+            DiaryRepository diaryRepository,
+            DiaryContextPersistenceService persistenceService,
+            ExternalAccountRepository externalAccountRepository,
+            DiaryContextDataClient contextDataClient,
+            DiaryImageAnalysisClient imageAnalysisClient,
+            ImageUploadValidator imageUploadValidator,
+            DiaryMemoryService diaryMemoryService,
+            DailyContextSnapshotPersistenceService snapshotPersistenceService,
+            ObjectMapper objectMapper,
+            Clock clock,
+            @Qualifier("diaryContextExecutor") Executor contextExecutor
+    ) {
+        this.diaryRepository = diaryRepository;
+        this.persistenceService = persistenceService;
+        this.externalAccountRepository = externalAccountRepository;
+        this.contextDataClient = contextDataClient;
+        this.imageAnalysisClient = imageAnalysisClient;
+        this.imageUploadValidator = imageUploadValidator;
+        this.diaryMemoryService = diaryMemoryService;
+        this.snapshotPersistenceService = snapshotPersistenceService;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+        this.contextExecutor = contextExecutor;
+    }
 
     public DiaryContextCreateResponse createContexts(
             Long userId,
@@ -122,46 +151,50 @@ public class DiaryContextService {
                             objectMapper.valueToTree(new MemoData(request.memo())))
                     .ifPresent(contexts::add);
         }
+        List<Supplier<Optional<DiaryContext>>> collectors = new ArrayList<>();
         if (!validatedImages.isEmpty()) {
-            collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.PHOTO,
-                    () -> imageAnalysisClient.analyze(validatedImages))
-                    .ifPresent(contexts::add);
+            collectors.add(() -> collect(userId, diaryId, leaseVersion, diary.getDiaryDate(),
+                    DiaryContextType.PHOTO, () -> imageAnalysisClient.analyze(validatedImages)));
         }
         if (request.location() != null) {
-            collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.WEATHER,
-                    () -> contextDataClient.fetchWeather(
-                            request.location(), diary.getDiaryDate()))
-                    .ifPresent(contexts::add);
+            collectors.add(() -> collect(userId, diaryId, leaseVersion, diary.getDiaryDate(),
+                    DiaryContextType.WEATHER, () -> contextDataClient.fetchWeather(
+                            request.location(), diary.getDiaryDate())));
         }
-        diaryMemoryService.create(userId, diaryId).ifPresent(contexts::add);
-
+        collectors.add(() -> diaryMemoryService.create(userId, diaryId));
         externalAccountRepository.findAllByUser_Id(userId).stream()
                 .filter(ExternalAccount::isUseEnabled)
-                .forEach(account -> collectExternal(
-                        userId, diaryId, leaseVersion, diary, account, contexts));
+                .map(account -> externalCollector(userId, diaryId, leaseVersion, diary, account))
+                .filter(java.util.Objects::nonNull)
+                .forEach(collectors::add);
+
+        collectors.stream()
+                .map(collector -> CompletableFuture.supplyAsync(collector, contextExecutor))
+                .toList().stream()
+                .map(this::joinContext)
+                .flatMap(Optional::stream)
+                .forEach(contexts::add);
 
         return new DiaryContextCreateResponse(diary.getId(), contexts.stream()
                 .map(DiaryContextCreateResponse.ContextResult::from).toList());
     }
 
-    private void collectExternal(
+    private Supplier<Optional<DiaryContext>> externalCollector(
             Long userId,
             Long diaryId,
             long leaseVersion,
             Diary diary,
-            ExternalAccount account,
-            List<DiaryContext> contexts
+            ExternalAccount account
     ) {
         if (account.getProvider() == ExternalServiceProvider.GOOGLE_CALENDAR) {
-            collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.CALENDAR,
+            return () -> collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.CALENDAR,
                     () -> contextDataClient.fetchCalendar(
-                            account.getAccessToken(), diary.getDiaryDate()))
-                    .ifPresent(contexts::add);
+                            account.getAccessToken(), diary.getDiaryDate()));
         } else if (account.getProvider() == ExternalServiceProvider.SPOTIFY) {
-            collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.SPOTIFY,
-                    () -> collectSpotify(userId, diary, account))
-                    .ifPresent(contexts::add);
+            return () -> collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.SPOTIFY,
+                    () -> collectSpotify(userId, diary, account));
         }
+        return null;
     }
 
     private JsonNode collectSpotify(Long userId, Diary diary, ExternalAccount account) {
@@ -227,7 +260,7 @@ public class DiaryContextService {
             Supplier<JsonNode> collector
     ) {
         try {
-            JsonNode data = collector.get();
+            JsonNode data = normalize(type, collector.get());
             if (data == null) {
                 throw new IllegalStateException("Context collector returned no data");
             }
@@ -240,6 +273,77 @@ public class DiaryContextService {
                     diaryId, type, ExternalCallLog.describe(exception));
             return persistenceService.saveFailure(userId, diaryId, leaseVersion, type);
         }
+    }
+
+    private Optional<DiaryContext> joinContext(
+            CompletableFuture<Optional<DiaryContext>> future
+    ) {
+        try {
+            return future.join();
+        } catch (CompletionException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof Error error) throw error;
+            if (cause instanceof RuntimeException runtimeException) throw runtimeException;
+            throw exception;
+        }
+    }
+
+    private JsonNode normalize(DiaryContextType type, JsonNode source) {
+        if (source == null || type == DiaryContextType.MEMO
+                || type == DiaryContextType.PHOTO || type == DiaryContextType.DIARY_MEMORY) {
+            return source;
+        }
+        ObjectNode result = objectMapper.createObjectNode();
+        if (type == DiaryContextType.WEATHER) {
+            JsonNode daily = source.path("daily");
+            result.put("weatherCode", firstInt(daily.path("weather_code")));
+            result.put("maxTemperatureC", firstDouble(daily.path("temperature_2m_max")));
+            result.put("minTemperatureC", firstDouble(daily.path("temperature_2m_min")));
+            result.put("precipitationMm", firstDouble(daily.path("precipitation_sum")));
+            return result;
+        }
+        if (type == DiaryContextType.CALENDAR) {
+            ArrayNode events = result.putArray("events");
+            source.path("items").forEach(item -> {
+                ObjectNode event = events.addObject();
+                event.put("title", item.path("summary").asText("일정"));
+                event.put("start", temporalValue(item.path("start")));
+                event.put("end", temporalValue(item.path("end")));
+            });
+            return result;
+        }
+        if (type == DiaryContextType.SPOTIFY) {
+            ArrayNode plays = result.putArray("recentPlays");
+            Map<String, Integer> counts = new LinkedHashMap<>();
+            source.path("items").forEach(item -> {
+                String track = item.path("track").path("name").asText("");
+                String artist = item.path("track").path("artists").path(0).path("name").asText("");
+                if (!track.isBlank()) counts.merge(track + " — " + artist, 1, Integer::sum);
+            });
+            counts.entrySet().stream()
+                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                    .limit(10)
+                    .forEach(entry -> {
+                        ObjectNode play = plays.addObject();
+                        play.put("trackAndArtist", entry.getKey());
+                        play.put("playCount", entry.getValue());
+                    });
+            result.put("totalPlays", source.path("items").size());
+            return result;
+        }
+        return source;
+    }
+
+    private int firstInt(JsonNode node) {
+        return node.isArray() && !node.isEmpty() ? node.path(0).asInt() : 0;
+    }
+
+    private double firstDouble(JsonNode node) {
+        return node.isArray() && !node.isEmpty() ? node.path(0).asDouble() : 0;
+    }
+
+    private String temporalValue(JsonNode node) {
+        return node.path("dateTime").asText(node.path("date").asText(""));
     }
 
     private void cleanupSnapshot(Long userId, LocalDate diaryDate, DiaryContextType type) {

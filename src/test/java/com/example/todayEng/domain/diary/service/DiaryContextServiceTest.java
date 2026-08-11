@@ -74,7 +74,7 @@ class DiaryContextServiceTest {
         service = new DiaryContextService(diaryRepository, persistenceService,
                 accountRepository, dataClient, imageAnalysisClient,
                 new ImageUploadValidator(), diaryMemoryService, snapshotPersistenceService,
-                new ObjectMapper(), clock);
+                new ObjectMapper(), clock, Runnable::run);
         User user = User.create();
         ReflectionTestUtils.setField(user, "id", 1L);
         diary = Diary.create(user, LocalDate.of(2026, 7, 30));
@@ -302,8 +302,11 @@ class DiaryContextServiceTest {
         service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of());
 
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
         verify(persistenceService).saveSuccess(
-                1L, 10L, LEASE_VERSION, DiaryContextType.SPOTIFY, freshData);
+                eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY), captor.capture());
+        assertThat(captor.getValue().path("recentPlays").isArray()).isTrue();
+        assertThat(captor.getValue().path("totalPlays").asInt()).isZero();
         verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
     }
@@ -342,11 +345,9 @@ class DiaryContextServiceTest {
                 eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY),
                 captor.capture());
         JsonNode saved = captor.getValue();
-        assertThat(saved.path("items").size()).isEqualTo(2);
-        assertThat(saved.path("items").get(0).path("track").path("name").asText())
-                .isEqualTo("Evening Song");
-        assertThat(saved.path("items").get(1).path("track").path("name").asText())
-                .isEqualTo("Morning Song");
+        assertThat(saved.path("recentPlays").size()).isEqualTo(2);
+        assertThat(saved.path("recentPlays").toString()).contains("Evening Song", "Morning Song");
+        assertThat(saved.path("totalPlays").asInt()).isEqualTo(2);
         verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
     }
@@ -390,15 +391,11 @@ class DiaryContextServiceTest {
                 eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY),
                 captor.capture());
         JsonNode saved = captor.getValue();
-        assertThat(saved.path("items").size()).isEqualTo(1);
-        assertThat(saved.path("items").get(0).path("track").path("name").asText())
-                .isEqualTo("Morning Song");
-        assertThat(saved.path("href").asText())
-                .isEqualTo("https://api.spotify.com/v1/me/player/recently-played");
-        assertThat(saved.path("cursors").path("after").asText()).isEqualTo("123456");
-        assertThat(saved.path("cursors").path("before").asText()).isEqualTo("654321");
-        assertThat(saved.path("limit").asInt()).isEqualTo(50);
-        assertThat(saved.path("total").asInt()).isEqualTo(2);
+        assertThat(saved.path("recentPlays").size()).isEqualTo(1);
+        assertThat(saved.path("recentPlays").get(0).path("trackAndArtist").asText())
+                .contains("Morning Song");
+        assertThat(saved.path("totalPlays").asInt()).isEqualTo(1);
+        assertThat(saved.has("href")).isFalse();
     }
 
     @Test
@@ -444,8 +441,10 @@ class DiaryContextServiceTest {
         service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of());
 
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
         verify(persistenceService).saveSuccess(
-                1L, 10L, LEASE_VERSION, DiaryContextType.SPOTIFY, preloadData);
+                eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.SPOTIFY), captor.capture());
+        assertThat(captor.getValue().path("recentPlays").toString()).contains("Morning Song");
         verify(persistenceService, never())
                 .saveFailure(any(), any(), anyLong(), eq(DiaryContextType.SPOTIFY));
     }

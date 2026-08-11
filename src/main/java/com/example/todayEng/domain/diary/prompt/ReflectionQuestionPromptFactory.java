@@ -57,6 +57,8 @@ public class ReflectionQuestionPromptFactory {
                     - Interests are only ranking signals for choosing among contexts. Interests are not facts and must not appear as events in questions unless a context states them.
                     - Adjust English sentence difficulty to the supplied englishLevel.
                     - Make the three questions meaningfully different.
+                    - When at least three contexts are supplied, use three different contextIds.
+                    - Prefer diversity across context types; do not create near-duplicate questions about the same event or theme.
                     - Return question orders 1, 2, and 3 exactly once.
                     - Korean translation must faithfully translate the English question.
                     - keyword must be a short English phrase grounded in the selected context.
