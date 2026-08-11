@@ -160,16 +160,13 @@ public class DiaryContextService {
         List<Supplier<Optional<DiaryContext>>> collectors = new ArrayList<>();
         CompletableFuture<List<DiaryContext>> photoFuture = validatedImages.isEmpty()
                 ? CompletableFuture.completedFuture(List.of())
-                : CompletableFuture.supplyAsync(
-                        () -> collectPhotos(
-                                userId,
-                                diaryId,
-                                leaseVersion,
-                                diary.getDiaryDate(),
-                                validatedImages
-                        ),
-                        contextExecutor
-                );
+                : submitPhotos(() -> collectPhotos(
+                        userId,
+                        diaryId,
+                        leaseVersion,
+                        diary.getDiaryDate(),
+                        validatedImages
+                ));
 
         if (request.location() != null) {
             collectors.add(() -> collect(
@@ -385,6 +382,17 @@ public class DiaryContextService {
         }
     }
 
+    private CompletableFuture<List<DiaryContext>> submitPhotos(
+            Supplier<List<DiaryContext>> collector
+    ) {
+        try {
+            return CompletableFuture.supplyAsync(collector, contextExecutor);
+        } catch (RejectedExecutionException exception) {
+            log.warn("Diary context executor rejected photo work; running in request thread");
+            return CompletableFuture.completedFuture(collector.get());
+        }
+    }
+
     private Optional<DiaryContext> joinContext(
             CompletableFuture<Optional<DiaryContext>> future
     ) {
@@ -405,6 +413,9 @@ public class DiaryContextService {
         }
         ObjectNode result = objectMapper.createObjectNode();
         if (type == DiaryContextType.WEATHER) {
+            if (!source.has("daily")) {
+                return source.deepCopy();
+            }
             JsonNode daily = source.path("daily");
             putFirstInt(result, "weatherCode", daily.path("weather_code"));
             putFirstDouble(result, "maxTemperatureC", daily.path("temperature_2m_max"));
@@ -413,6 +424,9 @@ public class DiaryContextService {
             return result;
         }
         if (type == DiaryContextType.CALENDAR) {
+            if (source.has("events")) {
+                return source.deepCopy();
+            }
             ArrayNode events = result.putArray("events");
             source.path("items").forEach(item -> {
                 ObjectNode event = events.addObject();
@@ -423,6 +437,9 @@ public class DiaryContextService {
             return result;
         }
         if (type == DiaryContextType.SPOTIFY) {
+            if (source.has("recentPlays")) {
+                return source.deepCopy();
+            }
             ArrayNode plays = result.putArray("recentPlays");
             Map<String, Integer> counts = new LinkedHashMap<>();
             source.path("items").forEach(item -> {

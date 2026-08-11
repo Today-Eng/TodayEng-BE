@@ -565,8 +565,11 @@ class DiaryContextServiceTest {
         service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of());
 
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
         verify(persistenceService).saveSuccess(
-                1L, 10L, LEASE_VERSION, DiaryContextType.CALENDAR, preloadData);
+                eq(1L), eq(10L), eq(LEASE_VERSION), eq(DiaryContextType.CALENDAR), captor.capture());
+        assertThat(captor.getValue().path("events").get(0).path("title").asText())
+                .isEqualTo("Team sync");
         verify(persistenceService, never())
                 .saveFailure(any(), any(), anyLong(), eq(DiaryContextType.CALENDAR));
     }

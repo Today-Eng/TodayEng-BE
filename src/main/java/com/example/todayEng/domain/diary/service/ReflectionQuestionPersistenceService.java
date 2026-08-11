@@ -271,16 +271,6 @@ public class ReflectionQuestionPersistenceService {
             }
         }
 
-        if (allowedContextIds.size() >= 3) {
-            long selectedContextCount = response.questions().stream()
-                    .map(ReflectionQuestionLlmResponse.GeneratedQuestion::contextId)
-                    .distinct()
-                    .count();
-            if (selectedContextCount != 3) {
-                throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
-            }
-        }
-
         return response.questions().stream()
                 .sorted(Comparator.comparing(
                         ReflectionQuestionLlmResponse.GeneratedQuestion::order
