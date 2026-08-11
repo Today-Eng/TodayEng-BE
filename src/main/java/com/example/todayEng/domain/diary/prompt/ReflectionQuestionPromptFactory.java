@@ -79,7 +79,7 @@ public class ReflectionQuestionPromptFactory {
         String distinctRule = requireDistinctContexts
                 ? "- Each context-grounded question must use a different contextId. "
                 + "Never reuse a contextId across questions.\n"
-                : "";
+                : "- Use every provided contextId at least once before reusing any contextId.\n";
 
         return """
                 Context-grounded question rules:

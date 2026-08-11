@@ -29,8 +29,8 @@ import org.hibernate.type.SqlTypes;
         name = "diary_context",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_diary_context_diary_type",
-                        columnNames = {"diary_id", "context_type"}
+                        name = "uk_diary_context_diary_type_key",
+                        columnNames = {"diary_id", "context_type", "context_key"}
                 )
         }
 )
@@ -50,6 +50,9 @@ public class DiaryContext {
     @Column(name = "context_type", nullable = false, length = 30)
     private DiaryContextType contextType;
 
+    @Column(name = "context_key", nullable = false)
+    private int contextKey;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "context_data", columnDefinition = "json")
     private JsonNode contextData;
@@ -65,11 +68,13 @@ public class DiaryContext {
     private DiaryContext(
             Diary diary,
             DiaryContextType contextType,
+            int contextKey,
             JsonNode contextData,
             boolean success
     ) {
         this.diary = diary;
         this.contextType = contextType;
+        this.contextKey = contextKey;
         this.contextData = contextData;
         this.success = success;
     }
@@ -79,9 +84,19 @@ public class DiaryContext {
             DiaryContextType contextType,
             JsonNode contextData
     ) {
+        return success(diary, contextType, 0, contextData);
+    }
+
+    public static DiaryContext success(
+            Diary diary,
+            DiaryContextType contextType,
+            int contextKey,
+            JsonNode contextData
+    ) {
         return DiaryContext.builder()
                 .diary(diary)
                 .contextType(contextType)
+                .contextKey(contextKey)
                 .contextData(contextData)
                 .success(true)
                 .build();
@@ -94,6 +109,7 @@ public class DiaryContext {
         return DiaryContext.builder()
                 .diary(diary)
                 .contextType(contextType)
+                .contextKey(0)
                 .success(false)
                 .build();
     }
