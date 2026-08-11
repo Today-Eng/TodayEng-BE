@@ -13,7 +13,7 @@ public class DiaryMultipartConfig {
     public MultipartConfigElement multipartConfigElement() {
         MultipartConfigFactory factory = new MultipartConfigFactory();
         factory.setMaxFileSize(DataSize.ofMegabytes(7));
-        factory.setMaxRequestSize(DataSize.ofMegabytes(14));
+        factory.setMaxRequestSize(DataSize.ofMegabytes(15));
         return factory.createMultipartConfig();
     }
 }

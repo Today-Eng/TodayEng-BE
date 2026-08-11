@@ -13,23 +13,26 @@ import org.springframework.web.client.ResourceAccessException;
 class ExternalCallLogTest {
 
     @Test
-    void describesHttpErrorWithResponseBody() {
+    void describesHttpErrorWithoutResponseBody() {
         HttpClientErrorException exception = HttpClientErrorException.create(
                 HttpStatus.BAD_REQUEST, "Bad Request", null,
-                "reason: location is invalid"
+                "access_token=secret-token, email=user@example.com, location is invalid"
                         .getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 
         assertThat(ExternalCallLog.describe(exception))
-                .contains("status=400", "body=", "location is invalid");
+                .isEqualTo("BadRequest(status=400)")
+                .doesNotContain("secret-token", "user@example.com",
+                        "location is invalid", "body=");
     }
 
     @Test
-    void limitsLongResponseBody() {
+    void excludesLongResponseBody() {
         HttpClientErrorException exception = HttpClientErrorException.create(
                 HttpStatus.BAD_REQUEST, "Bad Request", null,
                 "x".repeat(2_000).getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 
-        assertThat(ExternalCallLog.describe(exception)).hasSizeLessThan(1_100);
+        assertThat(ExternalCallLog.describe(exception))
+                .isEqualTo("BadRequest(status=400)");
     }
 
     @Test
