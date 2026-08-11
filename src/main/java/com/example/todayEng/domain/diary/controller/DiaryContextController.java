@@ -40,7 +40,8 @@ public class DiaryContextController {
             summary = "회고 질문 생성용 컨텍스트 생성",
             description = "multipart/form-data로 요청합니다. "
                     + "request part는 memo와 location을 담은 JSON 문자열이며 생략할 수 있습니다. "
-                    + "images part는 jpeg·png·webp만 허용하고 최대 2장, 장당 7MB, 합계 14MB입니다. "
+                    + "images part는 jpeg·png·webp만 허용하고 최대 2장, 장당 7MB, "
+                    + "합계 14MB이며 보내지 않아도 됩니다. "
                     + "서로 다른 사진은 개별 PHOTO 컨텍스트로 저장하며, 실질적으로 같은 장면은 하나로 병합할 수 있습니다."
     )
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
