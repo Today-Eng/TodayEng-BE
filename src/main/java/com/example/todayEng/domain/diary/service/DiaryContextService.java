@@ -37,6 +37,7 @@ import java.util.function.Supplier;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.RejectedExecutionException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -205,7 +206,7 @@ public class DiaryContextService {
                 .forEach(collectors::add);
 
         collectors.stream()
-                .map(collector -> CompletableFuture.supplyAsync(collector, contextExecutor))
+                .map(this::submitContext)
                 .toList().stream()
                 .map(this::joinContext)
                 .flatMap(Optional::stream)
@@ -373,6 +374,17 @@ public class DiaryContextService {
         }
     }
 
+    private CompletableFuture<Optional<DiaryContext>> submitContext(
+            Supplier<Optional<DiaryContext>> collector
+    ) {
+        try {
+            return CompletableFuture.supplyAsync(collector, contextExecutor);
+        } catch (RejectedExecutionException exception) {
+            log.warn("Diary context executor rejected work; running in request thread");
+            return CompletableFuture.completedFuture(collector.get());
+        }
+    }
+
     private Optional<DiaryContext> joinContext(
             CompletableFuture<Optional<DiaryContext>> future
     ) {
@@ -394,10 +406,10 @@ public class DiaryContextService {
         ObjectNode result = objectMapper.createObjectNode();
         if (type == DiaryContextType.WEATHER) {
             JsonNode daily = source.path("daily");
-            result.put("weatherCode", firstInt(daily.path("weather_code")));
-            result.put("maxTemperatureC", firstDouble(daily.path("temperature_2m_max")));
-            result.put("minTemperatureC", firstDouble(daily.path("temperature_2m_min")));
-            result.put("precipitationMm", firstDouble(daily.path("precipitation_sum")));
+            putFirstInt(result, "weatherCode", daily.path("weather_code"));
+            putFirstDouble(result, "maxTemperatureC", daily.path("temperature_2m_max"));
+            putFirstDouble(result, "minTemperatureC", daily.path("temperature_2m_min"));
+            putFirstDouble(result, "precipitationMm", daily.path("precipitation_sum"));
             return result;
         }
         if (type == DiaryContextType.CALENDAR) {
@@ -432,12 +444,21 @@ public class DiaryContextService {
         return source;
     }
 
-    private int firstInt(JsonNode node) {
-        return node.isArray() && !node.isEmpty() ? node.path(0).asInt() : 0;
+    private void putFirstInt(ObjectNode target, String field, JsonNode values) {
+        if (hasFirstValue(values)) {
+            target.put(field, values.path(0).asInt());
+        }
     }
 
-    private double firstDouble(JsonNode node) {
-        return node.isArray() && !node.isEmpty() ? node.path(0).asDouble() : 0;
+    private void putFirstDouble(ObjectNode target, String field, JsonNode values) {
+        if (hasFirstValue(values)) {
+            target.put(field, values.path(0).asDouble());
+        }
+    }
+
+    private boolean hasFirstValue(JsonNode values) {
+        return values.isArray() && !values.isEmpty()
+                && !values.path(0).isNull() && values.path(0).isNumber();
     }
 
     private String temporalValue(JsonNode node) {

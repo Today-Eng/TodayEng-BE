@@ -42,6 +42,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.concurrent.RejectedExecutionException;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -127,6 +128,42 @@ class DiaryContextServiceTest {
                 .isEqualTo(ErrorCode.INVALID_DIARY_LOCATION);
 
         verify(dataClient, never()).fetchWeather(any(), any());
+    }
+
+    @Test
+    void missingWeatherValuesAreOmittedInsteadOfStoredAsZero() throws Exception {
+        JsonNode weather = new ObjectMapper().readTree("{\"daily\":{}}");
+        given(dataClient.fetchWeather(any(), eq(diary.getDiaryDate()))).willReturn(weather);
+
+        service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null,
+                        new DiaryContextCreateRequest.Location(37.5, 127.0)),
+                List.of());
+
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
+        verify(persistenceService).saveSuccess(eq(1L), eq(10L), eq(LEASE_VERSION),
+                eq(DiaryContextType.WEATHER), captor.capture());
+        assertThat(captor.getValue().isEmpty()).isTrue();
+    }
+
+    @Test
+    void runsCollectorInRequestThreadWhenExecutorRejectsIt() throws Exception {
+        ReflectionTestUtils.setField(service, "contextExecutor",
+                (java.util.concurrent.Executor) command -> {
+                    throw new RejectedExecutionException("full");
+                });
+        JsonNode weather = new ObjectMapper().readTree(
+                "{\"daily\":{\"weather_code\":[1]}}");
+        given(dataClient.fetchWeather(any(), eq(diary.getDiaryDate()))).willReturn(weather);
+
+        service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null,
+                        new DiaryContextCreateRequest.Location(37.5, 127.0)),
+                List.of());
+
+        verify(persistenceService).saveSuccess(eq(1L), eq(10L), eq(LEASE_VERSION),
+                eq(DiaryContextType.WEATHER), any());
+        verify(persistenceService).completeContextCollection(1L, 10L, LEASE_VERSION);
     }
 
     @Test
