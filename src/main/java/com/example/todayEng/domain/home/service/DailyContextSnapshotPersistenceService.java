@@ -44,14 +44,22 @@ public class DailyContextSnapshotPersistenceService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<SnapshotClaim> reclaimStale(Long userId, LocalDate date, DiaryContextType type) {
         LocalDateTime now = LocalDateTime.now(clock);
-        int updated = snapshotRepository.reclaimStale(
+        int updated = snapshotRepository.restartFailed(
+                userId, date, type,
+                DailyContextCollectionStatus.IN_PROGRESS,
+                DailyContextCollectionStatus.FAILED,
+                now
+        );
+        if (updated == 0) {
+            updated = snapshotRepository.reclaimStale(
                 userId,
                 date,
                 type,
                 DailyContextCollectionStatus.IN_PROGRESS,
                 now,
                 now.minus(STALE_AFTER)
-        );
+            );
+        }
         if (updated == 0) {
             return Optional.empty();
         }

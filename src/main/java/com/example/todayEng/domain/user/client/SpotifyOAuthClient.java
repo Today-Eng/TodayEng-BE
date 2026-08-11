@@ -28,6 +28,7 @@ public class SpotifyOAuthClient implements OAuthProviderClient {
 
     private static final String RESPONSE_TYPE = "code";
     private static final String GRANT_TYPE = "authorization_code";
+    private static final String REFRESH_GRANT_TYPE = "refresh_token";
     private static final int MAX_ERROR_DESCRIPTION_LENGTH = 500;
 
     private final RestClient restClient;
@@ -127,6 +128,62 @@ public class SpotifyOAuthClient implements OAuthProviderClient {
             );
             throw new BaseException(
                     ErrorCode.OAUTH_TOKEN_EXCHANGE_FAILED
+            );
+        }
+    }
+
+    @Override
+    public OAuthTokenResponse refreshAccessToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BaseException(ErrorCode.OAUTH_TOKEN_REFRESH_FAILED);
+        }
+
+        MultiValueMap<String, String> requestBody =
+                new LinkedMultiValueMap<>();
+        requestBody.add("grant_type", REFRESH_GRANT_TYPE);
+        requestBody.add("refresh_token", refreshToken);
+
+        try {
+            SpotifyOAuthTokenResponse response = restClient.post()
+                    .uri(spotifyOAuthProperties.tokenUri())
+                    .headers(headers -> headers.setBasicAuth(
+                            spotifyOAuthProperties.clientId(),
+                            spotifyOAuthProperties.clientSecret()
+                    ))
+                    .contentType(
+                            MediaType.APPLICATION_FORM_URLENCODED
+                    )
+                    .body(requestBody)
+                    .retrieve()
+                    .body(SpotifyOAuthTokenResponse.class);
+
+            if (response == null
+                    || response.accessToken() == null
+                    || response.accessToken().isBlank()) {
+                throw new BaseException(
+                        ErrorCode.OAUTH_TOKEN_REFRESH_FAILED
+                );
+            }
+
+            return new OAuthTokenResponse(
+                    response.accessToken(),
+                    response.refreshToken(),
+                    response.expiresIn()
+            );
+        } catch (BaseException exception) {
+            throw exception;
+        } catch (RestClientResponseException exception) {
+            logTokenExchangeFailure(exception);
+            throw new BaseException(
+                    ErrorCode.OAUTH_TOKEN_REFRESH_FAILED
+            );
+        } catch (RestClientException exception) {
+            log.warn(
+                    "Spotify token refresh request failed: exception={}",
+                    exception.getClass().getSimpleName()
+            );
+            throw new BaseException(
+                    ErrorCode.OAUTH_TOKEN_REFRESH_FAILED
             );
         }
     }

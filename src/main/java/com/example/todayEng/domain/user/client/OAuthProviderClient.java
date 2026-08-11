@@ -28,6 +28,15 @@ public interface OAuthProviderClient {
     OAuthTokenResponse exchangeToken(String code);
 
     /**
+     * Refresh Token으로 Access Token을 재발급합니다.
+     *
+     * @param refreshToken 저장해 둔 Refresh Token
+     * @return 재발급된 토큰 정보. Provider가 Refresh Token을 회전시키지 않으면
+     *         응답의 refreshToken은 null일 수 있습니다.
+     */
+    OAuthTokenResponse refreshAccessToken(String refreshToken);
+
+    /**
      * Access Token으로 외부 계정의 식별 정보를 조회합니다.
      *
      * @param accessToken Provider에서 발급받은 Access Token

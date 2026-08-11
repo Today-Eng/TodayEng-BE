@@ -22,6 +22,8 @@ import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceS
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
+import com.example.todayEng.domain.user.service.ExternalAccountTokenService;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
@@ -29,6 +31,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,6 +49,7 @@ class DailyContextPreloadServiceTest {
     @Mock DiaryRepository diaryRepository;
     @Mock DiaryContextDataClient dataClient;
     @Mock DailyContextSnapshotPersistenceService persistenceService;
+    @Mock ExternalAccountTokenService tokenService;
     @Mock ExternalAccount account;
 
     DailyContextPreloadService service;
@@ -57,11 +61,18 @@ class DailyContextPreloadServiceTest {
                 diaryRepository,
                 dataClient,
                 persistenceService,
+                tokenService,
                 Clock.fixed(
                         Instant.parse("2026-08-06T00:00:00Z"),
                         ZoneId.of("Asia/Seoul")
                 )
         );
+        lenient().when(tokenService.<JsonNode>callWithAccessToken(any(), any()))
+                .thenAnswer(invocation -> {
+                    ExternalAccount target = invocation.getArgument(0);
+                    Function<String, JsonNode> call = invocation.getArgument(1);
+                    return call.apply(target.getAccessToken());
+                });
         given(diaryRepository.findByUserIdAndDiaryDate(USER_ID, TODAY))
                 .willReturn(Optional.empty());
         lenient().when(accountRepository.findAllByUser_Id(USER_ID))
@@ -108,6 +119,22 @@ class DailyContextPreloadServiceTest {
         assertThat(response.contexts())
                 .extracting(ContextResult::type, ContextResult::status)
                 .containsExactly(tuple(DiaryContextType.WEATHER, ResultStatus.NO_LOCATION));
+    }
+
+    @Test
+    void reusesSuccessfulSnapshotWithoutCallingExternalApi() {
+        given(persistenceService.findSuccessfulContextData(
+                USER_ID, TODAY, DiaryContextType.WEATHER))
+                .willReturn(Optional.of(new ObjectMapper().createObjectNode()));
+
+        DailyContextPreloadResponse response =
+                service.preload(USER_ID, new Location(37.5, 127.0));
+
+        verify(persistenceService, never()).start(any(), any(), any());
+        verify(dataClient, never()).fetchWeather(any(), any());
+        assertThat(response.contexts())
+                .extracting(ContextResult::type, ContextResult::status)
+                .containsExactly(tuple(DiaryContextType.WEATHER, ResultStatus.SUCCEEDED));
     }
 
     @Test

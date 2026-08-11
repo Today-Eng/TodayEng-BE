@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.service;
 
 import com.example.todayEng.domain.diary.client.DiaryContextDataClient;
+import com.example.todayEng.domain.diary.client.DiaryImageAnalysis;
 import com.example.todayEng.domain.diary.client.DiaryImageAnalysisClient;
 import com.example.todayEng.domain.diary.dto.request.DiaryContextCreateRequest;
 import com.example.todayEng.domain.diary.dto.response.DiaryContextCreateResponse;
@@ -14,6 +15,7 @@ import com.example.todayEng.domain.home.service.DailyContextSnapshotPersistenceS
 import com.example.todayEng.domain.user.entity.ExternalAccount;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
 import com.example.todayEng.domain.user.repository.ExternalAccountRepository;
+import com.example.todayEng.domain.user.service.ExternalAccountTokenService;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.example.todayEng.global.log.ExternalCallLog;
@@ -55,6 +57,7 @@ public class DiaryContextService {
     private final ImageUploadValidator imageUploadValidator;
     private final DiaryMemoryService diaryMemoryService;
     private final DailyContextSnapshotPersistenceService snapshotPersistenceService;
+    private final ExternalAccountTokenService tokenService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final Executor contextExecutor;
@@ -68,6 +71,7 @@ public class DiaryContextService {
             ImageUploadValidator imageUploadValidator,
             DiaryMemoryService diaryMemoryService,
             DailyContextSnapshotPersistenceService snapshotPersistenceService,
+            ExternalAccountTokenService tokenService,
             ObjectMapper objectMapper,
             Clock clock,
             @Qualifier("diaryContextExecutor") Executor contextExecutor
@@ -80,6 +84,7 @@ public class DiaryContextService {
         this.imageUploadValidator = imageUploadValidator;
         this.diaryMemoryService = diaryMemoryService;
         this.snapshotPersistenceService = snapshotPersistenceService;
+        this.tokenService = tokenService;
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.contextExecutor = contextExecutor;
@@ -152,14 +157,45 @@ public class DiaryContextService {
                     .ifPresent(contexts::add);
         }
         List<Supplier<Optional<DiaryContext>>> collectors = new ArrayList<>();
-        if (!validatedImages.isEmpty()) {
-            collectors.add(() -> collect(userId, diaryId, leaseVersion, diary.getDiaryDate(),
-                    DiaryContextType.PHOTO, () -> imageAnalysisClient.analyze(validatedImages)));
-        }
+        CompletableFuture<List<DiaryContext>> photoFuture = validatedImages.isEmpty()
+                ? CompletableFuture.completedFuture(List.of())
+                : CompletableFuture.supplyAsync(
+                        () -> collectPhotos(
+                                userId,
+                                diaryId,
+                                leaseVersion,
+                                diary.getDiaryDate(),
+                                validatedImages
+                        ),
+                        contextExecutor
+                );
+
         if (request.location() != null) {
-            collectors.add(() -> collect(userId, diaryId, leaseVersion, diary.getDiaryDate(),
-                    DiaryContextType.WEATHER, () -> contextDataClient.fetchWeather(
-                            request.location(), diary.getDiaryDate())));
+            collectors.add(() -> collect(
+                    userId,
+                    diaryId,
+                    leaseVersion,
+                    diary.getDiaryDate(),
+                    DiaryContextType.WEATHER,
+                    () -> contextDataClient.fetchWeather(
+                            request.location(), diary.getDiaryDate())
+            ));
+        }
+        else {
+            collectors.add(() -> snapshotPersistenceService.findSuccessfulContextData(
+                                    userId,
+                                    diary.getDiaryDate(),
+                                    DiaryContextType.WEATHER
+                            )
+                            .flatMap(preload -> collect(
+                                    userId,
+                                    diaryId,
+                                    leaseVersion,
+                                    diary.getDiaryDate(),
+                                    DiaryContextType.WEATHER,
+                                    () -> preload
+                            ))
+            );
         }
         collectors.add(() -> diaryMemoryService.create(userId, diaryId));
         externalAccountRepository.findAllByUser_Id(userId).stream()
@@ -175,8 +211,44 @@ public class DiaryContextService {
                 .flatMap(Optional::stream)
                 .forEach(contexts::add);
 
+        contexts.addAll(photoFuture.join());
+
         return new DiaryContextCreateResponse(diary.getId(), contexts.stream()
                 .map(DiaryContextCreateResponse.ContextResult::from).toList());
+    }
+
+    private List<DiaryContext> collectPhotos(
+            Long userId,
+            Long diaryId,
+            long leaseVersion,
+            LocalDate diaryDate,
+            List<MultipartFile> images
+    ) {
+        try {
+            DiaryImageAnalysis analysis = imageAnalysisClient.analyze(images);
+            if (analysis == null || analysis.photoContexts().isEmpty()) {
+                throw new IllegalStateException("Photo collector returned no data");
+            }
+            List<DiaryContext> contexts = persistenceService.savePhotoContexts(
+                    userId,
+                    diaryId,
+                    leaseVersion,
+                    analysis.photoContexts().stream()
+                            .map(DiaryImageAnalysis.PhotoContext::contextData)
+                            .toList()
+            );
+            if (!contexts.isEmpty()) {
+                cleanupSnapshot(userId, diaryDate, DiaryContextType.PHOTO);
+            }
+            return contexts;
+        } catch (RuntimeException exception) {
+            log.warn("Diary context collection failed: diaryId={}, type={}, cause={}",
+                    diaryId, DiaryContextType.PHOTO, ExternalCallLog.describe(exception));
+            return persistenceService.saveFailure(
+                            userId, diaryId, leaseVersion, DiaryContextType.PHOTO)
+                    .stream()
+                    .toList();
+        }
     }
 
     private Supplier<Optional<DiaryContext>> externalCollector(
@@ -184,12 +256,17 @@ public class DiaryContextService {
             Long diaryId,
             long leaseVersion,
             Diary diary,
-            ExternalAccount account
+        ExternalAccount account
     ) {
         if (account.getProvider() == ExternalServiceProvider.GOOGLE_CALENDAR) {
-            return () -> collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.CALENDAR,
-                    () -> contextDataClient.fetchCalendar(
-                            account.getAccessToken(), diary.getDiaryDate()));
+            return () -> collect(
+                    userId,
+                    diaryId,
+                    leaseVersion,
+                    diary.getDiaryDate(),
+                    DiaryContextType.CALENDAR,
+                    () -> collectCalendar(userId, diary, account)
+            );
         } else if (account.getProvider() == ExternalServiceProvider.SPOTIFY) {
             return () -> collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.SPOTIFY,
                     () -> collectSpotify(userId, diary, account));
@@ -197,32 +274,53 @@ public class DiaryContextService {
         return null;
     }
 
+    /** Calendar는 일정이 갱신되어도 항목이 겹치므로 병합 없이 스냅샷을 그대로 사용한다. */
+    private JsonNode collectCalendar(Long userId, Diary diary, ExternalAccount account) {
+        JsonNode preload = findPreload(userId, diary.getDiaryDate(), DiaryContextType.CALENDAR);
+        JsonNode fresh = fetchOrFallback(preload, DiaryContextType.CALENDAR,
+                () -> tokenService.callWithAccessToken(account,
+                        accessToken -> contextDataClient.fetchCalendar(
+                                accessToken, diary.getDiaryDate())));
+        return fresh == null ? preload : fresh;
+    }
+
     private JsonNode collectSpotify(Long userId, Diary diary, ExternalAccount account) {
-        JsonNode preload = findSpotifyPreload(userId, diary.getDiaryDate());
-        JsonNode fresh;
-        try {
-            fresh = contextDataClient.fetchSpotify(
-                    account.getAccessToken(), diary.getDiaryDate());
-        } catch (RuntimeException exception) {
-            if (preload == null) {
-                throw exception;
-            }
-            log.warn("Spotify refresh failed, falling back to preloaded context: cause={}",
-                    ExternalCallLog.describe(exception));
-            return preload;
-        }
+        JsonNode preload = findPreload(userId, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
+        JsonNode fresh = fetchOrFallback(preload, DiaryContextType.SPOTIFY,
+                () -> tokenService.callWithAccessToken(account,
+                        accessToken -> contextDataClient.fetchSpotify(
+                                accessToken, diary.getDiaryDate())));
         if (fresh == null) {
             return preload;
         }
-        if (preload == null) {
+        if (preload == null || fresh == preload) {
             return fresh;
         }
         return mergeSpotifyItems(preload, fresh);
     }
 
-    private JsonNode findSpotifyPreload(Long userId, LocalDate date) {
+    /** 스냅샷이 없으면 원래 예외를 그대로 올려 수집 실패로 기록되게 한다. */
+    private JsonNode fetchOrFallback(
+            JsonNode preload,
+            DiaryContextType type,
+            Supplier<JsonNode> fetch
+    ) {
+        try {
+            return fetch.get();
+        } catch (RuntimeException exception) {
+            if (preload == null) {
+                throw exception;
+            }
+            log.warn("Context refresh failed, falling back to preloaded snapshot: "
+                            + "type={}, cause={}",
+                    type, ExternalCallLog.describe(exception));
+            return preload;
+        }
+    }
+
+    private JsonNode findPreload(Long userId, LocalDate date, DiaryContextType type) {
         return snapshotPersistenceService
-                .findSuccessfulContextData(userId, date, DiaryContextType.SPOTIFY)
+                .findSuccessfulContextData(userId, date, type)
                 .orElse(null);
     }
 
