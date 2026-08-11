@@ -88,6 +88,9 @@ public class DiaryContextPersistenceService {
             return List.of();
         }
         Diary diary = getManagedDiary(userId, diaryId);
+        List<DiaryContext> existingContexts = contextRepository
+                .findAllByDiaryAndContextTypeOrderByContextKey(
+                        diary, DiaryContextType.PHOTO);
         List<DiaryContext> contexts = new ArrayList<>();
         for (int contextKey = 0; contextKey < contextData.size(); contextKey++) {
             int key = contextKey;
@@ -100,6 +103,9 @@ public class DiaryContextPersistenceService {
             context.updateContextData(data);
             contexts.add(contextRepository.save(context));
         }
+        existingContexts.stream()
+                .filter(context -> context.getContextKey() >= contextData.size())
+                .forEach(DiaryContext::markFailed);
         return List.copyOf(contexts);
     }
 

@@ -149,6 +149,36 @@ class DiaryContextPersistenceServiceTest {
                 .doesNotHaveDuplicates();
     }
 
+    @Test
+    void deactivatesPhotoContextsMissingFromRecollection() {
+        diaryRepository.claimContextCollection(
+                diary.getId(), user.getId(), LocalDateTime.now());
+        long leaseVersion = currentLeaseVersion();
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode park = objectMapper.createObjectNode().put("summary", "공원");
+        JsonNode cafe = objectMapper.createObjectNode().put("summary", "카페");
+        service.savePhotoContexts(
+                user.getId(), diary.getId(), leaseVersion, List.of(park, cafe));
+
+        JsonNode merged = objectMapper.createObjectNode().put("summary", "같은 장소");
+        service.savePhotoContexts(
+                user.getId(), diary.getId(), leaseVersion, List.of(merged));
+        contextRepository.flush();
+
+        List<DiaryContext> all = contextRepository
+                .findAllByDiaryAndContextTypeOrderByContextKey(
+                        diary, DiaryContextType.PHOTO);
+        assertThat(all).hasSize(2);
+        assertThat(all.get(0).isSuccess()).isTrue();
+        assertThat(all.get(0).getContextData()).isEqualTo(merged);
+        assertThat(all.get(1).isSuccess()).isFalse();
+        assertThat(all.get(1).getContextData()).isNull();
+        assertThat(contextRepository.findAllByDiaryIdAndSuccessTrueOrderById(diary.getId()))
+                .singleElement()
+                .extracting(DiaryContext::getContextKey)
+                .isEqualTo(0);
+    }
+
     private long currentLeaseVersion() {
         return diaryRepository.findById(diary.getId())
                 .orElseThrow()

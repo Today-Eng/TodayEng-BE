@@ -1,9 +1,9 @@
 package com.example.todayEng.domain.diary.repository;
 
-import java.util.List;
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
 import com.example.todayEng.domain.diary.entity.enums.DiaryContextType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -25,6 +25,11 @@ public interface DiaryContextRepository extends JpaRepository<DiaryContext, Long
             Diary diary,
             DiaryContextType contextType,
             int contextKey
+    );
+
+    List<DiaryContext> findAllByDiaryAndContextTypeOrderByContextKey(
+            Diary diary,
+            DiaryContextType contextType
     );
 
     @Modifying
