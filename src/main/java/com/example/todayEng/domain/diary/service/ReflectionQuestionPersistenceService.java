@@ -78,12 +78,13 @@ public class ReflectionQuestionPersistenceService {
             throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        List<DiaryContext> contexts = selectDiverseContexts(contextRepository
-                .findAllByDiaryIdAndSuccessTrueOrderById(diaryId));
-        if (contexts.stream().anyMatch(context -> context.getContextData() == null)) {
+        List<DiaryContext> successfulContexts = contextRepository
+                .findAllByDiaryIdAndSuccessTrueOrderById(diaryId);
+        if (successfulContexts.stream().anyMatch(context -> context.getContextData() == null)) {
             claimedDiary.failQuestionGeneration();
             throw new BaseException(ErrorCode.DIARY_CONTEXT_NOT_FOUND);
         }
+        List<DiaryContext> contexts = selectDiverseContexts(successfulContexts);
 
         List<String> interests = userInterestRepository
                 .findAllByUserIdOrderByInterestTagId(userId)
@@ -180,10 +181,10 @@ public class ReflectionQuestionPersistenceService {
 
         LinkedHashMap<Long, DefaultQuestion> candidates = new LinkedHashMap<>();
         if (!interestNames.isEmpty()) {
-            defaultQuestionRepository.findActiveByInterestNames(interestNames)
+            defaultQuestionRepository.findActiveMainByInterestNames(interestNames)
                     .forEach(question -> candidates.put(question.getId(), question));
         }
-        defaultQuestionRepository.findAllActive()
+        defaultQuestionRepository.findAllActiveMain()
                 .forEach(question -> candidates.putIfAbsent(question.getId(), question));
 
         List<DefaultQuestion> selected = new ArrayList<>(candidates.values()).stream()

@@ -7,6 +7,7 @@ import com.example.todayEng.domain.diary.entity.enums.CorrectionStatus;
 import com.example.todayEng.domain.diary.entity.enums.QuestionType;
 import com.example.todayEng.domain.diary.repository.DiaryAnswerRepository;
 import com.example.todayEng.domain.diary.repository.DiaryQuestionRepository;
+import com.example.todayEng.domain.diary.repository.DefaultQuestionRepository;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AnswerCorrectionPersistenceService {
     private final DiaryAnswerRepository answerRepository;
     private final DiaryQuestionRepository questionRepository;
+    private final DefaultQuestionRepository defaultQuestionRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -77,6 +79,42 @@ public class AnswerCorrectionPersistenceService {
                 objectMapper.valueToTree(response.alternativeExpressions()));
         return new AnswerCorrectionResult(question.getQuestionType(), question.getId(), answer.getId(),
                 response.correctedText(), response.correctionReason(), next, ready);
+    }
+
+    @Transactional
+    public AnswerCorrectionResult completeWithDefaultFollowUp(AnswerCorrectionWork work) {
+        DiaryAnswer answer = owned(work.userId(), work.diaryId(), work.questionId(), work.answerId());
+        if (answer.getCorrectionStatus() != CorrectionStatus.PROCESSING) {
+            throw new BaseException(ErrorCode.ANSWER_CORRECTION_ALREADY_PROCESSING);
+        }
+        DiaryQuestion question = answer.getQuestion();
+        if (question.getQuestionType() != QuestionType.MAIN) {
+            throw new BaseException(ErrorCode.INVALID_LLM_RESPONSE);
+        }
+        if (questionRepository.existsByParentQuestionId(question.getId())) {
+            throw new BaseException(ErrorCode.FOLLOW_UP_QUESTION_ALREADY_EXISTS);
+        }
+
+        var defaults = defaultQuestionRepository.findAllActiveFollowUps();
+        if (defaults.isEmpty()) {
+            throw new BaseException(ErrorCode.DEFAULT_QUESTIONS_NOT_CONFIGURED);
+        }
+        int mainIndex = Math.max(0, (question.getQuestionOrder() - 1) / 2);
+        var selected = defaults.get(mainIndex % defaults.size());
+        DiaryQuestion saved = questionRepository.saveAndFlush(
+                DiaryQuestion.createDefaultFollowUpQuestion(
+                        question.getDiary(), question, selected));
+
+        String originalText = answer.getOriginalText();
+        String reason = "AI 교정을 사용할 수 없어 원문을 유지했습니다.";
+        answer.completeCorrection(originalText, reason, objectMapper.valueToTree(java.util.List.of()));
+        return new AnswerCorrectionResult(
+                question.getQuestionType(), question.getId(), answer.getId(),
+                originalText, reason,
+                new AnswerCorrectionResult.NextQuestion(
+                        saved.getId(), saved.getKoreanTranslation(), true),
+                false
+        );
     }
 
     @Transactional

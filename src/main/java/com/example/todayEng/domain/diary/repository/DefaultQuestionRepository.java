@@ -12,10 +12,11 @@ public interface DefaultQuestionRepository extends JpaRepository<DefaultQuestion
             select dq from DefaultQuestion dq
             join fetch dq.interestTag tag
             where dq.active = true
+              and dq.questionType = com.example.todayEng.domain.diary.entity.enums.QuestionType.MAIN
               and tag.tagName in :interestNames
             order by dq.id
             """)
-    List<DefaultQuestion> findActiveByInterestNames(
+    List<DefaultQuestion> findActiveMainByInterestNames(
             @Param("interestNames") List<com.example.todayEng.domain.user.entity.enums.InterestTagName> interestNames
     );
 
@@ -23,7 +24,17 @@ public interface DefaultQuestionRepository extends JpaRepository<DefaultQuestion
             select dq from DefaultQuestion dq
             join fetch dq.interestTag
             where dq.active = true
+              and dq.questionType = com.example.todayEng.domain.diary.entity.enums.QuestionType.MAIN
             order by dq.id
             """)
-    List<DefaultQuestion> findAllActive();
+    List<DefaultQuestion> findAllActiveMain();
+
+    @Query("""
+            select dq from DefaultQuestion dq
+            left join fetch dq.interestTag
+            where dq.active = true
+              and dq.questionType = com.example.todayEng.domain.diary.entity.enums.QuestionType.FOLLOW_UP
+            order by dq.id
+            """)
+    List<DefaultQuestion> findAllActiveFollowUps();
 }

@@ -3,6 +3,7 @@ package com.example.todayEng.domain.diary.service;
 import com.example.todayEng.domain.diary.client.AnswerCorrectionLlmClient;
 import com.example.todayEng.domain.diary.dto.llm.AnswerCorrectionResult;
 import com.example.todayEng.domain.diary.dto.llm.AnswerCorrectionWork;
+import com.example.todayEng.domain.diary.entity.enums.QuestionType;
 import com.example.todayEng.domain.diary.dto.sse.DiarySsePayload;
 import com.example.todayEng.domain.diary.sse.DiarySseEmitterManager;
 import com.example.todayEng.global.error.ErrorCode;
@@ -28,26 +29,50 @@ public class AnswerCorrectionPipelineService {
             var llmResponse = llmClient.correct(work.command());
             result = persistenceService.complete(work, llmResponse);
         } catch (RuntimeException exception) {
-            handleProcessingFailure(userId, diaryId, questionId, answerId, work, exception);
-            return;
+            if (canUseDefaultFollowUp(work, exception)) {
+                try {
+                    result = persistenceService.completeWithDefaultFollowUp(work);
+                    log.warn("AI follow-up generation failed; used a default follow-up: diaryId={}, questionId={}",
+                            diaryId, questionId, exception);
+                } catch (RuntimeException fallbackException) {
+                    fallbackException.addSuppressed(exception);
+                    handleProcessingFailure(userId, diaryId, questionId, answerId, work, fallbackException);
+                    return;
+                }
+            } else {
+                handleProcessingFailure(userId, diaryId, questionId, answerId, work, exception);
+                return;
+            }
         }
 
+        AnswerCorrectionResult completedResult = result;
         runFollowUpAction("answer-corrected notification", diaryId, questionId, answerId,
                 () -> emitterManager.sendAnswerCorrected(userId, diaryId, new DiarySsePayload.AnswerCorrected(
-                        questionId, answerId, result.correctedText(), result.correctionReason())));
+                        questionId, answerId, completedResult.correctedText(), completedResult.correctionReason())));
         runFollowUpAction("next step", diaryId, questionId, answerId, () -> {
-            if (result.nextQuestion() != null) {
-                if (result.nextQuestion().followUp()) {
-                    questionTtsService.generateFollowUpQuestion(userId, diaryId, result.nextQuestion().id(),
-                            result.nextQuestion().koreanTranslation());
+            if (completedResult.nextQuestion() != null) {
+                if (completedResult.nextQuestion().followUp()) {
+                    questionTtsService.generateFollowUpQuestion(userId, diaryId, completedResult.nextQuestion().id(),
+                            completedResult.nextQuestion().koreanTranslation());
                 } else {
-                    questionTtsService.generateQuestion(userId, diaryId, result.nextQuestion().id(),
-                            result.nextQuestion().koreanTranslation());
+                    questionTtsService.generateQuestion(userId, diaryId, completedResult.nextQuestion().id(),
+                            completedResult.nextQuestion().koreanTranslation());
                 }
-            } else if (result.readyToComplete()) {
+            } else if (completedResult.readyToComplete()) {
                 emitterManager.sendReadyToComplete(userId, diaryId);
             }
         });
+    }
+
+    private boolean canUseDefaultFollowUp(AnswerCorrectionWork work, RuntimeException exception) {
+        if (work == null || work.command().questionType() != QuestionType.MAIN) {
+            return false;
+        }
+        if (!(exception instanceof BaseException baseException)) {
+            return false;
+        }
+        return baseException.getErrorCode() == ErrorCode.LLM_API_FAILED
+                || baseException.getErrorCode() == ErrorCode.INVALID_LLM_RESPONSE;
     }
 
     private void runFollowUpAction(String action, Long diaryId, Long questionId, Long answerId, Runnable runnable) {
