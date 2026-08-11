@@ -12,6 +12,8 @@ import com.example.todayEng.global.error.exception.BaseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,10 +70,37 @@ public class DiaryContextPersistenceService {
             return Optional.empty();
         }
         Diary diary = getManagedDiary(userId, diaryId);
-        DiaryContext context = contextRepository.findByDiaryAndContextType(diary, type)
+        DiaryContext context = contextRepository
+                .findByDiaryAndContextTypeAndContextKey(diary, type, 0)
                 .orElseGet(() -> DiaryContext.failure(diary, type));
         context.markFailed();
         return Optional.of(contextRepository.save(context));
+    }
+
+    @Transactional
+    public List<DiaryContext> savePhotoContexts(
+            Long userId,
+            Long diaryId,
+            long leaseVersion,
+            List<JsonNode> contextData
+    ) {
+        if (!verifyLease(diaryId, userId, leaseVersion)) {
+            return List.of();
+        }
+        Diary diary = getManagedDiary(userId, diaryId);
+        List<DiaryContext> contexts = new ArrayList<>();
+        for (int contextKey = 0; contextKey < contextData.size(); contextKey++) {
+            int key = contextKey;
+            JsonNode data = contextData.get(contextKey);
+            DiaryContext context = contextRepository
+                    .findByDiaryAndContextTypeAndContextKey(
+                            diary, DiaryContextType.PHOTO, contextKey)
+                    .orElseGet(() -> DiaryContext.success(
+                            diary, DiaryContextType.PHOTO, key, data));
+            context.updateContextData(data);
+            contexts.add(contextRepository.save(context));
+        }
+        return List.copyOf(contexts);
     }
 
     @Transactional
@@ -141,7 +170,8 @@ public class DiaryContextPersistenceService {
     }
 
     private DiaryContext saveSuccess(Diary diary, DiaryContextType type, JsonNode data) {
-        DiaryContext context = contextRepository.findByDiaryAndContextType(diary, type)
+        DiaryContext context = contextRepository
+                .findByDiaryAndContextTypeAndContextKey(diary, type, 0)
                 .orElseGet(() -> DiaryContext.success(diary, type, data));
         context.updateContextData(data);
         return contextRepository.save(context);

@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -125,6 +126,27 @@ class DiaryContextPersistenceServiceTest {
         service.completeContextCollection(user.getId(), diary.getId(), reclaimerLeaseVersion);
         assertThat(diaryRepository.findById(diary.getId()).orElseThrow()
                 .getContextCollectionStatus()).isEqualTo(DiaryContextCollectionStatus.COMPLETED);
+    }
+
+    @Test
+    void savesTwoPhotoContextsWithDifferentKeysAndIds() {
+        diaryRepository.claimContextCollection(
+                diary.getId(), user.getId(), LocalDateTime.now());
+        long leaseVersion = currentLeaseVersion();
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode park = objectMapper.createObjectNode().put("summary", "공원");
+        JsonNode cafe = objectMapper.createObjectNode().put("summary", "카페");
+
+        List<DiaryContext> saved = service.savePhotoContexts(
+                user.getId(), diary.getId(), leaseVersion, List.of(park, cafe));
+        contextRepository.flush();
+
+        assertThat(saved).hasSize(2)
+                .extracting(DiaryContext::getContextKey)
+                .containsExactly(0, 1);
+        assertThat(saved).extracting(DiaryContext::getId)
+                .doesNotContainNull()
+                .doesNotHaveDuplicates();
     }
 
     private long currentLeaseVersion() {

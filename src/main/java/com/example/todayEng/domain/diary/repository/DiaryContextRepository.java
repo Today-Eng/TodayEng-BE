@@ -21,6 +21,12 @@ public interface DiaryContextRepository extends JpaRepository<DiaryContext, Long
             DiaryContextType contextType
     );
 
+    Optional<DiaryContext> findByDiaryAndContextTypeAndContextKey(
+            Diary diary,
+            DiaryContextType contextType,
+            int contextKey
+    );
+
     @Modifying
     @Query("DELETE FROM DiaryContext c WHERE c.diary.id = :diaryId")
     void deleteAllByDiaryId(@Param("diaryId") Long diaryId);

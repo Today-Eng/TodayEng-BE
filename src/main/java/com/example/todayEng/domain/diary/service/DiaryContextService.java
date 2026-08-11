@@ -1,6 +1,7 @@
 package com.example.todayEng.domain.diary.service;
 
 import com.example.todayEng.domain.diary.client.DiaryContextDataClient;
+import com.example.todayEng.domain.diary.client.DiaryImageAnalysis;
 import com.example.todayEng.domain.diary.client.DiaryImageAnalysisClient;
 import com.example.todayEng.domain.diary.dto.request.DiaryContextCreateRequest;
 import com.example.todayEng.domain.diary.dto.response.DiaryContextCreateResponse;
@@ -125,9 +126,8 @@ public class DiaryContextService {
                     .ifPresent(contexts::add);
         }
         if (!validatedImages.isEmpty()) {
-            collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.PHOTO,
-                    () -> imageAnalysisClient.analyze(validatedImages))
-                    .ifPresent(contexts::add);
+            contexts.addAll(collectPhotos(
+                    userId, diaryId, leaseVersion, diary.getDiaryDate(), validatedImages));
         }
         if (request.location() != null) {
             collect(userId, diaryId, leaseVersion, diary.getDiaryDate(), DiaryContextType.WEATHER,
@@ -151,6 +151,40 @@ public class DiaryContextService {
 
         return new DiaryContextCreateResponse(diary.getId(), contexts.stream()
                 .map(DiaryContextCreateResponse.ContextResult::from).toList());
+    }
+
+    private List<DiaryContext> collectPhotos(
+            Long userId,
+            Long diaryId,
+            long leaseVersion,
+            LocalDate diaryDate,
+            List<MultipartFile> images
+    ) {
+        try {
+            DiaryImageAnalysis analysis = imageAnalysisClient.analyze(images);
+            if (analysis == null || analysis.photoContexts().isEmpty()) {
+                throw new IllegalStateException("Photo collector returned no data");
+            }
+            List<DiaryContext> contexts = persistenceService.savePhotoContexts(
+                    userId,
+                    diaryId,
+                    leaseVersion,
+                    analysis.photoContexts().stream()
+                            .map(DiaryImageAnalysis.PhotoContext::contextData)
+                            .toList()
+            );
+            if (!contexts.isEmpty()) {
+                cleanupSnapshot(userId, diaryDate, DiaryContextType.PHOTO);
+            }
+            return contexts;
+        } catch (RuntimeException exception) {
+            log.warn("Diary context collection failed: diaryId={}, type={}, cause={}",
+                    diaryId, DiaryContextType.PHOTO, ExternalCallLog.describe(exception));
+            return persistenceService.saveFailure(
+                            userId, diaryId, leaseVersion, DiaryContextType.PHOTO)
+                    .stream()
+                    .toList();
+        }
     }
 
     private void collectExternal(
