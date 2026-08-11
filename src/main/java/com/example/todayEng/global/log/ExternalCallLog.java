@@ -17,7 +17,8 @@ public final class ExternalCallLog {
         }
         if (throwable instanceof RestClientResponseException responseException) {
             return throwable.getClass().getSimpleName()
-                    + "(status=" + responseException.getStatusCode().value() + ")";
+                    + "(status=" + responseException.getStatusCode().value()
+                    + ")";
         }
         if (throwable instanceof ResourceAccessException && throwable.getCause() != null) {
             return throwable.getClass().getSimpleName()
