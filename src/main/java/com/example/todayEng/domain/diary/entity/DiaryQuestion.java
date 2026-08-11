@@ -219,6 +219,26 @@ public class DiaryQuestion {
                 .build();
     }
 
+    public static DiaryQuestion createDefaultFollowUpQuestion(
+            Diary diary,
+            DiaryQuestion parentQuestion,
+            DefaultQuestion defaultQuestion
+    ) {
+        return DiaryQuestion.builder()
+                .diary(diary)
+                .parentQuestion(parentQuestion)
+                .defaultQuestion(defaultQuestion)
+                .questionType(QuestionType.FOLLOW_UP)
+                .questionOrder(parentQuestion.getQuestionOrder() + 1)
+                .questionText(defaultQuestion.getQuestionText())
+                .generationType(QuestionGenerationType.DEFAULT)
+                .koreanTranslation(defaultQuestion.getKoreanTranslation())
+                .context(parentQuestion.getContext())
+                .englishLevelSnapshot(parentQuestion.getEnglishLevelSnapshot())
+                .interestSnapshot(parentQuestion.getInterestSnapshot())
+                .build();
+    }
+
     private static void validateParentQuestion(
             QuestionType questionType,
             DiaryQuestion parentQuestion

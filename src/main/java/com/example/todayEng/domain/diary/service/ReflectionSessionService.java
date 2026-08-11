@@ -6,6 +6,8 @@ import com.example.todayEng.domain.diary.dto.llm.ReflectionQuestionLlmResponse;
 import com.example.todayEng.domain.diary.dto.response.ReflectionSessionResponse;
 import com.example.todayEng.domain.diary.dto.sse.DiarySsePayload;
 import com.example.todayEng.domain.diary.sse.DiarySseEmitterManager;
+import com.example.todayEng.global.error.ErrorCode;
+import com.example.todayEng.global.error.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,8 +32,19 @@ public class ReflectionSessionService {
                     llmClient.generateQuestions(command);
             response = persistenceService.saveQuestions(command, llmResponse);
         } catch (RuntimeException exception) {
-            persistenceService.markFailed(command);
-            throw exception;
+            if (!isLlmQuestionFailure(exception)) {
+                persistenceService.markFailed(command);
+                throw exception;
+            }
+            log.warn("AI question generation failed; trying default questions: userId={}, diaryId={}",
+                    userId, diaryId, exception);
+            try {
+                response = persistenceService.saveDefaultQuestions(command);
+            } catch (RuntimeException fallbackException) {
+                persistenceService.markFailed(command);
+                fallbackException.addSuppressed(exception);
+                throw fallbackException;
+            }
         }
         try {
             emitterManager.sendQuestionsReady(
@@ -50,5 +63,14 @@ public class ReflectionSessionService {
                     userId, diaryId, exception);
         }
         return response;
+    }
+
+    private boolean isLlmQuestionFailure(RuntimeException exception) {
+        if (!(exception instanceof BaseException baseException)) {
+            return false;
+        }
+        return baseException.getErrorCode() == ErrorCode.LLM_API_FAILED
+                || baseException.getErrorCode() == ErrorCode.INVALID_LLM_RESPONSE
+                || baseException.getErrorCode() == ErrorCode.INVALID_QUESTION_CONTEXT;
     }
 }

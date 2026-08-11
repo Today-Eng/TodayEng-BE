@@ -18,6 +18,7 @@ import com.example.todayEng.domain.diary.entity.enums.ReflectionQuestionGenerati
 import com.example.todayEng.domain.diary.repository.DiaryContextRepository;
 import com.example.todayEng.domain.diary.repository.DiaryQuestionRepository;
 import com.example.todayEng.domain.diary.repository.DiaryRepository;
+import com.example.todayEng.domain.diary.repository.DefaultQuestionRepository;
 import com.example.todayEng.domain.user.entity.InterestTag;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.entity.UserInterest;
@@ -46,6 +47,7 @@ class ReflectionQuestionPersistenceServiceTest {
     @Mock private DiaryContextRepository contextRepository;
     @Mock private DiaryQuestionRepository questionRepository;
     @Mock private UserInterestRepository userInterestRepository;
+    @Mock private DefaultQuestionRepository defaultQuestionRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ReflectionQuestionPersistenceService service;
@@ -60,6 +62,7 @@ class ReflectionQuestionPersistenceServiceTest {
                 contextRepository,
                 questionRepository,
                 userInterestRepository,
+                defaultQuestionRepository,
                 objectMapper,
                 Clock.systemDefaultZone()
         );
