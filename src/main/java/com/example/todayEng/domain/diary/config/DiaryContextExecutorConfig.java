@@ -16,7 +16,7 @@ public class DiaryContextExecutorConfig {
         executor.setMaxPoolSize(5);
         executor.setQueueCapacity(20);
         executor.setThreadNamePrefix("diary-context-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();
