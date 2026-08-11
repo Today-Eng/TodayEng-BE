@@ -244,6 +244,11 @@ public class ReflectionQuestionPersistenceService {
                 && Set.copyOf(usedContextIds).size() != usedContextIds.size()) {
             throw new BaseException(ErrorCode.INVALID_QUESTION_CONTEXT);
         }
+        if (!plan.requireDistinctContexts()
+                && allowedContextIds.size() <= plan.contextQuestionCount()
+                && !Set.copyOf(usedContextIds).containsAll(allowedContextIds)) {
+            throw new BaseException(ErrorCode.INVALID_QUESTION_CONTEXT);
+        }
     }
 
     private boolean claimQuestionGeneration(Long diaryId, Long userId) {

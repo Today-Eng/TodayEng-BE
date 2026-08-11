@@ -9,10 +9,13 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 
 import com.example.todayEng.domain.diary.client.DiaryContextDataClient;
 import com.example.todayEng.domain.diary.client.DiaryImageAnalysisClient;
+import com.example.todayEng.domain.diary.client.DiaryImageAnalysis;
+import com.example.todayEng.domain.diary.client.DiaryImageAnalysis.PhotoContext;
 import com.example.todayEng.domain.diary.dto.request.DiaryContextCreateRequest;
 import com.example.todayEng.domain.diary.entity.Diary;
 import com.example.todayEng.domain.diary.entity.DiaryContext;
@@ -103,6 +106,14 @@ class DiaryContextServiceTest {
         given(persistenceService.saveFailure(any(), any(), anyLong(), any()))
                 .willAnswer(call -> Optional.of(DiaryContext.failure(
                         diary, call.getArgument(3))));
+        given(persistenceService.savePhotoContexts(any(), any(), anyLong(), any()))
+                .willAnswer(call -> {
+                    List<JsonNode> data = call.getArgument(3);
+                    return java.util.stream.IntStream.range(0, data.size())
+                            .mapToObj(index -> DiaryContext.success(
+                                    diary, DiaryContextType.PHOTO, index, data.get(index)))
+                            .toList();
+                });
     }
 
     @Test
@@ -138,7 +149,7 @@ class DiaryContextServiceTest {
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
         var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
-        given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
+        given(imageAnalysisClient.analyze(List.of(image))).willReturn(photoAnalysis(analysis));
 
         var response = service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of(image));
@@ -152,6 +163,29 @@ class DiaryContextServiceTest {
         verify(persistenceService, never()).failContextCollection(any(), any(), anyLong());
         verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.PHOTO);
+    }
+
+    @Test
+    void storesDifferentPhotosAsSeparatePhotoContexts() throws Exception {
+        var first = new MockMultipartFile(
+                "images", "first.jpg", "image/jpeg", imageBytes(true));
+        var second = new MockMultipartFile(
+                "images", "second.jpg", "image/jpeg", imageBytes(true));
+        JsonNode park = new ObjectMapper().createObjectNode().put("summary", "공원");
+        JsonNode cafe = new ObjectMapper().createObjectNode().put("summary", "카페");
+        given(imageAnalysisClient.analyze(List.of(first, second)))
+                .willReturn(new DiaryImageAnalysis(List.of(
+                        new PhotoContext(List.of(0), park),
+                        new PhotoContext(List.of(1), cafe))));
+
+        var response = service.createContexts(
+                1L, 10L, new DiaryContextCreateRequest(null, null), List.of(first, second));
+
+        assertThat(response.contexts()).hasSize(2)
+                .allMatch(result -> result.type() == DiaryContextType.PHOTO
+                        && result.success());
+        verify(persistenceService).savePhotoContexts(
+                1L, 10L, LEASE_VERSION, List.of(park, cafe));
     }
 
     @Test
@@ -235,7 +269,7 @@ class DiaryContextServiceTest {
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
         var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
-        given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
+        given(imageAnalysisClient.analyze(List.of(image))).willReturn(photoAnalysis(analysis));
 
         var response = service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of(image));
@@ -243,8 +277,8 @@ class DiaryContextServiceTest {
         assertThat(response.contexts()).singleElement()
                 .matches(result -> result.success());
         verify(persistenceService).completeContextCollection(1L, 10L, 2L);
-        verify(persistenceService).saveSuccess(eq(1L), eq(10L), eq(2L),
-                eq(DiaryContextType.PHOTO), any());
+        verify(persistenceService).savePhotoContexts(
+                eq(1L), eq(10L), eq(2L), any());
     }
 
     @Test
@@ -262,13 +296,13 @@ class DiaryContextServiceTest {
 
     @Test
     void discardsResultWhenLeaseIsLostMidCollection() throws Exception {
-        given(persistenceService.saveSuccess(any(), any(), anyLong(), any(), any()))
-                .willReturn(Optional.empty());
+        doReturn(List.of()).when(persistenceService)
+                .savePhotoContexts(any(), any(), anyLong(), any());
         var image = new MockMultipartFile(
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
         var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
-        given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
+        given(imageAnalysisClient.analyze(List.of(image))).willReturn(photoAnalysis(analysis));
 
         var response = service.createContexts(1L, 10L,
                 new DiaryContextCreateRequest(null, null), List.of(image));
@@ -284,7 +318,7 @@ class DiaryContextServiceTest {
                 "images", "day.jpg", "image/jpeg",
                 imageBytes(true));
         var analysis = new ObjectMapper().readTree("{\"summary\":\"공원\"}");
-        given(imageAnalysisClient.analyze(List.of(image))).willReturn(analysis);
+        given(imageAnalysisClient.analyze(List.of(image))).willReturn(photoAnalysis(analysis));
         willThrow(new RuntimeException("db blip"))
                 .given(snapshotPersistenceService)
                 .cleanupCollected(any(), any(), any());
@@ -315,6 +349,23 @@ class DiaryContextServiceTest {
                 1L, 10L, LEASE_VERSION, DiaryContextType.SPOTIFY, freshData);
         verify(snapshotPersistenceService).cleanupCollected(
                 1L, diary.getDiaryDate(), DiaryContextType.SPOTIFY);
+    }
+
+    @Test
+    void usesPreloadedWeatherWhenLocationIsAbsent() {
+        JsonNode preload = new ObjectMapper().createObjectNode().put("temperature", 24);
+        given(snapshotPersistenceService.findSuccessfulContextData(
+                1L, diary.getDiaryDate(), DiaryContextType.WEATHER))
+                .willReturn(Optional.of(preload));
+
+        service.createContexts(1L, 10L,
+                new DiaryContextCreateRequest(null, null), List.of());
+
+        verify(dataClient, never()).fetchWeather(any(), any());
+        verify(persistenceService).saveSuccess(
+                1L, 10L, LEASE_VERSION, DiaryContextType.WEATHER, preload);
+        verify(snapshotPersistenceService).cleanupCollected(
+                1L, diary.getDiaryDate(), DiaryContextType.WEATHER);
     }
 
     @Test
@@ -515,5 +566,9 @@ class DiaryContextServiceTest {
         } catch (IOException exception) {
             throw new AssertionError(exception);
         }
+    }
+
+    private DiaryImageAnalysis photoAnalysis(JsonNode contextData) {
+        return new DiaryImageAnalysis(List.of(new PhotoContext(List.of(0), contextData)));
     }
 }
