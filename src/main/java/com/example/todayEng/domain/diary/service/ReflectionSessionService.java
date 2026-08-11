@@ -30,8 +30,15 @@ public class ReflectionSessionService {
                     llmClient.generateQuestions(command);
             response = persistenceService.saveQuestions(command, llmResponse);
         } catch (RuntimeException exception) {
-            persistenceService.markFailed(command);
-            throw exception;
+            log.warn("AI question generation failed; trying default questions: userId={}, diaryId={}",
+                    userId, diaryId, exception);
+            try {
+                response = persistenceService.saveDefaultQuestions(command);
+            } catch (RuntimeException fallbackException) {
+                persistenceService.markFailed(command);
+                fallbackException.addSuppressed(exception);
+                throw fallbackException;
+            }
         }
         try {
             emitterManager.sendQuestionsReady(
