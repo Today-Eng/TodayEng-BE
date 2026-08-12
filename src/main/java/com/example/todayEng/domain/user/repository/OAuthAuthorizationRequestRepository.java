@@ -43,16 +43,10 @@ public interface OAuthAuthorizationRequestRepository extends JpaRepository<OAuth
             @Param("processing") OAuthAuthorizationRequestStatus processing
     );
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            UPDATE OAuthAuthorizationRequest request
-            SET request.status = :succeeded, request.completedAt = :completedAt
-            WHERE request.id = :requestId AND request.status = :processing
-            """)
-    int markSucceeded(@Param("requestId") Long requestId,
-                      @Param("processing") OAuthAuthorizationRequestStatus processing,
-                      @Param("succeeded") OAuthAuthorizationRequestStatus succeeded,
-                      @Param("completedAt") LocalDateTime completedAt);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT request FROM OAuthAuthorizationRequest request WHERE request.id = :requestId")
+    Optional<OAuthAuthorizationRequest> findByIdForUpdate(
+            @Param("requestId") Long requestId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -74,7 +68,7 @@ public interface OAuthAuthorizationRequestRepository extends JpaRepository<OAuth
             SET request.status = :failed, request.failureStage = :stage,
                 request.failureType = :failureType, request.completedAt = :now
             WHERE request.status = :processing
-              AND request.processingStartedAt < :staleBefore
+              AND request.processingStartedAt <= :staleBefore
             """)
     int failStaleProcessing(
             @Param("processing") OAuthAuthorizationRequestStatus processing,

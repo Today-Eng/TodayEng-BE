@@ -6,7 +6,7 @@ ALTER TABLE oauth_authorization_request
     ADD COLUMN completed_at DATETIME(6) NULL AFTER processing_started_at;
 
 UPDATE oauth_authorization_request
-SET status = CASE WHEN used_at IS NULL THEN 'ISSUED' ELSE 'SUCCEEDED' END,
+SET status = CASE WHEN used_at IS NULL THEN 'ISSUED' ELSE 'LEGACY' END,
     processing_started_at = used_at,
     completed_at = used_at
 WHERE status IS NULL;

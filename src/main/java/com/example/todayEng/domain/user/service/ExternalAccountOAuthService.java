@@ -25,8 +25,7 @@ public class ExternalAccountOAuthService {
     private final OAuthProviderClientRegistry
             oauthProviderClientRegistry;
 
-    private final ExternalAccountConnectionService
-            externalAccountConnectionService;
+    private final OAuthCallbackCompletionService oauthCallbackCompletionService;
 
     public OAuthAuthorizationResponse createAuthorizationUrl(
             Long userId,
@@ -73,10 +72,9 @@ public class ExternalAccountOAuthService {
                     providerClient.fetchUserInfo(tokenResponse.accessToken());
 
             stage = OAuthCallbackFailureStage.ACCOUNT_SAVE;
-            externalAccountConnectionService.saveOrUpdate(
-                    claim.userId(), provider, tokenResponse, externalUserInfo);
-
-            oauthAuthorizationRequestService.succeed(claim.requestId());
+            oauthCallbackCompletionService.saveAccountAndSucceed(
+                    claim.requestId(), claim.userId(), provider,
+                    tokenResponse, externalUserInfo);
         } catch (RuntimeException exception) {
             oauthAuthorizationRequestService.fail(
                     claim.requestId(), stage, classifyFailure(exception));

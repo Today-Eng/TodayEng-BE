@@ -121,4 +121,12 @@ public class OAuthAuthorizationRequest extends BaseTimeEntity {
     public boolean isUsed() {
         return status != OAuthAuthorizationRequestStatus.ISSUED;
     }
+
+    public void succeed(LocalDateTime completedAt) {
+        if (status != OAuthAuthorizationRequestStatus.PROCESSING) {
+            throw new IllegalStateException("OAuth authorization request is not processing");
+        }
+        this.status = OAuthAuthorizationRequestStatus.SUCCEEDED;
+        this.completedAt = completedAt;
+    }
 }

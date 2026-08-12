@@ -113,19 +113,6 @@ public class OAuthAuthorizationRequestService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void succeed(Long requestId) {
-        int updated = oauthAuthorizationRequestRepository.markSucceeded(
-                requestId,
-                OAuthAuthorizationRequestStatus.PROCESSING,
-                OAuthAuthorizationRequestStatus.SUCCEEDED,
-                LocalDateTime.now()
-        );
-        if (updated == 0) {
-            throw new BaseException(ErrorCode.OAUTH_STATE_CONSUME_FAILED);
-        }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void fail(Long requestId, OAuthCallbackFailureStage stage,
                      OAuthCallbackFailureType failureType) {
         oauthAuthorizationRequestRepository.markFailed(

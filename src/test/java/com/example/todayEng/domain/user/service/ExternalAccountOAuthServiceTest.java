@@ -35,8 +35,7 @@ class ExternalAccountOAuthServiceTest {
             oauthProviderClientRegistry;
 
     @Mock
-    private ExternalAccountConnectionService
-            externalAccountConnectionService;
+    private OAuthCallbackCompletionService oauthCallbackCompletionService;
 
     @Mock
     private OAuthProviderClient providerClient;
@@ -79,9 +78,8 @@ class ExternalAccountOAuthServiceTest {
 
         service.connectExternalAccount(provider, "code", "state", null);
 
-        verify(externalAccountConnectionService)
-                .saveOrUpdate(1L, provider, token, userInfo);
-        verify(oauthAuthorizationRequestService).succeed(10L);
+        verify(oauthCallbackCompletionService)
+                .saveAccountAndSucceed(10L, 1L, provider, token, userInfo);
     }
 
     @Test
@@ -100,7 +98,13 @@ class ExternalAccountOAuthServiceTest {
         verify(oauthAuthorizationRequestService).fail(
                 10L, OAuthCallbackFailureStage.TOKEN_EXCHANGE,
                 OAuthCallbackFailureType.EXTERNAL_API);
-        verify(oauthAuthorizationRequestService, never()).succeed(10L);
+        verify(oauthCallbackCompletionService, never())
+                .saveAccountAndSucceed(
+                        org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -115,8 +119,8 @@ class ExternalAccountOAuthServiceTest {
         given(providerClient.exchangeToken("sensitive-code")).willReturn(token);
         given(providerClient.fetchUserInfo("sensitive-access")).willReturn(userInfo);
         doThrow(new DataIntegrityViolationException("duplicate"))
-                .when(externalAccountConnectionService)
-                .saveOrUpdate(1L, provider, token, userInfo);
+                .when(oauthCallbackCompletionService)
+                .saveAccountAndSucceed(10L, 1L, provider, token, userInfo);
 
         assertThatThrownBy(() -> service.connectExternalAccount(
                 provider, "sensitive-code", "state", null))
