@@ -334,6 +334,18 @@ jobs:
             --default-service="${PREVIOUS_BACKEND}" \
             --global; then
             echo "Failed to rollback URL Map to ${PREVIOUS_BACKEND}."
+
+            CURRENT="UNKNOWN"
+
+            if CURRENT_URL=$(gcloud compute url-maps describe "${URL_MAP}" \
+              --global \
+              --format="value(defaultService)"); then
+              CURRENT="${CURRENT_URL##*/}"
+            else
+              echo "Failed to query URL Map after rollback command failure."
+            fi
+
+            echo "Current backend: ${CURRENT}"
             exit 1
           fi
 
