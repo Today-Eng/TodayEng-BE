@@ -263,6 +263,7 @@ jobs:
           exit 1
 
       - name: Switch traffic to standby
+        id: switch
         shell: bash
         run: |
           set -euo pipefail
@@ -302,6 +303,88 @@ jobs:
           done
 
           echo "URL Map update verification failed."
+          exit 1
+
+      - name: Rollback traffic to previous active
+        id: rollback
+        if: failure() && steps.switch.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ACTIVE_COLOR="${{ steps.target.outputs.active_color }}"
+
+          if [ "${ACTIVE_COLOR}" = "blue" ]; then
+            PREVIOUS_BACKEND="${BLUE_BACKEND}"
+          elif [ "${ACTIVE_COLOR}" = "green" ]; then
+            PREVIOUS_BACKEND="${GREEN_BACKEND}"
+          else
+            echo "Cannot determine previous backend from active color: ${ACTIVE_COLOR}"
+            exit 1
+          fi
+
+          echo "======================================"
+          echo "URL Map update verification failed."
+          echo "Starting automatic rollback."
+          echo "Previous active : ${ACTIVE_COLOR}"
+          echo "Rollback backend: ${PREVIOUS_BACKEND}"
+          echo "======================================"
+
+          if ! gcloud compute url-maps set-default-service "${URL_MAP}" \
+            --default-service="${PREVIOUS_BACKEND}" \
+            --global; then
+            echo "Failed to rollback URL Map to ${PREVIOUS_BACKEND}."
+            exit 1
+          fi
+
+          echo "Rollback command completed."
+
+      - name: Verify URL Map rollback
+        if: failure() && steps.switch.outcome == 'success' && steps.rollback.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ACTIVE_COLOR="${{ steps.target.outputs.active_color }}"
+
+          if [ "${ACTIVE_COLOR}" = "blue" ]; then
+            EXPECTED="${BLUE_BACKEND}"
+          elif [ "${ACTIVE_COLOR}" = "green" ]; then
+            EXPECTED="${GREEN_BACKEND}"
+          else
+            echo "Cannot determine rollback backend from active color: ${ACTIVE_COLOR}"
+            exit 1
+          fi
+
+          echo "Verifying rollback to: ${EXPECTED}"
+          CURRENT="UNKNOWN"
+
+          for attempt in $(seq 1 30); do
+            if ! CURRENT_URL=$(gcloud compute url-maps describe "${URL_MAP}" \
+              --global \
+              --format="value(defaultService)"); then
+              echo "Failed to query URL Map during rollback verification."
+              echo "Rollback verification attempt ${attempt}/30 failed."
+              sleep 5
+              continue
+            fi
+
+            CURRENT="${CURRENT_URL##*/}"
+
+            echo "Current URL Map backend: ${CURRENT}"
+
+            if [ "${CURRENT}" = "${EXPECTED}" ]; then
+              echo "URL Map rollback completed successfully."
+              exit 0
+            fi
+
+            echo "Rollback verification attempt ${attempt}/30 not reflected yet."
+            sleep 5
+          done
+
+          echo "URL Map rollback verification failed."
+          echo "Expected backend: ${EXPECTED}"
+          echo "Current backend : ${CURRENT}"
           exit 1
 
       - name: Deployment summary
