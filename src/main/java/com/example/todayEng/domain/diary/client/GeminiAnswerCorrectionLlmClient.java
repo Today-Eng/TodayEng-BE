@@ -30,13 +30,16 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
     private final GeminiProperties properties;
     private final AnswerCorrectionPromptFactory promptFactory;
     private final ObjectMapper objectMapper;
+    private final AnswerCorrectionLanguageValidator languageValidator;
 
     public GeminiAnswerCorrectionLlmClient(@Qualifier("geminiRestClient") RestClient restClient,
-            GeminiProperties properties, AnswerCorrectionPromptFactory promptFactory, ObjectMapper objectMapper) {
+            GeminiProperties properties, AnswerCorrectionPromptFactory promptFactory, ObjectMapper objectMapper,
+            AnswerCorrectionLanguageValidator languageValidator) {
         this.restClient = restClient;
         this.properties = properties;
         this.promptFactory = promptFactory;
         this.objectMapper = objectMapper;
+        this.languageValidator = languageValidator;
     }
 
     @Override
@@ -111,7 +114,10 @@ public class GeminiAnswerCorrectionLlmClient implements AnswerCorrectionLlmClien
     }
 
     private void validate(QuestionType type, AnswerCorrectionLlmResponse r) {
-        if (r == null || blank(r.correctedText()) || blank(r.correctionReason()) || r.alternativeExpressions() == null
+        if (r == null
+                || !languageValidator.isEnglishText(r.correctedText())
+                || !languageValidator.isKoreanExplanation(r.correctionReason())
+                || !languageValidator.areEnglishExpressions(r.alternativeExpressions())
                 || (type == QuestionType.MAIN && (r.followUpQuestion() == null
                 || blank(r.followUpQuestion().questionText()) || blank(r.followUpQuestion().koreanTranslation())))
                 || (type == QuestionType.FOLLOW_UP && r.followUpQuestion() != null)) {
