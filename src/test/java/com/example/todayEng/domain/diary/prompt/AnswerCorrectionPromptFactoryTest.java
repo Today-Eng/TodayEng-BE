@@ -17,6 +17,8 @@ class AnswerCorrectionPromptFactoryTest {
                 "It good", EnglishLevel.BEGINNER,
                 new ObjectMapper().readTree("{\"event\":\"walk\"}")));
         assertThat(prompt).contains("preserving its original meaning", "Never invent or add facts",
+                "Write correctionReason only in Korean",
+                "Keep correctedText and alternativeExpressions in English",
                 "exactly one natural follow-up", "BEGINNER", "walk");
     }
 
