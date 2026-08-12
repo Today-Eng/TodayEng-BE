@@ -13,7 +13,9 @@ public class AnswerCorrectionPromptFactory {
         return """
                 You are an English reflection-writing coach.
                 Correct the answer at the user's English level while preserving its original meaning.
-                Never invent or add facts. Give a concise correction reason and useful alternative expressions.
+                Never invent or add facts.
+                Write correctionReason only in Korean.
+                Keep correctedText and alternativeExpressions in English.
                 %s
                 English level: %s
                 Question: %s
