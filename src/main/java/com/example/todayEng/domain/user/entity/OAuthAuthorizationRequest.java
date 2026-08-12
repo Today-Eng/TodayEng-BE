@@ -1,6 +1,9 @@
 package com.example.todayEng.domain.user.entity;
 
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
+import com.example.todayEng.domain.user.entity.enums.OAuthAuthorizationRequestStatus;
+import com.example.todayEng.domain.user.entity.enums.OAuthCallbackFailureStage;
+import com.example.todayEng.domain.user.entity.enums.OAuthCallbackFailureType;
 import com.example.todayEng.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -23,6 +26,10 @@ import java.time.LocalDateTime;
                 @Index(
                         name = "idx_oauth_authorization_request_expires_at",
                         columnList = "expires_at"
+                ),
+                @Index(
+                        name = "idx_oauth_authorization_request_status_processing",
+                        columnList = "status, processing_started_at"
                 )
         }
 )
@@ -62,6 +69,24 @@ public class OAuthAuthorizationRequest extends BaseTimeEntity {
     @Column(name = "used_at")
     private LocalDateTime usedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private OAuthAuthorizationRequestStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "failure_stage", length = 30)
+    private OAuthCallbackFailureStage failureStage;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "failure_type", length = 30)
+    private OAuthCallbackFailureType failureType;
+
+    @Column(name = "processing_started_at")
+    private LocalDateTime processingStartedAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     private OAuthAuthorizationRequest(
             User user,
             ExternalServiceProvider provider,
@@ -72,6 +97,7 @@ public class OAuthAuthorizationRequest extends BaseTimeEntity {
         this.provider = provider;
         this.stateHash = stateHash;
         this.expiresAt = expiresAt;
+        this.status = OAuthAuthorizationRequestStatus.ISSUED;
     }
 
     public static OAuthAuthorizationRequest create(
@@ -93,6 +119,6 @@ public class OAuthAuthorizationRequest extends BaseTimeEntity {
     }
 
     public boolean isUsed() {
-        return usedAt != null;
+        return status != OAuthAuthorizationRequestStatus.ISSUED;
     }
 }

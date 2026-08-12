@@ -6,10 +6,14 @@ import com.example.todayEng.domain.user.dto.oauth.ExternalUserInfo;
 import com.example.todayEng.domain.user.dto.oauth.OAuthTokenResponse;
 import com.example.todayEng.domain.user.dto.response.OAuthAuthorizationResponse;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
+import com.example.todayEng.domain.user.entity.enums.OAuthCallbackFailureStage;
+import com.example.todayEng.domain.user.entity.enums.OAuthCallbackFailureType;
+import com.example.todayEng.domain.user.service.OAuthAuthorizationRequestService.ProcessingClaim;
 import com.example.todayEng.global.error.ErrorCode;
 import com.example.todayEng.global.error.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataAccessException;
 
 @Service
 @RequiredArgsConstructor
@@ -50,35 +54,54 @@ public class ExternalAccountOAuthService {
             String state,
             String error
     ) {
-        Long userId =
+        ProcessingClaim claim =
                 oauthAuthorizationRequestService
-                        .validateAndConsume(
+                        .startProcessing(
                                 state,
                                 provider
                         );
+        OAuthCallbackFailureStage stage = OAuthCallbackFailureStage.CALLBACK_VALIDATION;
+        try {
+            validateOAuthCallback(code, error);
+            OAuthProviderClient providerClient = oauthProviderClientRegistry.getClient(provider);
 
-        validateOAuthCallback(
-                code,
-                error
-        );
+            stage = OAuthCallbackFailureStage.TOKEN_EXCHANGE;
+            OAuthTokenResponse tokenResponse = providerClient.exchangeToken(code);
 
-        OAuthProviderClient providerClient =
-                oauthProviderClientRegistry.getClient(provider);
+            stage = OAuthCallbackFailureStage.USER_INFO;
+            ExternalUserInfo externalUserInfo =
+                    providerClient.fetchUserInfo(tokenResponse.accessToken());
 
-        OAuthTokenResponse tokenResponse =
-                providerClient.exchangeToken(code);
+            stage = OAuthCallbackFailureStage.ACCOUNT_SAVE;
+            externalAccountConnectionService.saveOrUpdate(
+                    claim.userId(), provider, tokenResponse, externalUserInfo);
 
-        ExternalUserInfo externalUserInfo =
-                providerClient.fetchUserInfo(
-                        tokenResponse.accessToken()
-                );
+            oauthAuthorizationRequestService.succeed(claim.requestId());
+        } catch (RuntimeException exception) {
+            oauthAuthorizationRequestService.fail(
+                    claim.requestId(), stage, classifyFailure(exception));
+            throw exception;
+        }
+    }
 
-        externalAccountConnectionService.saveOrUpdate(
-                userId,
-                provider,
-                tokenResponse,
-                externalUserInfo
-        );
+    private OAuthCallbackFailureType classifyFailure(RuntimeException exception) {
+        if (exception instanceof BaseException baseException) {
+            return switch (baseException.getErrorCode()) {
+                case OAUTH_AUTHORIZATION_DENIED ->
+                        OAuthCallbackFailureType.AUTHORIZATION_DENIED;
+                case OAUTH_AUTHORIZATION_CODE_MISSING ->
+                        OAuthCallbackFailureType.AUTHORIZATION_CODE_MISSING;
+                case EXTERNAL_ACCOUNT_ALREADY_LINKED ->
+                        OAuthCallbackFailureType.CONFLICT;
+                case OAUTH_TOKEN_EXCHANGE_FAILED, OAUTH_USER_INFO_FAILED, EXTERNAL_API_ERROR ->
+                        OAuthCallbackFailureType.EXTERNAL_API;
+                default -> OAuthCallbackFailureType.INTERNAL;
+            };
+        }
+        if (exception instanceof DataAccessException) {
+            return OAuthCallbackFailureType.DATABASE;
+        }
+        return OAuthCallbackFailureType.INTERNAL;
     }
 
     private void validateOAuthCallback(

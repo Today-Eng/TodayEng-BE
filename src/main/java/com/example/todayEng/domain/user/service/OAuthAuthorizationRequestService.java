@@ -3,6 +3,9 @@ package com.example.todayEng.domain.user.service;
 import com.example.todayEng.domain.user.entity.OAuthAuthorizationRequest;
 import com.example.todayEng.domain.user.entity.User;
 import com.example.todayEng.domain.user.entity.enums.ExternalServiceProvider;
+import com.example.todayEng.domain.user.entity.enums.OAuthAuthorizationRequestStatus;
+import com.example.todayEng.domain.user.entity.enums.OAuthCallbackFailureStage;
+import com.example.todayEng.domain.user.entity.enums.OAuthCallbackFailureType;
 import com.example.todayEng.domain.user.repository.OAuthAuthorizationRequestRepository;
 import com.example.todayEng.domain.user.repository.UserRepository;
 import com.example.todayEng.global.error.ErrorCode;
@@ -64,7 +67,7 @@ public class OAuthAuthorizationRequestService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public Long validateAndConsume(
+    public ProcessingClaim startProcessing(
             String rawState,
             ExternalServiceProvider provider
     ) {
@@ -88,9 +91,11 @@ public class OAuthAuthorizationRequestService {
 
         int updatedCount =
                 oauthAuthorizationRequestRepository
-                        .consumeIfAvailable(
+                        .startProcessingIfIssued(
                                 authorizationRequest.getId(),
-                                now
+                                now,
+                                OAuthAuthorizationRequestStatus.ISSUED,
+                                OAuthAuthorizationRequestStatus.PROCESSING
                         );
 
         if (updatedCount == 0) {
@@ -101,7 +106,36 @@ public class OAuthAuthorizationRequestService {
             );
         }
 
-        return authorizationRequest.getUser().getId();
+        return new ProcessingClaim(
+                authorizationRequest.getId(),
+                authorizationRequest.getUser().getId()
+        );
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void succeed(Long requestId) {
+        int updated = oauthAuthorizationRequestRepository.markSucceeded(
+                requestId,
+                OAuthAuthorizationRequestStatus.PROCESSING,
+                OAuthAuthorizationRequestStatus.SUCCEEDED,
+                LocalDateTime.now()
+        );
+        if (updated == 0) {
+            throw new BaseException(ErrorCode.OAUTH_STATE_CONSUME_FAILED);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void fail(Long requestId, OAuthCallbackFailureStage stage,
+                     OAuthCallbackFailureType failureType) {
+        oauthAuthorizationRequestRepository.markFailed(
+                requestId,
+                OAuthAuthorizationRequestStatus.PROCESSING,
+                OAuthAuthorizationRequestStatus.FAILED,
+                stage,
+                failureType,
+                LocalDateTime.now()
+        );
     }
 
     private void validateState(
@@ -114,7 +148,7 @@ public class OAuthAuthorizationRequestService {
             );
         }
 
-        if (authorizationRequest.isUsed()) {
+        if (authorizationRequest.getStatus() != OAuthAuthorizationRequestStatus.ISSUED) {
             throw new BaseException(
                     ErrorCode.OAUTH_STATE_ALREADY_USED
             );
@@ -142,7 +176,7 @@ public class OAuthAuthorizationRequestService {
             );
         }
 
-        if (currentRequest.isUsed()) {
+        if (currentRequest.getStatus() != OAuthAuthorizationRequestStatus.ISSUED) {
             throw new BaseException(
                     ErrorCode.OAUTH_STATE_ALREADY_USED
             );
@@ -151,6 +185,9 @@ public class OAuthAuthorizationRequestService {
         throw new BaseException(
                 ErrorCode.OAUTH_STATE_CONSUME_FAILED
         );
+    }
+
+    public record ProcessingClaim(Long requestId, Long userId) {
     }
 
     private String generateRawState() {
