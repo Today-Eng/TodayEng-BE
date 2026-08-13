@@ -49,6 +49,12 @@ public class NotificationService {
                 "테스트 알림입니다.",
                 "/home"
         );
+
+        log.info(
+                "테스트 알림 발송 성공. notificationSettingId={}, userId={}",
+                notificationSetting.getId(),
+                userId
+        );
     }
 
     public void sendDiaryReminders(LocalDate today) {
@@ -69,6 +75,12 @@ public class NotificationService {
                         "오늘의 회고를 남겨볼까요?",
                         "오늘 하루를 영어로 천천히 돌아보세요.",
                         "/home"
+                );
+
+                log.info(
+                        "회고 알림 발송 성공. notificationSettingId={}, userId={}",
+                        target.notificationSettingId(),
+                        target.userId()
                 );
             } catch (PushSubscriptionExpiredException exception) {
                 try {

@@ -8,15 +8,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
-import org.apache.http.HttpResponse;
 import org.jose4j.lang.JoseException;
 import org.springframework.stereotype.Service;
 import nl.martijndwars.webpush.Encoding;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.impl.client.CloseableHttpClient;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WebPushService {
@@ -98,21 +100,26 @@ public class WebPushService {
                             Encoding.AES128GCM
                     );
 
-            HttpResponse response =
-                    webPushHttpClient.execute(request);
+            try (CloseableHttpResponse response =
+                         webPushHttpClient.execute(request)) {
+                int statusCode =
+                        response.getStatusLine().getStatusCode();
 
-            int statusCode =
-                    response.getStatusLine().getStatusCode();
+                if (statusCode == NOT_FOUND_STATUS
+                        || statusCode == GONE_STATUS) {
+                    throw new PushSubscriptionExpiredException();
+                }
 
-            if (statusCode == NOT_FOUND_STATUS
-                    || statusCode == GONE_STATUS) {
-                throw new PushSubscriptionExpiredException();
-            }
+                if (statusCode < 200 || statusCode >= 300) {
+                    throw new IllegalStateException(
+                            "Web Push 전송에 실패했습니다. status="
+                                    + statusCode
+                    );
+                }
 
-            if (statusCode < 200 || statusCode >= 300) {
-                throw new IllegalStateException(
-                        "Web Push 전송에 실패했습니다. status="
-                                + statusCode
+                log.info(
+                        "Web Push Provider 응답 성공. status={}",
+                        statusCode
                 );
             }
         } catch (

@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,11 @@ public class DiaryReminderScheduler {
     @Scheduled(
             cron = "${notification.diary-reminder.cron:0 0 22 * * *}",
             zone = "${notification.diary-reminder.zone:Asia/Seoul}"
+    )
+    @SchedulerLock(
+            name = "diaryReminderScheduler",
+            lockAtLeastFor = "1m",
+            lockAtMostFor = "1h"
     )
     public void sendDiaryReminders() {
         LocalDate today =
