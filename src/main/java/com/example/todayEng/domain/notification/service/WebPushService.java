@@ -17,6 +17,7 @@ import nl.martijndwars.webpush.Encoding;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.util.EntityUtils;
 
 @Slf4j
 @Service
@@ -104,6 +105,7 @@ public class WebPushService {
                          webPushHttpClient.execute(request)) {
                 int statusCode =
                         response.getStatusLine().getStatusCode();
+                EntityUtils.consume(response.getEntity());
 
                 if (statusCode == NOT_FOUND_STATUS
                         || statusCode == GONE_STATUS) {
