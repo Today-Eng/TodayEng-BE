@@ -88,8 +88,6 @@ Backend는 Google Compute Engine의 **Blue / Green 두 환경**에서 운영되�
 
 ## 👩‍💻 Backend Team
 
-## 👩‍💻 Backend Team
-
 <table>
   <tr>
     <td align="center">
