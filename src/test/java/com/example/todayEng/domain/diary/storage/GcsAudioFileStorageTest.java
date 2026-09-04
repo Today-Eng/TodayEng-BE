@@ -86,12 +86,17 @@ class GcsAudioFileStorageTest {
                 .isEqualTo("https://storage.googleapis.com/signed-audio");
 
         ArgumentCaptor<BlobInfo> blob = ArgumentCaptor.forClass(BlobInfo.class);
+        ArgumentCaptor<Storage.SignUrlOption> signUrlOption =
+                ArgumentCaptor.forClass(Storage.SignUrlOption.class);
         verify(gcsStorage).signUrl(
                 blob.capture(),
                 eq(900L),
                 eq(TimeUnit.SECONDS),
-                any(Storage.SignUrlOption.class));
+                signUrlOption.capture());
         assertThat(blob.getValue().getBucket()).isEqualTo("todayeng-test-media");
         assertThat(blob.getValue().getName()).isEqualTo("tts/audio.mp3");
+        assertThat(signUrlOption.getValue())
+                .usingRecursiveComparison()
+                .isEqualTo(Storage.SignUrlOption.withV4Signature());
     }
 }
