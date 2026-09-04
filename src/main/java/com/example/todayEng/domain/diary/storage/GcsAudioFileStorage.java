@@ -100,7 +100,7 @@ public class GcsAudioFileStorage implements AudioFileStorage {
 
     private BaseException storageFailure(RuntimeException exception) {
         log.error("GCS audio storage operation failed: bucket={}, error={}",
-                properties.bucket(), exception.getClass().getSimpleName());
+                properties.bucket(), exception.getClass().getSimpleName(), exception);
         return new BaseException(ErrorCode.AUDIO_STORAGE_FAILED);
     }
 }
