@@ -92,3 +92,9 @@ storage:
       tts-prefix: ${AUDIO_S3_TTS_PREFIX:tts}
       stt-prefix: ${AUDIO_S3_STT_PREFIX:stt}
       playback-url-expiration: ${AUDIO_PLAYBACK_URL_EXPIRATION:30m}
+
+    gcs:
+      bucket: ${AUDIO_GCS_BUCKET:}
+      tts-prefix: ${AUDIO_GCS_TTS_PREFIX:tts}
+      stt-prefix: ${AUDIO_GCS_STT_PREFIX:stt}
+      playback-url-expiration: ${AUDIO_PLAYBACK_URL_EXPIRATION:30m}
