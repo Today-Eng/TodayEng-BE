@@ -38,7 +38,7 @@ public class GcsAudioFileStorage implements AudioFileStorage {
     public String store(Long diaryId, Long questionId, byte[] audio) {
         String key = "%s/diaries/%d/questions/%d/%s.mp3".formatted(
                 properties.ttsPrefix(), diaryId, questionId, UUID.randomUUID());
-        put(key, audio, "audio/mpeg", "private, max-age=31536000, immutable");
+        put(key, audio, "audio/mpeg", "no-store");
         return key;
     }
 

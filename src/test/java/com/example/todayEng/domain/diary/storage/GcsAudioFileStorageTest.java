@@ -47,7 +47,7 @@ class GcsAudioFileStorageTest {
         assertThat(blob.getValue().getBucket()).isEqualTo("todayeng-test-media");
         assertThat(blob.getValue().getName()).isEqualTo(key);
         assertThat(blob.getValue().getContentType()).isEqualTo("audio/mpeg");
-        assertThat(blob.getValue().getCacheControl()).contains("private");
+        assertThat(blob.getValue().getCacheControl()).isEqualTo("no-store");
     }
 
     @Test
