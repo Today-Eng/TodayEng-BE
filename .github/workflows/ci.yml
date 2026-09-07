@@ -44,4 +44,4 @@ jobs:
         run: |
           result="build/test-results/test/TEST-com.example.todayEng.global.config.FlywayMigrationIntegrationTest.xml"
           test -f "$result"
-          grep -q 'tests="1" skipped="0" failures="0" errors="0"' "$result"
+          grep -Eq 'tests="[1-9][0-9]*" skipped="0" failures="0" errors="0"' "$result"
