@@ -11,17 +11,13 @@
 3. 배포 전 백업 또는 복구 가능한 snapshot을 확보합니다.
 4. 최초 배포 대상 VM의 `/opt/todayeng/.env`에만 `FLYWAY_BASELINE_ON_MIGRATE=true`를 설정합니다.
 5. 애플리케이션 시작 후 `flyway_schema_history`에 version `1`, type `BASELINE`, success `1`이 기록됐는지 확인합니다.
-6. CD는 성공과 실패 모두에서 `/opt/todayeng/.env`의 일회성 변수를 자동 제거합니다. 배포 완료 후 아래 명령의 결과가 비어 있는지 확인합니다.
+6. CD는 성공과 실패 모두에서 `/opt/todayeng/.env`의 일회성 변수를 자동 제거합니다. 최초 health check 성공 후 컨테이너를 `FLYWAY_BASELINE_ON_MIGRATE=false`로 강제 재생성하고 두 번째 health check를 수행합니다.
+7. 배포 완료 후 호스트 `.env`에 변수가 없고 실행 중인 컨테이너에는 `false`가 적용됐는지 확인합니다.
 
    ```bash
    grep '^FLYWAY_BASELINE_ON_MIGRATE=' /opt/todayeng/.env
-   ```
-
-7. 다음 배포부터 Compose가 `FLYWAY_BASELINE_ON_MIGRATE=false`를 주입하는지 확인합니다.
-
-   ```bash
-   docker compose --env-file /opt/todayeng/.env -f /opt/todayeng/docker-compose.prod.yml config \
-     | grep FLYWAY_BASELINE_ON_MIGRATE
+   docker inspect todayeng-app --format '{{range .Config.Env}}{{println .}}{{end}}' \
+     | grep '^FLYWAY_BASELINE_ON_MIGRATE=false$'
    ```
 
 빈 DB에서는 baseline 옵션을 켜지 않습니다. Flyway가 `V1__baseline.sql`을 실행한 뒤 Hibernate가 엔티티 매핑을 `validate`합니다.
