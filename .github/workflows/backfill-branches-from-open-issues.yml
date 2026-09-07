@@ -1,0 +1,296 @@
+name: Backfill Branches from Open Issues
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create branches for open issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          MODEL="openai/gpt-oss-20b"
+
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "GROQ_API_KEY is not configured."
+            exit 1
+          fi
+
+          echo "Checking Groq API access..."
+
+          MODELS_RESPONSE=$(curl \
+            --silent \
+            --show-error \
+            --write-out "\n%{http_code}" \
+            https://api.groq.com/openai/v1/models \
+            -H "Authorization: Bearer $GROQ_API_KEY")
+
+          MODELS_STATUS=$(echo "$MODELS_RESPONSE" | tail -n1)
+          MODELS_BODY=$(echo "$MODELS_RESPONSE" | sed '$d')
+
+          if [ "$MODELS_STATUS" -lt 200 ] || [ "$MODELS_STATUS" -ge 300 ]; then
+            echo "Failed to access Groq models API."
+            echo "HTTP status: $MODELS_STATUS"
+            echo "Response:"
+            echo "$MODELS_BODY" | jq '.' 2>/dev/null || echo "$MODELS_BODY"
+            exit 1
+          fi
+
+          echo "Groq API access OK."
+
+          MODEL_AVAILABLE=$(echo "$MODELS_BODY" \
+            | jq -r '.data[].id' \
+            | grep -Fx "$MODEL" || true)
+
+          if [ -z "$MODEL_AVAILABLE" ]; then
+            echo "Model $MODEL is not available."
+            echo "Available models:"
+            echo "$MODELS_BODY" | jq -r '.data[].id'
+            exit 1
+          fi
+
+          echo "Groq model available: $MODEL"
+
+          BASE_SHA=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/heads/develop" \
+            --jq '.object.sha')
+
+          echo "Base branch: develop"
+          echo "Base SHA: $BASE_SHA"
+
+          gh issue list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --limit 1000 \
+            --json number,title \
+            > open-issues.json
+
+          echo "Open issues:"
+          jq '.' open-issues.json
+
+          > pending-issues.jsonl
+
+          while IFS= read -r issue; do
+            ISSUE_NUMBER=$(echo "$issue" | jq -r '.number')
+            TITLE=$(echo "$issue" | jq -r '.title')
+
+            PREFIX=$(echo "$TITLE" \
+              | grep -oP '(?<=\[)[^\]]+(?=\])' \
+              | head -1 \
+              | tr '[:upper:]' '[:lower:]' || true)
+
+            if [ -z "$PREFIX" ]; then
+              echo "Skipping #${ISSUE_NUMBER}: no [PREFIX] found."
+              continue
+            fi
+
+            EXISTING_BRANCH=$(gh api \
+              "repos/${GITHUB_REPOSITORY}/branches" \
+              --paginate \
+              --jq '.[].name' \
+              | grep -E "/#${ISSUE_NUMBER}(-|$)" \
+              | head -1 || true)
+
+            if [ -n "$EXISTING_BRANCH" ]; then
+              echo "Skipping #${ISSUE_NUMBER}: ${EXISTING_BRANCH}"
+              continue
+            fi
+
+            CLEAN_TITLE=$(echo "$TITLE" \
+              | sed 's/\[[^]]*\]//g' \
+              | xargs)
+
+            jq -n \
+              --argjson number "$ISSUE_NUMBER" \
+              --arg prefix "$PREFIX" \
+              --arg title "$CLEAN_TITLE" \
+              '{
+                number: $number,
+                prefix: $prefix,
+                title: $title
+              }' >> pending-issues.jsonl
+          done < <(jq -c '.[]' open-issues.json)
+
+          if [ ! -s pending-issues.jsonl ]; then
+            echo "No branches need to be backfilled."
+            exit 0
+          fi
+
+          jq -s '.' pending-issues.jsonl > pending-issues.json
+
+          echo "Issues requiring branches:"
+          jq '.' pending-issues.json
+
+          ISSUES=$(jq -c \
+            '[.[] | {
+              number: .number,
+              title: .title
+            }]' \
+            pending-issues.json)
+
+          PROMPT=$(cat <<EOF
+          Convert each GitHub issue title into a concise English git branch slug.
+
+          Rules:
+          - Keep the provided issue number unchanged.
+          - Translate Korean text into English.
+          - Use lowercase ASCII letters, numbers, and hyphens only.
+          - Use at most 5 words.
+          - Do not include issue types such as feat, fix, infra, test, security, docs, observe, or resilience.
+          - Return one result for every supplied issue.
+          - Do not omit or invent issue numbers.
+
+          Issues:
+          $ISSUES
+          EOF
+          )
+
+          BODY=$(jq -n \
+            --arg model "$MODEL" \
+            --arg prompt "$PROMPT" \
+            '{
+              model: $model,
+              messages: [
+                {
+                  role: "user",
+                  content: $prompt
+                }
+              ],
+              temperature: 0,
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "branch_slugs",
+                  strict: true,
+                  schema: {
+                    type: "object",
+                    properties: {
+                      issues: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            number: {
+                              type: "integer"
+                            },
+                            slug: {
+                              type: "string",
+                              pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                            }
+                          },
+                          required: [
+                            "number",
+                            "slug"
+                          ],
+                          additionalProperties: false
+                        }
+                      }
+                    },
+                    required: [
+                      "issues"
+                    ],
+                    additionalProperties: false
+                  }
+                }
+              }
+            }')
+
+          HTTP_RESPONSE=$(curl \
+            --silent \
+            --show-error \
+            --write-out "\n%{http_code}" \
+            https://api.groq.com/openai/v1/chat/completions \
+            -H "Authorization: Bearer $GROQ_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+
+          HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n1)
+          RESPONSE=$(echo "$HTTP_RESPONSE" | sed '$d')
+
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "Groq API request failed."
+            echo "HTTP status: $HTTP_STATUS"
+            echo "Response:"
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+            exit 1
+          fi
+
+          CONTENT=$(echo "$RESPONSE" \
+            | jq -r '.choices[0].message.content // empty')
+
+          if [ -z "$CONTENT" ]; then
+            echo "Groq returned no content."
+            echo "$RESPONSE"
+            exit 1
+          fi
+
+          echo "$CONTENT" > slugs.json
+
+          if ! jq empty slugs.json 2>/dev/null; then
+            echo "Groq returned invalid JSON."
+            cat slugs.json
+            exit 1
+          fi
+
+          jq '.issues' slugs.json > normalized-slugs.json
+
+          EXPECTED_COUNT=$(jq 'length' pending-issues.json)
+          ACTUAL_COUNT=$(jq 'length' normalized-slugs.json)
+
+          if [ "$EXPECTED_COUNT" -ne "$ACTUAL_COUNT" ]; then
+            echo "Expected ${EXPECTED_COUNT} slugs but received ${ACTUAL_COUNT}."
+            jq '.' normalized-slugs.json
+            exit 1
+          fi
+
+          EXPECTED_NUMBERS=$(jq -r '.[].number' pending-issues.json | sort -n)
+          ACTUAL_NUMBERS=$(jq -r '.[].number' normalized-slugs.json | sort -n)
+
+          if [ "$EXPECTED_NUMBERS" != "$ACTUAL_NUMBERS" ]; then
+            echo "Issue numbers returned by Groq do not match pending issues."
+            echo "Expected:"
+            echo "$EXPECTED_NUMBERS"
+            echo "Actual:"
+            echo "$ACTUAL_NUMBERS"
+            exit 1
+          fi
+
+          while IFS= read -r issue; do
+            ISSUE_NUMBER=$(echo "$issue" | jq -r '.number')
+            PREFIX=$(echo "$issue" | jq -r '.prefix')
+
+            SLUG=$(jq -r \
+              --argjson number "$ISSUE_NUMBER" \
+              '.[] | select(.number == $number) | .slug' \
+              normalized-slugs.json)
+
+            if [ -z "$SLUG" ] || [ "$SLUG" = "null" ]; then
+              echo "Missing slug for issue #${ISSUE_NUMBER}."
+              exit 1
+            fi
+
+            BRANCH_NAME="${PREFIX}/#${ISSUE_NUMBER}-${SLUG}"
+
+            echo "Creating: ${BRANCH_NAME}"
+
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -X POST \
+              -f ref="refs/heads/${BRANCH_NAME}" \
+              -f sha="$BASE_SHA"
+
+            echo "Created: ${BRANCH_NAME}"
+          done < <(jq -c '.[]' pending-issues.json)
+
+          echo ""
+          echo "Backfill completed."

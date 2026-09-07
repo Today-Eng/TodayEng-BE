@@ -1,0 +1,211 @@
+# .github/workflows/create-branch-from-issue.yml
+
+name: Create Branch from Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  create-branch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract prefix and title
+        id: parse
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+
+          TITLE="$ISSUE_TITLE"
+
+          PREFIX=$(echo "$TITLE" \
+            | grep -oP '(?<=\[)[^\]]+(?=\])' \
+            | head -1 \
+            | tr '[:upper:]' '[:lower:]' || true)
+
+          if [ -z "$PREFIX" ]; then
+            echo "No [PREFIX] found in issue title. Skipping branch creation."
+            echo "should_create=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CLEAN_TITLE=$(echo "$TITLE" \
+            | sed 's/\[[^]]*\]//g' \
+            | xargs)
+
+          echo "should_create=true" >> "$GITHUB_OUTPUT"
+          echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
+          echo "clean_title=$CLEAN_TITLE" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Check existing branch
+        if: steps.parse.outputs.should_create == 'true'
+        id: branch-check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.parse.outputs.issue_number }}
+        run: |
+          set -euo pipefail
+
+          EXISTING_BRANCH=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/branches" \
+            --paginate \
+            --jq '.[].name' \
+            | grep -E "/#${ISSUE_NUMBER}(-|$)" \
+            | head -1 || true)
+
+          if [ -n "$EXISTING_BRANCH" ]; then
+            echo "Branch already exists for issue #${ISSUE_NUMBER}: ${EXISTING_BRANCH}"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No existing branch found for issue #${ISSUE_NUMBER}."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate branch slug via Groq
+        if: >
+          steps.parse.outputs.should_create == 'true' &&
+          steps.branch-check.outputs.exists == 'false'
+        id: slug
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CLEAN_TITLE: ${{ steps.parse.outputs.clean_title }}
+        run: |
+          set -euo pipefail
+
+          MODEL="openai/gpt-oss-20b"
+
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "GROQ_API_KEY is not configured."
+            exit 1
+          fi
+
+          PROMPT=$(cat <<EOF
+          Convert the following GitHub issue title into a concise English git branch slug.
+
+          Rules:
+          - Translate Korean text into English.
+          - Use lowercase ASCII letters, numbers, and hyphens only.
+          - Use at most 5 words.
+          - Do not include issue types such as feat, fix, infra, test, security, docs, observe, or resilience.
+
+          Issue title:
+          $CLEAN_TITLE
+          EOF
+          )
+
+          BODY=$(jq -n \
+            --arg model "$MODEL" \
+            --arg prompt "$PROMPT" \
+            '{
+              model: $model,
+              messages: [
+                {
+                  role: "user",
+                  content: $prompt
+                }
+              ],
+              temperature: 0,
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "branch_slug",
+                  strict: true,
+                  schema: {
+                    type: "object",
+                    properties: {
+                      slug: {
+                        type: "string",
+                        pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                      }
+                    },
+                    required: [
+                      "slug"
+                    ],
+                    additionalProperties: false
+                  }
+                }
+              }
+            }')
+
+          HTTP_RESPONSE=$(curl \
+            --silent \
+            --show-error \
+            --write-out "\n%{http_code}" \
+            https://api.groq.com/openai/v1/chat/completions \
+            -H "Authorization: Bearer $GROQ_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+
+          HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n1)
+          RESPONSE=$(echo "$HTTP_RESPONSE" | sed '$d')
+
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "Groq API request failed."
+            echo "HTTP status: $HTTP_STATUS"
+            echo "Response:"
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+            exit 1
+          fi
+
+          CONTENT=$(echo "$RESPONSE" \
+            | jq -r '.choices[0].message.content // empty')
+
+          if [ -z "$CONTENT" ]; then
+            echo "Groq returned no content."
+            echo "$RESPONSE"
+            exit 1
+          fi
+
+          SLUG=$(echo "$CONTENT" | jq -r '.slug // empty')
+
+          if [ -z "$SLUG" ]; then
+            echo "Groq returned an invalid slug."
+            echo "$CONTENT"
+            exit 1
+          fi
+
+          if ! echo "$SLUG" | grep -Eq '^[a-z0-9]+(-[a-z0-9]+)*$'; then
+            echo "Slug format validation failed: $SLUG"
+            exit 1
+          fi
+
+          echo "Generated slug: $SLUG"
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+
+      - name: Create branch
+        if: >
+          steps.parse.outputs.should_create == 'true' &&
+          steps.branch-check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREFIX: ${{ steps.parse.outputs.prefix }}
+          ISSUE_NUMBER: ${{ steps.parse.outputs.issue_number }}
+          SLUG: ${{ steps.slug.outputs.slug }}
+        run: |
+          set -euo pipefail
+
+          BRANCH_NAME="${PREFIX}/#${ISSUE_NUMBER}-${SLUG}"
+
+          BASE_SHA=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/heads/develop" \
+            --jq '.object.sha')
+
+          echo "Creating branch: $BRANCH_NAME"
+          echo "Base branch: develop"
+          echo "Base SHA: $BASE_SHA"
+
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -X POST \
+            -f ref="refs/heads/${BRANCH_NAME}" \
+            -f sha="$BASE_SHA"
+
+          echo "Branch '$BRANCH_NAME' created from develop."
