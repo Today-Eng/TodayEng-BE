@@ -44,4 +44,18 @@ jobs:
         run: |
           result="build/test-results/test/TEST-com.example.todayEng.global.config.FlywayMigrationIntegrationTest.xml"
           test -f "$result"
-          grep -Eq 'tests="[1-9][0-9]*" skipped="0" failures="0" errors="0"' "$result"
+          python3 - "$result" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          suite = ET.parse(sys.argv[1]).getroot()
+          counts = {
+              name: int(suite.attrib.get(name, "-1"))
+              for name in ("tests", "skipped", "failures", "errors")
+          }
+
+          if counts["tests"] < 1 or any(
+              counts[name] != 0 for name in ("skipped", "failures", "errors")
+          ):
+              raise SystemExit(f"MySQL migration test did not run successfully: {counts}")
+          PY

@@ -133,6 +133,11 @@ jobs:
 
             cd /opt/todayeng
 
+            cleanup_flyway_baseline_flag() {
+              sed -i '/^FLYWAY_BASELINE_ON_MIGRATE=/d' .env
+            }
+            trap cleanup_flyway_baseline_flag EXIT
+
             echo "Deploying image: ${{ env.IMAGE_TAG }}"
             echo "Target environment: Green"
 
@@ -153,6 +158,14 @@ jobs:
                 http://127.0.0.1:8080/health; then
 
                 echo "Green application health check passed."
+
+                cleanup_flyway_baseline_flag
+                if grep -q '^FLYWAY_BASELINE_ON_MIGRATE=' .env; then
+                  echo "Failed to remove one-time Flyway baseline flag."
+                  exit 1
+                fi
+
+                echo "One-time Flyway baseline flag removed from .env."
 
                 IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
                   --env-file .env \
@@ -189,6 +202,11 @@ jobs:
 
             cd /opt/todayeng
 
+            cleanup_flyway_baseline_flag() {
+              sed -i '/^FLYWAY_BASELINE_ON_MIGRATE=/d' .env
+            }
+            trap cleanup_flyway_baseline_flag EXIT
+
             echo "Deploying image: ${{ env.IMAGE_TAG }}"
             echo "Target environment: Blue"
 
@@ -209,6 +227,14 @@ jobs:
                 http://127.0.0.1:8080/health; then
 
                 echo "Blue application health check passed."
+
+                cleanup_flyway_baseline_flag
+                if grep -q '^FLYWAY_BASELINE_ON_MIGRATE=' .env; then
+                  echo "Failed to remove one-time Flyway baseline flag."
+                  exit 1
+                fi
+
+                echo "One-time Flyway baseline flag removed from .env."
 
                 IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
                   --env-file .env \

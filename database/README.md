@@ -6,11 +6,23 @@
 
 ## 기존 운영 DB 최초 전환
 
-1. 운영 DB의 schema-only dump와 `V1__baseline.sql`이 일치하는지 확인합니다.
-2. 배포 전 백업 또는 복구 가능한 snapshot을 확보합니다.
-3. 최초 배포에만 `FLYWAY_BASELINE_ON_MIGRATE=true`를 설정합니다.
-4. 애플리케이션 시작 후 `flyway_schema_history`에 version `1`, type `BASELINE`이 기록됐는지 확인합니다.
-5. 다음 배포부터 `FLYWAY_BASELINE_ON_MIGRATE`를 제거하거나 `false`로 되돌립니다.
+1. 운영 DB에서 schema-only dump를 다시 생성하고 테이블, 컬럼, 인덱스, 제약조건이 `V1__baseline.sql`과 일치하는지 확인합니다.
+2. `flyway_schema_history`가 아직 없는지 확인합니다.
+3. 배포 전 백업 또는 복구 가능한 snapshot을 확보합니다.
+4. 최초 배포 대상 VM의 `/opt/todayeng/.env`에만 `FLYWAY_BASELINE_ON_MIGRATE=true`를 설정합니다.
+5. 애플리케이션 시작 후 `flyway_schema_history`에 version `1`, type `BASELINE`, success `1`이 기록됐는지 확인합니다.
+6. CD는 성공과 실패 모두에서 `/opt/todayeng/.env`의 일회성 변수를 자동 제거합니다. 배포 완료 후 아래 명령의 결과가 비어 있는지 확인합니다.
+
+   ```bash
+   grep '^FLYWAY_BASELINE_ON_MIGRATE=' /opt/todayeng/.env
+   ```
+
+7. 다음 배포부터 Compose가 `FLYWAY_BASELINE_ON_MIGRATE=false`를 주입하는지 확인합니다.
+
+   ```bash
+   docker compose --env-file /opt/todayeng/.env -f /opt/todayeng/docker-compose.prod.yml config \
+     | grep FLYWAY_BASELINE_ON_MIGRATE
+   ```
 
 빈 DB에서는 baseline 옵션을 켜지 않습니다. Flyway가 `V1__baseline.sql`을 실행한 뒤 Hibernate가 엔티티 매핑을 `validate`합니다.
 
