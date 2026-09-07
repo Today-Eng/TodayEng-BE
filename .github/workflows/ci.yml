@@ -39,3 +39,9 @@ jobs:
 
       - name: Build and test
         run: ./gradlew clean build
+
+      - name: Verify MySQL migration test ran
+        run: |
+          result="build/test-results/test/TEST-com.example.todayEng.global.config.FlywayMigrationIntegrationTest.xml"
+          test -f "$result"
+          grep -q 'tests="1" skipped="0" failures="0" errors="0"' "$result"
