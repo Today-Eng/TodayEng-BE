@@ -32,6 +32,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class FlywayMigrationIntegrationTest {
 
+    private static final int TABLE_COUNT_INCLUDING_FLYWAY_HISTORY = 19;
+
     @Container
     @SuppressWarnings("resource")
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4");
@@ -59,6 +61,7 @@ class FlywayMigrationIntegrationTest {
                 String.class
         );
 
+        assertThat(tables).hasSize(TABLE_COUNT_INCLUDING_FLYWAY_HISTORY);
         assertThat(tables)
                 .contains("flyway_schema_history", "users", "diary", "shedlock");
         assertThat(jdbcTemplate.queryForObject(

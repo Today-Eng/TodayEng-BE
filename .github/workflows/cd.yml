@@ -134,6 +134,7 @@ jobs:
             cd /opt/todayeng
 
             cleanup_flyway_baseline_flag() {
+              cp .env .env.bak
               sed -i '/^FLYWAY_BASELINE_ON_MIGRATE=/d' .env
             }
 
@@ -164,7 +165,10 @@ jobs:
               return 1
             }
 
-            trap cleanup_flyway_baseline_flag EXIT
+            BASELINE_FLAG_PRESENT=false
+            if grep -q '^FLYWAY_BASELINE_ON_MIGRATE=' .env 2>/dev/null; then
+              BASELINE_FLAG_PRESENT=true
+            fi
 
             echo "Deploying image: ${{ env.IMAGE_TAG }}"
             echo "Target environment: Green"
@@ -187,8 +191,10 @@ jobs:
 
                 echo "Green application health check passed."
 
-                reapply_flyway_baseline_disabled
-                echo "Flyway baseline flag is disabled and application is healthy."
+                if [ "$BASELINE_FLAG_PRESENT" = "true" ]; then
+                  reapply_flyway_baseline_disabled
+                  echo "Flyway baseline flag is disabled and application is healthy."
+                fi
 
                 IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
                   --env-file .env \
@@ -226,6 +232,7 @@ jobs:
             cd /opt/todayeng
 
             cleanup_flyway_baseline_flag() {
+              cp .env .env.bak
               sed -i '/^FLYWAY_BASELINE_ON_MIGRATE=/d' .env
             }
 
@@ -256,7 +263,10 @@ jobs:
               return 1
             }
 
-            trap cleanup_flyway_baseline_flag EXIT
+            BASELINE_FLAG_PRESENT=false
+            if grep -q '^FLYWAY_BASELINE_ON_MIGRATE=' .env 2>/dev/null; then
+              BASELINE_FLAG_PRESENT=true
+            fi
 
             echo "Deploying image: ${{ env.IMAGE_TAG }}"
             echo "Target environment: Blue"
@@ -279,8 +289,10 @@ jobs:
 
                 echo "Blue application health check passed."
 
-                reapply_flyway_baseline_disabled
-                echo "Flyway baseline flag is disabled and application is healthy."
+                if [ "$BASELINE_FLAG_PRESENT" = "true" ]; then
+                  reapply_flyway_baseline_disabled
+                  echo "Flyway baseline flag is disabled and application is healthy."
+                fi
 
                 IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
                   --env-file .env \
