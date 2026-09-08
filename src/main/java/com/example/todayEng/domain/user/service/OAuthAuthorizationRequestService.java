@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -34,6 +35,8 @@ public class OAuthAuthorizationRequestService {
             oauthAuthorizationRequestRepository;
 
     private final UserRepository userRepository;
+
+    private final Clock clock;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -55,7 +58,7 @@ public class OAuthAuthorizationRequestService {
                         user,
                         provider,
                         stateHash,
-                        LocalDateTime.now()
+                        LocalDateTime.now(clock)
                                 .plusMinutes(STATE_VALIDITY_MINUTES)
                 );
 
@@ -71,7 +74,7 @@ public class OAuthAuthorizationRequestService {
             String rawState,
             ExternalServiceProvider provider
     ) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         String stateHash = hashState(rawState);
 
         OAuthAuthorizationRequest authorizationRequest =
@@ -121,7 +124,7 @@ public class OAuthAuthorizationRequestService {
                 OAuthAuthorizationRequestStatus.FAILED,
                 stage,
                 failureType,
-                LocalDateTime.now()
+                LocalDateTime.now(clock)
         );
     }
 
