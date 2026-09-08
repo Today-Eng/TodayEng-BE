@@ -6,6 +6,7 @@ services:
 
     environment:
       TZ: Asia/Seoul
+      FLYWAY_BASELINE_ON_MIGRATE: ${FLYWAY_BASELINE_ON_MIGRATE:-false}
 
     env_file:
       - /opt/todayeng/.env

@@ -133,6 +133,43 @@ jobs:
 
             cd /opt/todayeng
 
+            cleanup_flyway_baseline_flag() {
+              cp .env .env.bak
+              sed -i '/^FLYWAY_BASELINE_ON_MIGRATE=/d' .env
+            }
+
+            reapply_flyway_baseline_disabled() {
+              cleanup_flyway_baseline_flag
+
+              FLYWAY_BASELINE_ON_MIGRATE=false IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
+                --env-file .env \
+                -f docker-compose.prod.yml \
+                up -d --force-recreate
+
+              for verification_attempt in $(seq 1 30); do
+                ACTUAL_VALUE=$(docker inspect todayeng-app \
+                  --format '{{range .Config.Env}}{{println .}}{{end}}' \
+                  | sed -n 's/^FLYWAY_BASELINE_ON_MIGRATE=//p')
+
+                if [ "$ACTUAL_VALUE" = "false" ] && \
+                  curl --fail --silent --output /dev/null \
+                    http://127.0.0.1:8080/health; then
+                  return 0
+                fi
+
+                echo "Post-baseline verification ${verification_attempt}/30 failed."
+                sleep 5
+              done
+
+              docker logs --tail 200 todayeng-app
+              return 1
+            }
+
+            BASELINE_FLAG_PRESENT=false
+            if grep -q '^FLYWAY_BASELINE_ON_MIGRATE=' .env 2>/dev/null; then
+              BASELINE_FLAG_PRESENT=true
+            fi
+
             echo "Deploying image: ${{ env.IMAGE_TAG }}"
             echo "Target environment: Green"
 
@@ -153,6 +190,11 @@ jobs:
                 http://127.0.0.1:8080/health; then
 
                 echo "Green application health check passed."
+
+                if [ "$BASELINE_FLAG_PRESENT" = "true" ]; then
+                  reapply_flyway_baseline_disabled
+                  echo "Flyway baseline flag is disabled and application is healthy."
+                fi
 
                 IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
                   --env-file .env \
@@ -189,6 +231,43 @@ jobs:
 
             cd /opt/todayeng
 
+            cleanup_flyway_baseline_flag() {
+              cp .env .env.bak
+              sed -i '/^FLYWAY_BASELINE_ON_MIGRATE=/d' .env
+            }
+
+            reapply_flyway_baseline_disabled() {
+              cleanup_flyway_baseline_flag
+
+              FLYWAY_BASELINE_ON_MIGRATE=false IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
+                --env-file .env \
+                -f docker-compose.prod.yml \
+                up -d --force-recreate
+
+              for verification_attempt in $(seq 1 30); do
+                ACTUAL_VALUE=$(docker inspect todayeng-app \
+                  --format '{{range .Config.Env}}{{println .}}{{end}}' \
+                  | sed -n 's/^FLYWAY_BASELINE_ON_MIGRATE=//p')
+
+                if [ "$ACTUAL_VALUE" = "false" ] && \
+                  curl --fail --silent --output /dev/null \
+                    http://127.0.0.1:8080/health; then
+                  return 0
+                fi
+
+                echo "Post-baseline verification ${verification_attempt}/30 failed."
+                sleep 5
+              done
+
+              docker logs --tail 200 todayeng-app
+              return 1
+            }
+
+            BASELINE_FLAG_PRESENT=false
+            if grep -q '^FLYWAY_BASELINE_ON_MIGRATE=' .env 2>/dev/null; then
+              BASELINE_FLAG_PRESENT=true
+            fi
+
             echo "Deploying image: ${{ env.IMAGE_TAG }}"
             echo "Target environment: Blue"
 
@@ -209,6 +288,11 @@ jobs:
                 http://127.0.0.1:8080/health; then
 
                 echo "Blue application health check passed."
+
+                if [ "$BASELINE_FLAG_PRESENT" = "true" ]; then
+                  reapply_flyway_baseline_disabled
+                  echo "Flyway baseline flag is disabled and application is healthy."
+                fi
 
                 IMAGE_TAG=${{ env.IMAGE_TAG }} docker compose \
                   --env-file .env \
