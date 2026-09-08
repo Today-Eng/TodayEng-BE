@@ -4,6 +4,7 @@ import com.example.todayEng.domain.user.entity.enums.OAuthAuthorizationRequestSt
 import com.example.todayEng.domain.user.entity.enums.OAuthCallbackFailureStage;
 import com.example.todayEng.domain.user.entity.enums.OAuthCallbackFailureType;
 import com.example.todayEng.domain.user.repository.OAuthAuthorizationRequestRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -20,11 +21,12 @@ public class OAuthAuthorizationRequestRecoveryScheduler {
     private static final Duration PROCESSING_TIMEOUT = Duration.ofMinutes(15);
 
     private final OAuthAuthorizationRequestRepository repository;
+    private final Clock clock;
 
     @Scheduled(fixedDelayString = "${oauth.callback.recovery-interval-millis:60000}")
     @Transactional
     public void failStaleProcessingRequests() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         int updated = repository.failStaleProcessing(
                 OAuthAuthorizationRequestStatus.PROCESSING,
                 OAuthAuthorizationRequestStatus.FAILED,

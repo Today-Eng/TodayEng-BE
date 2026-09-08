@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Optional;
 
 public interface OAuthAuthorizationRequestRepository extends JpaRepository<OAuthAuthorizationRequest, Long> {
@@ -84,9 +85,12 @@ public interface OAuthAuthorizationRequestRepository extends JpaRepository<OAuth
     )
     @Query("""
             DELETE FROM OAuthAuthorizationRequest request
-            WHERE request.expiresAt < :threshold
+            WHERE request.expiresAt <= :threshold
+              AND request.status IN :deletableStatuses
             """)
     int deleteExpiredRequests(
-            @Param("threshold") LocalDateTime threshold
+            @Param("threshold") LocalDateTime threshold,
+            @Param("deletableStatuses")
+            Collection<OAuthAuthorizationRequestStatus> deletableStatuses
     );
 }
