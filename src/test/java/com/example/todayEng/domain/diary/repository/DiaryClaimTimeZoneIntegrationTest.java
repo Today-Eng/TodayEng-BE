@@ -33,7 +33,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * H2는 Connector/J의 변환을 재현하지 않아 이 경계를 잡지 못한다.
  */
 @Testcontainers(disabledWithoutDocker = true)
-@DataJpaTest
+@DataJpaTest(properties = {
+        "spring.flyway.enabled=true",
+        "spring.jpa.hibernate.ddl-auto=validate"
+})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class DiaryClaimTimeZoneIntegrationTest {
 
