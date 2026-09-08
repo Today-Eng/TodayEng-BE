@@ -121,6 +121,17 @@ jobs:
           echo "standby_color=${STANDBY_COLOR}" >> "$GITHUB_OUTPUT"
           echo "standby_backend=${STANDBY_BACKEND}" >> "$GITHUB_OUTPUT"
 
+      - name: Sync docker-compose.prod.yml to Green standby
+        if: steps.target.outputs.standby_color == 'green'
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.GREEN_VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: docker-compose.prod.yml
+          target: /opt/todayeng
+          overwrite: true
+
       - name: Deploy SHA image to Green standby
         if: steps.target.outputs.standby_color == 'green'
         uses: appleboy/ssh-action@v1
@@ -218,6 +229,17 @@ jobs:
             docker logs --tail 200 todayeng-app
 
             exit 1
+
+      - name: Sync docker-compose.prod.yml to Blue standby
+        if: steps.target.outputs.standby_color == 'blue'
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.BLUE_VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: docker-compose.prod.yml
+          target: /opt/todayeng
+          overwrite: true
 
       - name: Deploy SHA image to Blue standby
         if: steps.target.outputs.standby_color == 'blue'
