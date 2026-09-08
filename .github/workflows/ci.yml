@@ -42,20 +42,31 @@ jobs:
 
       - name: Verify MySQL migration test ran
         run: |
-          result="build/test-results/test/TEST-com.example.todayEng.global.config.FlywayMigrationIntegrationTest.xml"
-          test -f "$result"
-          python3 - "$result" <<'PY'
+          results=(
+            "build/test-results/test/TEST-com.example.todayEng.global.config.FlywayMigrationIntegrationTest.xml"
+            "build/test-results/test/TEST-com.example.todayEng.global.config.FlywayExistingSchemaBootIntegrationTest.xml"
+          )
+
+          for result in "${results[@]}"; do
+            test -f "$result"
+          done
+
+          python3 - "${results[@]}" <<'PY'
           import sys
           import xml.etree.ElementTree as ET
 
-          suite = ET.parse(sys.argv[1]).getroot()
-          counts = {
-              name: int(suite.attrib.get(name, "-1"))
-              for name in ("tests", "skipped", "failures", "errors")
-          }
+          for result_path in sys.argv[1:]:
+              suite = ET.parse(result_path).getroot()
+              counts = {
+                  name: int(suite.attrib.get(name, "-1"))
+                  for name in ("tests", "skipped", "failures", "errors")
+              }
 
-          if counts["tests"] < 1 or any(
-              counts[name] != 0 for name in ("skipped", "failures", "errors")
-          ):
-              raise SystemExit(f"MySQL migration test did not run successfully: {counts}")
+              if counts["tests"] < 1 or any(
+                  counts[name] != 0 for name in ("skipped", "failures", "errors")
+              ):
+                  raise SystemExit(
+                      f"MySQL migration test did not run successfully: "
+                      f"{result_path}: {counts}"
+                  )
           PY
