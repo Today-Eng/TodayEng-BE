@@ -123,7 +123,7 @@ jobs:
 
       - name: Sync docker-compose.prod.yml to Green standby
         if: steps.target.outputs.standby_color == 'green'
-        uses: appleboy/scp-action@v1
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1
         with:
           host: ${{ secrets.GREEN_VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
@@ -232,7 +232,7 @@ jobs:
 
       - name: Sync docker-compose.prod.yml to Blue standby
         if: steps.target.outputs.standby_color == 'blue'
-        uses: appleboy/scp-action@v1
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1
         with:
           host: ${{ secrets.BLUE_VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
