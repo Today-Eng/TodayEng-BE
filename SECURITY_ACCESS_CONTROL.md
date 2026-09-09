@@ -15,7 +15,7 @@
 | `GET /api/diaries/{diaryId}` | `DiaryQueryService.findByIdAndUserIdAndStatus` |
 | `POST /api/diaries/{diaryId}/contexts` | `DiaryContextService.findByIdAndUserId` 및 persistence claim |
 | `POST /api/diaries/{diaryId}/reflection-sessions` | `ReflectionQuestionPersistenceService.findByIdAndUserId` |
-| `GET /api/diaries/{diaryId}/questions`, `questions/next` | `DiaryQuestionQueryService.ownedDiary` |
+| `GET /api/diaries/{diaryId}/questions`, `GET /api/diaries/{diaryId}/questions/next` | `DiaryQuestionQueryService.ownedDiary` |
 | `POST /api/diaries/{diaryId}/questions/{questionId}/answers` | `AnswerPersistenceService.findByIdAndDiaryIdAndDiaryUserId` |
 | `GET /api/diaries/{diaryId}/answers` | `DiaryAnswerQueryService.validateOwner` |
 | `GET /api/diaries/{diaryId}/answers/{answerId}` | Diary 소유권 및 Answer-Diary 결속 확인 |
