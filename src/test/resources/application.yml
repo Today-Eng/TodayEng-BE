@@ -1,3 +1,27 @@
 spring:
+  profiles:
+    active: test
+  datasource:
+    url: jdbc:h2:mem:todayeng;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
   flyway:
     enabled: false
+
+jwt:
+  secret: todayeng-test-jwt-secret-key-for-isolated-tests-2026
+
+google:
+  client-id: test-google-client-id
+
+cors:
+  allowed-origins: http://localhost
+
+security:
+  oauth:
+    authorization-endpoint-permit-all: false
